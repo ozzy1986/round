@@ -3,6 +3,16 @@ Round (Raund) — Project Description
 
 Product name shown to users: "Round". Internal/codebase name: "raund".
 
+*** UPDATE THIS FILE AFTER EVERY PROJECT CHANGE. Keep it in sync with the codebase, features, and deployment. ***
+
+AFTER EVERY CHANGE (for AI and humans): (1) Sync to all four places — local (commit), GitHub (push origin main), GitLab (push gitlab main), VPS (SSH and run deploy-vps.sh). Exact steps: SYNC.txt. (2) Then update this file (PROJECT_DESCRIPTION.txt) so it reflects the change.
+
+CORE PRINCIPLES (MANDATORY)
+---------------------------
+1. Focus on security, speed, stability, scalability.
+2. DRY, KISS, SOLID.
+3. Test-driven development. All code should be covered with tests.
+
 
 1. WHAT IT IS
 --------------
@@ -107,13 +117,13 @@ Pure logic; no I/O. Used by backend (Telegram) and by Android (Kotlin reimplemen
 
 9. TELEGRAM BOT
 ---------------
-Commands:
-  /start   - welcome message (i18n by user language_code)
-  /profiles - list profiles from API (or hint to use /timer "3x5 1")
-  /timer <spec> - start timer. <spec> can be:
-    - "3x5 1" (template: N x work_min rest_min)
-    - "5 run, 5 walk" (custom rounds, minutes then name)
-    - profile name or ID from API
+UI: Button-based (inline keyboards). No need to type commands; user taps buttons.
+
+/start: Welcome message (i18n by user language_code) with two buttons: "Profiles", "Quick timer".
+  - Profiles: Lists profiles from API as buttons (emoji + name); tap to start that profile's timer. "Back" returns to main menu.
+  - Quick timer: Presets as buttons — e.g. 3×5+1, 5×3+1, "5 run, 5 walk". "Back" returns to main menu.
+Commands (still supported): /profiles (same list with buttons), /timer <spec> (with no arg shows main menu; with arg starts timer).
+<spec> for /timer: "3x5 1" (template), "5 run, 5 walk" (custom), or profile name/ID from API.
 
 Flow: runs timer-engine in process; every second calls advance(). On round_start and warn10, synthesizes speech via Google TTS and sends voice message. On training_end sends text "Training finished." One running timer per user (stored in memory).
 
@@ -170,15 +180,17 @@ VPS (production):
   bot           - tsx src/bot/run.ts (Telegram bot)
 
 
-14. QUALITY & SECURITY (from plan)
------------------------------------
-- Security: validate all input (Fastify schemas), parameterized queries only, no secrets in logs, .env not committed.
-- DRY/KISS/SOLID; shared timer core; TDD — Vitest with coverage (timer-engine 100%, others high).
+14. QUALITY & SECURITY
+-----------------------
+Aligned with CORE PRINCIPLES above: security, speed, stability, scalability; DRY, KISS, SOLID; TDD with full test coverage.
+- Validate all input (Fastify schemas), parameterized queries only, no secrets in logs, .env not committed.
+- Shared timer core; Vitest with coverage (timer-engine 100%, others high).
 - Offline-first and data validation. UI: minimal, big countdown, clear typography.
 
 
 15. SOURCE OF TRUTH
 -------------------
 This description is derived from the implementation plan and the current codebase.
+- After every change: sync to 4 places (local, GitHub, GitLab, VPS) then update this file. See "AFTER EVERY CHANGE" at top and SYNC.txt for exact sync commands.
 - One-time VPS setup and SSH key: ENV_CHECK.txt (VPS DEPLOY section).
-- How to sync local / GitHub / GitLab / VPS after changes: SYNC.txt (exact commands for AI or human).
+- How to sync: SYNC.txt (exact commands for AI or human).

@@ -34,7 +34,9 @@ EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
 
    This does: git pull, npm ci, npm run migrate:up, npm run build, pm2 restart round-api, pm2 restart round-bot, pm2 save.
 
-DONE. All four (local, GitHub, GitLab, VPS) are in sync.
+5. Update PROJECT_DESCRIPTION.txt so it reflects the change (for AI: update after every task).
+
+DONE. All four (local, GitHub, GitLab, VPS) are in sync, and the project description is up to date.
 
 NOTES
 -----
