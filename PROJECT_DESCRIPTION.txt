@@ -16,7 +16,7 @@ CORE PRINCIPLES (MANDATORY)
 
 1. WHAT IT IS
 --------------
-Interval timer for boxing, MMA, HIIT, running. Users define profiles: each profile has a name, an emoji, and an ordered list of rounds. Each round has a name (announced at start), duration in seconds, and an optional "warn 10 sec" (voice "X in 10 seconds" plus per-second tick in the last 10 seconds). One tap to start; app announces round names by voice and warnings. Works offline on the phone; syncs with the backend when online. Delivered as: backend API + Telegram bot, and an Android app.
+Interval timer for boxing, MMA, HIIT, running. Users define profiles: each profile has a name, an emoji, and an ordered list of rounds. Each round has a name (announced at start), duration in seconds, and an optional "warn 10 sec" (voice "X in 10 seconds" plus per-second tick in the last 10 seconds). One tap to start; app announces round names by voice and warnings. Works offline on the phone; syncs with the backend when online. Delivered as: backend API + Telegram bot (both run on the VPS), and an Android app that connects to the VPS server.
 
 
 2. KEY FEATURES (from plan)
@@ -31,8 +31,9 @@ Interval timer for boxing, MMA, HIIT, running. Users define profiles: each profi
 
 3. ARCHITECTURE
 ---------------
+- Server: API and Telegram bot run on the VPS (round.ozzy1986.com). The Android app and Telegram users connect to this server. The local machine is for development only (running backend/bot locally, emulator).
 - Backend (this repo): Node.js, TypeScript, Fastify, PostgreSQL. REST API for profiles and rounds CRUD. Telegram bot (Telegraf) runs the same timer logic and sends TTS voice messages. Timer engine is a shared pure TS module (no I/O).
-- Android app: in subfolder android/. Kotlin, Jetpack Compose, Room for local storage, Retrofit for sync with backend. Timer runs locally with same event contract; TTS and optional tick sounds.
+- Android app: in subfolder android/. Kotlin, Jetpack Compose, Room for local storage, Retrofit for sync with backend on VPS. Timer runs locally with same event contract; TTS and optional tick sounds.
 - Shared timer contract: events emitted are round_start, tick (remainingSeconds), warn10, round_end, training_end. Backend uses the TS engine; Android reimplements the same logic in Kotlin.
 
 
@@ -66,7 +67,7 @@ raund/
     i18n/               - en.json, ru.json, index.ts (getString, localeFromTelegram)
   migrations/           - node-pg-migrate .cjs files (profiles + rounds tables)
   tests/                - Vitest: db/, routes/, timer-engine/, bot/, i18n/
-  scripts/              - run-migrate.ts, run-timer-demo.ts, test-pg.js, deploy-vps.sh (run on VPS), deploy.ps1 (local push + SSH deploy)
+  scripts/              - run-migrate.ts, run-timer-demo.ts, test-pg.js, deploy-vps.sh (run on VPS), deploy.ps1 (local push + SSH deploy), build-apk.ps1 (build Android APK, copy to root as Round-debug.apk)
   deploy/               - nginx-round.ozzy1986.com.conf (Nginx vhost for VPS)
   android/              - Android app (Compose, Room, Retrofit, timer screen)
   package.json, tsconfig.json, vitest.config.ts, .env.example, .gitignore (.env, dist/, coverage/)
@@ -127,16 +128,21 @@ Commands (still supported): /profiles (same list with buttons), /timer <spec> (w
 
 Flow: runs timer-engine in process; every second calls advance(). On round_start and warn10, synthesizes speech via Google TTS and sends voice message. On training_end sends text "Training finished." One running timer per user (stored in memory).
 
-Env: TELEGRAM_BOT_TOKEN required. Optional: GOOGLE_APPLICATION_CREDENTIALS for TTS; API_URL (default http://127.0.0.1:3001) for /profiles and loading profile by name.
+Env: TELEGRAM_BOT_TOKEN required. On VPS, API_URL is set so the bot talks to the local API (127.0.0.1:3001). Optional: GOOGLE_APPLICATION_CREDENTIALS for TTS.
 
 
 10. ANDROID APP
 ---------------
 Location: android/ (Gradle, Kotlin, Compose).
 
-Screens: profile list, profile/round editor (name, emoji, rounds with name/duration/warn10), timer (big countdown, current round name and emoji, TTS). One-tap start. Data in Room; sync with backend when online (Retrofit). Timer: same event contract; TTS for round name and "X in 10 seconds". i18n: values/strings.xml (EN), values-ru/strings.xml (RU).
+Screens: profile list, profile/round editor (name, emoji, rounds with name/duration/warn10), timer (big countdown, current round name and emoji, TTS). One-tap start. Data in Room; sync with backend on VPS when online (Retrofit). Timer: same event contract; TTS for round name and "X in 10 seconds". i18n: values/strings.xml (EN), values-ru/strings.xml (RU).
 
-Package: com.raund.app. API base URL in RaundApplication (e.g. http://10.0.2.2:3001/ for emulator).
+Package: com.raund.app. API base URL in RaundApplication points to the VPS: http://round.ozzy1986.com:8080/ (for real device / phone). For Android emulator only use http://10.0.2.2:3001/.
+
+Testing on phone: build an APK and install it on the device.
+  - Command line: from project root run "scripts\build-apk.ps1" (or "cd android && .\gradlew.bat assembleDebug"). The script copies the APK to the project root as Round-debug.apk for easy transfer.
+  - Android Studio: open the android/ folder as project, then Build > Build Bundle(s) / APK(s) > Build APK(s). Output: android/app/build/outputs/apk/debug/app-debug.apk.
+  - Transfer: copy Round-debug.apk (or app-debug.apk) to the phone via USB, cloud, or email. Open the file on the phone to install (enable "Install from unknown sources" if prompted). No app store required.
 
 
 11. I18N
@@ -148,7 +154,9 @@ Android: res/values/strings.xml, res/values-ru/strings.xml.
 
 12. ENVIRONMENT & DEPLOYMENT
 ----------------------------
-Local (dev):
+Production server: the VPS at round.ozzy1986.com. The Android app and Telegram bot use this server. The local machine is for development only (running backend/bot locally, building the app, emulator).
+
+Local (dev only):
   - Node.js, npm. PostgreSQL (e.g. host 127.0.0.1, port 5432, user postgres, database raund or round).
   - .env: PG_* or DATABASE_URL, PORT=3001, TELEGRAM_BOT_TOKEN (optional for bot), GOOGLE_APPLICATION_CREDENTIALS (optional for TTS).
   - npm run migrate:up, npm run dev (or npm run build && npm start).
@@ -159,7 +167,7 @@ Git remotes (4-way sync):
   - gitlab  = GitLab  (https://gitlab.com/ozzy1986/round.git)
   - Workflow: commit locally -> push origin main -> push gitlab main -> deploy on VPS (see below). .env is not in the repo and is not overwritten on deploy.
 
-VPS (production):
+VPS (production server):
   - Domain: round.ozzy1986.com (A record to VPS IP). Apache on 80; Nginx on 8080.
   - App dir: /var/www/round.ozzy1986.com (git clone from GitHub). .env in app root (PG_USER=round, PG_DATABASE=round, PORT=3001, HOST=127.0.0.1, TELEGRAM_BOT_TOKEN); .env persists across deploys.
   - Nginx: config in deploy/nginx-round.ozzy1986.com.conf (listen 8080, server_name round.ozzy1986.com, proxy_pass to 127.0.0.1:3001). On server, use /etc/nginx/sites-available/ copy or symlink; only one server block per server_name on 8080.

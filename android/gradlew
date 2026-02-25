@@ -1,0 +1,7 @@
+#!/bin/sh
+# Gradle start up script for POSIX.
+# Use gradlew.bat on Windows. On Unix: chmod +x gradlew && ./gradlew assembleDebug
+
+set -e
+APP_HOME=$( cd -P "${0%/*}/." > /dev/null && pwd )
+exec java -Dorg.gradle.appname=gradlew -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$@"

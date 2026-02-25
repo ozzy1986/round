@@ -11,7 +11,7 @@ class RaundApplication : Application() {
     val database by lazy { AppDatabase.get(this) }
     val api by lazy {
         Retrofit.Builder()
-            .baseUrl("http://10.0.2.2:3001/")
+            .baseUrl("http://round.ozzy1986.com:8080/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)
