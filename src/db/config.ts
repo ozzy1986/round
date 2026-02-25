@@ -8,7 +8,7 @@ export function getDbConfig(): { connectionString: string } {
   const host = process.env.PG_HOST ?? '127.0.0.1';
   const port = process.env.PG_PORT ?? '5432';
   const user = process.env.PG_USER ?? 'postgres';
-  const password = process.env.PG_PASSWORD ?? '';
+  const password = String(process.env.PG_PASSWORD ?? '');
   const database = process.env.PG_DATABASE ?? 'raund';
   const encoded = encodeURIComponent(password);
   return {
