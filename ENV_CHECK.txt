@@ -23,12 +23,18 @@ BACKEND
 VPS DEPLOY (round.ozzy1986.com, 162.246.19.78)
 -----------------------------------------------
 Remotes: origin = GitHub (https://github.com/ozzy1986/round.git), gitlab = GitLab (https://gitlab.com/ozzy1986/round.git).
-Sync workflow: edit locally -> commit -> push origin main -> push gitlab main -> on VPS run scripts/deploy-vps.sh (or use scripts/deploy.ps1 after setting SSH key).
+Sync workflow: edit locally -> commit -> push origin main -> push gitlab main -> on VPS run: cd /var/www/round.ozzy1986.com && bash scripts/deploy-vps.sh
 
-One-time VPS setup (if not done):
-- Clone: git clone https://github.com/ozzy1986/round.git /var/www/round.ozzy1986.com
-- .env in app root (PG_USER=round, PG_DATABASE=round, PORT=3001, HOST=127.0.0.1, TELEGRAM_BOT_TOKEN=...). Already on server.
-- Nginx: symlink deploy/nginx-round.ozzy1986.com.conf to /etc/nginx/sites-enabled/, then nginx -t && systemctl reload nginx.
-- App: npm ci, npm run migrate:up, npm run build, pm2 start dist/src/server.js --name round-api, pm2 save.
+Domain (round.ozzy1986.com): In your DNS at the hosting where the domain is managed, add an A record: name = round (or round.ozzy1986 if your panel uses full subdomain), value = 162.246.19.78. Then round.ozzy1986.com will resolve to this VPS. No other DNS change needed for the app.
+
+One-time VPS setup (directory must be a git clone):
+- If /var/www/round.ozzy1986.com exists but is NOT a git repo: backup .env, then remove the dir and clone fresh:
+    cp /var/www/round.ozzy1986.com/.env /root/round.env.bak 2>/dev/null || true
+    rm -rf /var/www/round.ozzy1986.com
+    git clone https://github.com/ozzy1986/round.git /var/www/round.ozzy1986.com
+    cp /root/round.env.bak /var/www/round.ozzy1986.com/.env 2>/dev/null || true
+- .env in app root: PG_USER=round, PG_DATABASE=round, PORT=3001, HOST=127.0.0.1, TELEGRAM_BOT_TOKEN=...
+- Nginx: only ONE config for server_name "round.ozzy1986.com" on 8080. Remove duplicates in /etc/nginx/sites-enabled/ (e.g. ls -la, rm the duplicate), then: ln -sf /var/www/round.ozzy1986.com/deploy/nginx-round.ozzy1986.com.conf /etc/nginx/sites-enabled/ ; nginx -t && systemctl reload nginx
+- App: cd /var/www/round.ozzy1986.com && npm ci && npm run migrate:up && npm run build && pm2 start dist/src/server.js --name round-api && pm2 save
 
 SSH key (for deploy.ps1 from this machine): run in Git Bash or WSL: ssh-copy-id root@162.246.19.78
