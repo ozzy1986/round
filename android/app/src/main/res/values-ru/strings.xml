@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Раунд</string>
+    <string name="profiles">Профили</string>
+    <string name="add_profile">Добавить профиль</string>
+    <string name="profile_name">Название</string>
+    <string name="profile_emoji">Эмодзи</string>
+    <string name="rounds">Раунды</string>
+    <string name="round_name">Название раунда</string>
+    <string name="duration_seconds">Длительность (сек)</string>
+    <string name="warn_10_sec">Предупредить за 10 сек</string>
+    <string name="start_timer">Старт</string>
+    <string name="timer_finished">Тренировка завершена</string>
+    <string name="save">Сохранить</string>
+    <string name="delete">Удалить</string>
+</resources>

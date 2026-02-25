@@ -1,0 +1,10 @@
+{
+  "bot.welcome": "Round — interval timer. Send /profiles to list profiles, /timer <name or \"3x5 1\"> to start.",
+  "bot.profiles_empty": "No profiles yet. Create one via the app or use /timer \"3x5 1\" for 3 rounds of 5 min work + 1 min rest.",
+  "bot.timer_starting": "Starting: {name}",
+  "bot.timer_round": "{name}",
+  "bot.timer_warn10": "{name} in 10 seconds",
+  "bot.timer_finished": "Training finished.",
+  "bot.profile_not_found": "Profile not found.",
+  "bot.error": "Something went wrong."
+}

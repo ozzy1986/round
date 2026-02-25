@@ -1,0 +1,21 @@
+Raund project – environment check (run from project root)
+
+DONE
+----
+- Node.js: v22.15.0 (npm 10.9.2) – OK
+- PostgreSQL: port 5432, user postgres (trust), database "raund" created – OK
+- Backend project: D:\laragon\www\raund
+- Nginx: sites-enabled\raund.test.conf (raund.test -> 127.0.0.1:3001), ozzb2b.test.conf (ozzb2b). No script needed.
+
+YOU NEED TO DO
+--------------
+1. Android build (for building the app later):
+   - Java: not in PATH. Install JDK 17 (e.g. https://adoptium.net/) and add to PATH,
+     OR install Android Studio (includes JDK).
+   - Android SDK: only platform-tools present. For full builds install Android Studio
+     and install SDK platforms (e.g. API 34) + build-tools via SDK Manager.
+
+BACKEND
+-------
+- Start API (when implemented): listen on 3001 so Nginx can proxy raund.test to it.
+- DB connection: host=127.0.0.1 port=5432 user=postgres password= database=raund

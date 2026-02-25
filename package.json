@@ -1,0 +1,38 @@
+{
+  "name": "raund",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "bot": "tsx src/bot/run.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "migrate:up": "tsx scripts/run-migrate.ts up",
+    "migrate:down": "tsx scripts/run-migrate.ts down",
+    "migrate:create": "node-pg-migrate create"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Interval timer for boxing, MMA, HIIT, running",
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^6.4.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.1.0",
+    "pg": "^8.18.0",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/pg": "^8.11.10",
+    "@vitest/coverage-v8": "^2.1.6",
+    "node-pg-migrate": "^6.2.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.6"
+  }
+}

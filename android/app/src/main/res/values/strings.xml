@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Round</string>
+    <string name="profiles">Profiles</string>
+    <string name="add_profile">Add profile</string>
+    <string name="profile_name">Name</string>
+    <string name="profile_emoji">Emoji</string>
+    <string name="rounds">Rounds</string>
+    <string name="round_name">Round name</string>
+    <string name="duration_seconds">Duration (sec)</string>
+    <string name="warn_10_sec">Warn 10 sec</string>
+    <string name="start_timer">Start</string>
+    <string name="timer_finished">Training finished</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+</resources>

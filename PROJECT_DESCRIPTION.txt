@@ -1,0 +1,174 @@
+Round (Raund) — Project Description
+===================================
+
+Product name shown to users: "Round". Internal/codebase name: "raund".
+
+
+1. WHAT IT IS
+--------------
+Interval timer for boxing, MMA, HIIT, running. Users define profiles: each profile has a name, an emoji, and an ordered list of rounds. Each round has a name (announced at start), duration in seconds, and an optional "warn 10 sec" (voice "X in 10 seconds" plus per-second tick in the last 10 seconds). One tap to start; app announces round names by voice and warnings. Works offline on the phone; syncs with the backend when online. Delivered as: backend API + Telegram bot, and an Android app.
+
+
+2. KEY FEATURES (from plan)
+---------------------------
+- Profiles: name, user-chosen emoji, list of rounds (order matters).
+- Round: name (spoken at start), durationSeconds, warn10sec (voice "X in 10 sec" + tick each second).
+- Quick entry: template "N x (work + rest)" generates N pairs (e.g. "3x5 1" = 3 x (5 min work + 1 min rest)); custom rounds (e.g. "5 run, 5 walk, 4 run, 15 walk").
+- Timer screen: big countdown + current round emoji (profile emoji or round-based).
+- i18n: EN + RU from start; strings in backend and Android resources.
+- Offline-first: Android works without network; backend used for sync and Telegram.
+
+
+3. ARCHITECTURE
+---------------
+- Backend (this repo): Node.js, TypeScript, Fastify, PostgreSQL. REST API for profiles and rounds CRUD. Telegram bot (Telegraf) runs the same timer logic and sends TTS voice messages. Timer engine is a shared pure TS module (no I/O).
+- Android app: in subfolder android/. Kotlin, Jetpack Compose, Room for local storage, Retrofit for sync with backend. Timer runs locally with same event contract; TTS and optional tick sounds.
+- Shared timer contract: events emitted are round_start, tick (remainingSeconds), warn10, round_end, training_end. Backend uses the TS engine; Android reimplements the same logic in Kotlin.
+
+
+4. TECH STACK (as implemented)
+-------------------------------
+Backend:
+  - Runtime: Node.js (ESM)
+  - Language: TypeScript
+  - HTTP: Fastify
+  - DB: PostgreSQL, driver "pg"
+  - Migrations: node-pg-migrate (migrations in migrations/*.cjs)
+  - Tests: Vitest, coverage with v8
+  - Bot: Telegraf; TTS: @google-cloud/text-to-speech (free tier)
+
+Android:
+  - Kotlin 1.9+, Jetpack Compose, Material 3
+  - Room (SQLite), Retrofit + Gson
+  - Min SDK 26, target/compile 35
+  - Build: Gradle 8.9
+
+
+5. REPOSITORY LAYOUT
+--------------------
+raund/
+  src/
+    server.ts           - Fastify app, listens PORT (default 3001)
+    routes/             - profiles.ts, rounds.ts (CRUD)
+    db/                 - config, pool, types, profiles, rounds queries
+    timer-engine/       - types.ts, index.ts (getInitialState, advance, runToCompletion)
+    bot/                - index.ts (Telegraf), parser.ts (3x5 1, custom rounds), tts.ts (Google TTS), run.ts
+    i18n/               - en.json, ru.json, index.ts (getString, localeFromTelegram)
+  migrations/           - node-pg-migrate .cjs files (profiles + rounds tables)
+  tests/                - Vitest: db/, routes/, timer-engine/, bot/, i18n/
+  scripts/              - run-migrate.ts, run-timer-demo.ts, test-pg.js
+  android/              - Android app (Compose, Room, Retrofit, timer screen)
+  package.json, tsconfig.json, vitest.config.ts, .env.example
+
+
+6. DATA MODEL (PostgreSQL)
+--------------------------
+profiles:
+  id (uuid, PK), name (text), emoji (text), user_id (text, nullable), created_at, updated_at (timestamptz)
+
+rounds:
+  id (uuid, PK), profile_id (uuid, FK -> profiles, CASCADE), name (text), duration_seconds (int), warn10sec (boolean), position (int)
+  Index on profile_id; unique (profile_id, position).
+
+Auth: not implemented yet (user_id nullable; API is anonymous).
+
+
+7. API ENDPOINTS
+---------------
+  GET    /profiles              - list all profiles
+  GET    /profiles/:id          - get profile with rounds (404 if not found)
+  POST   /profiles              - create profile (body: name, emoji)
+  PATCH  /profiles/:id          - update profile (body: name?, emoji?)
+  DELETE /profiles/:id          - delete profile (cascades to rounds)
+
+  GET    /profiles/:id/rounds   - list rounds for profile (ordered by position)
+  POST   /profiles/:id/rounds   - create round (body: name, duration_seconds, warn10sec?, position)
+  PATCH  /rounds/:roundId      - update round
+  DELETE /rounds/:roundId      - delete round
+
+All request/response bodies validated via Fastify JSON schema. UUIDs in path.
+
+
+8. TIMER ENGINE (shared logic)
+------------------------------
+Input: TimerProfile { name, emoji, rounds: [{ name, durationSeconds, warn10sec }] }.
+Output: stream of events (callback or advance() per second).
+
+Events:
+  round_start  - start of a round (roundIndex, round, totalRounds)
+  tick         - every second (roundIndex, round, remainingSeconds, totalRounds)
+  warn10       - when remainingSeconds === 10 and warn10sec (roundIndex, round, totalRounds)
+  round_end    - end of round
+  training_end - all rounds done
+
+Pure logic; no I/O. Used by backend (Telegram) and by Android (Kotlin reimplementation).
+
+
+9. TELEGRAM BOT
+---------------
+Commands:
+  /start   - welcome message (i18n by user language_code)
+  /profiles - list profiles from API (or hint to use /timer "3x5 1")
+  /timer <spec> - start timer. <spec> can be:
+    - "3x5 1" (template: N x work_min rest_min)
+    - "5 run, 5 walk" (custom rounds, minutes then name)
+    - profile name or ID from API
+
+Flow: runs timer-engine in process; every second calls advance(). On round_start and warn10, synthesizes speech via Google TTS and sends voice message. On training_end sends text "Training finished." One running timer per user (stored in memory).
+
+Env: TELEGRAM_BOT_TOKEN required. Optional: GOOGLE_APPLICATION_CREDENTIALS for TTS; API_URL (default http://127.0.0.1:3001) for /profiles and loading profile by name.
+
+
+10. ANDROID APP
+---------------
+Location: android/ (Gradle, Kotlin, Compose).
+
+Screens: profile list, profile/round editor (name, emoji, rounds with name/duration/warn10), timer (big countdown, current round name and emoji, TTS). One-tap start. Data in Room; sync with backend when online (Retrofit). Timer: same event contract; TTS for round name and "X in 10 seconds". i18n: values/strings.xml (EN), values-ru/strings.xml (RU).
+
+Package: com.raund.app. API base URL in RaundApplication (e.g. http://10.0.2.2:3001/ for emulator).
+
+
+11. I18N
+--------
+Backend/bot: src/i18n/ — en.json, ru.json (key -> string). getString(locale, key, params?). localeFromTelegram(langCode) -> 'en' | 'ru'. Bot uses Telegram user language_code.
+
+Android: res/values/strings.xml, res/values-ru/strings.xml.
+
+
+12. ENVIRONMENT & DEPLOYMENT
+----------------------------
+Local (dev):
+  - Node.js, npm. PostgreSQL (e.g. host 127.0.0.1, port 5432, user postgres, database raund or round).
+  - .env: PG_* or DATABASE_URL, PORT=3001, TELEGRAM_BOT_TOKEN (optional for bot), GOOGLE_APPLICATION_CREDENTIALS (optional for TTS).
+  - npm run migrate:up, npm run dev (or npm run build && node dist/src/server.js).
+  - Optional: Nginx or similar to proxy a hostname to 3001.
+
+VPS (production, as used):
+  - Apache remains on port 80 for WordPress. Nginx installed and listens on port 8080 only.
+  - Nginx site: round.ozzy1986.com (or similar) listen 8080; proxy_pass to http://127.0.0.1:3001.
+  - PostgreSQL: user and database named "round"; app .env uses PG_USER=round, PG_DATABASE=round.
+  - App directory: e.g. /var/www/round.ozzy1986.com. Run: npm install, npm run migrate:up, npm run build; start with node dist/src/server.js or PM2 (pm2 start dist/src/server.js --name round-api).
+
+
+13. NPM SCRIPTS
+---------------
+  build         - tsc (output under dist/src/)
+  start         - node dist/server.js (note: actual entry is dist/src/server.js)
+  dev           - tsx watch src/server.ts
+  test          - vitest run
+  test:coverage - vitest run --coverage
+  migrate:up    - tsx scripts/run-migrate.ts up (uses PG_* or DATABASE_URL from .env)
+  migrate:down  - tsx scripts/run-migrate.ts down
+  bot           - tsx src/bot/run.ts (Telegram bot)
+
+
+14. QUALITY & SECURITY (from plan)
+-----------------------------------
+- Security: validate all input (Fastify schemas), parameterized queries only, no secrets in logs, .env not committed.
+- DRY/KISS/SOLID; shared timer core; TDD — Vitest with coverage (timer-engine 100%, others high).
+- Offline-first and data validation. UI: minimal, big countdown, clear typography.
+
+
+15. SOURCE OF TRUTH
+-------------------
+Implementation plan: PLAN.txt (this description is derived from it and from the current codebase).
