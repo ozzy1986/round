@@ -56,9 +56,10 @@ raund/
     i18n/               - en.json, ru.json, index.ts (getString, localeFromTelegram)
   migrations/           - node-pg-migrate .cjs files (profiles + rounds tables)
   tests/                - Vitest: db/, routes/, timer-engine/, bot/, i18n/
-  scripts/              - run-migrate.ts, run-timer-demo.ts, test-pg.js
+  scripts/              - run-migrate.ts, run-timer-demo.ts, test-pg.js, deploy-vps.sh (run on VPS), deploy.ps1 (local push + SSH deploy)
+  deploy/               - nginx-round.ozzy1986.com.conf (Nginx vhost for VPS)
   android/              - Android app (Compose, Room, Retrofit, timer screen)
-  package.json, tsconfig.json, vitest.config.ts, .env.example
+  package.json, tsconfig.json, vitest.config.ts, .env.example, .gitignore (.env, dist/, coverage/)
 
 
 6. DATA MODEL (PostgreSQL)
@@ -140,20 +141,26 @@ Android: res/values/strings.xml, res/values-ru/strings.xml.
 Local (dev):
   - Node.js, npm. PostgreSQL (e.g. host 127.0.0.1, port 5432, user postgres, database raund or round).
   - .env: PG_* or DATABASE_URL, PORT=3001, TELEGRAM_BOT_TOKEN (optional for bot), GOOGLE_APPLICATION_CREDENTIALS (optional for TTS).
-  - npm run migrate:up, npm run dev (or npm run build && node dist/src/server.js).
+  - npm run migrate:up, npm run dev (or npm run build && npm start).
   - Optional: Nginx or similar to proxy a hostname to 3001.
 
-VPS (production, as used):
-  - Apache remains on port 80 for WordPress. Nginx installed and listens on port 8080 only.
-  - Nginx site: round.ozzy1986.com (or similar) listen 8080; proxy_pass to http://127.0.0.1:3001.
-  - PostgreSQL: user and database named "round"; app .env uses PG_USER=round, PG_DATABASE=round.
-  - App directory: e.g. /var/www/round.ozzy1986.com. Run: npm install, npm run migrate:up, npm run build; start with node dist/src/server.js or PM2 (pm2 start dist/src/server.js --name round-api).
+Git remotes (4-way sync):
+  - origin  = GitHub  (https://github.com/ozzy1986/round.git)
+  - gitlab  = GitLab  (https://gitlab.com/ozzy1986/round.git)
+  - Workflow: commit locally -> push origin main -> push gitlab main -> deploy on VPS (see below). .env is not in the repo and is not overwritten on deploy.
+
+VPS (production):
+  - Domain: round.ozzy1986.com (A record to VPS IP). Apache on 80; Nginx on 8080.
+  - App dir: /var/www/round.ozzy1986.com (git clone from GitHub). .env in app root (PG_USER=round, PG_DATABASE=round, PORT=3001, HOST=127.0.0.1, TELEGRAM_BOT_TOKEN); .env persists across deploys.
+  - Nginx: config in deploy/nginx-round.ozzy1986.com.conf (listen 8080, server_name round.ozzy1986.com, proxy_pass to 127.0.0.1:3001). On server, use /etc/nginx/sites-available/ copy or symlink; only one server block per server_name on 8080.
+  - Deploy: on VPS run "cd /var/www/round.ozzy1986.com && bash scripts/deploy-vps.sh" (git pull, npm ci, migrate:up, build, pm2 restart round-api). From local PC: scripts/deploy.ps1 (push both remotes then SSH and run deploy-vps.sh); requires SSH key from PC to VPS (ssh-copy-id root@VPS_IP).
+  - PM2 app name: round-api. PostgreSQL user and database: round.
 
 
 13. NPM SCRIPTS
 ---------------
   build         - tsc (output under dist/src/)
-  start         - node dist/server.js (note: actual entry is dist/src/server.js)
+  start         - node dist/src/server.js
   dev           - tsx watch src/server.ts
   test          - vitest run
   test:coverage - vitest run --coverage
@@ -171,4 +178,4 @@ VPS (production, as used):
 
 15. SOURCE OF TRUTH
 -------------------
-Implementation plan: PLAN.txt (this description is derived from it and from the current codebase).
+This description is derived from the implementation plan and the current codebase. For one-time VPS setup and SSH key steps, see ENV_CHECK.txt (VPS DEPLOY section).
