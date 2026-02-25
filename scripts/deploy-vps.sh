@@ -14,4 +14,9 @@ if pm2 describe round-api >/dev/null 2>&1; then
 else
   pm2 start dist/src/server.js --name round-api
 fi
+if pm2 describe round-bot >/dev/null 2>&1; then
+  pm2 restart round-bot --update-env
+else
+  pm2 start dist/src/bot/run.js --name round-bot
+fi
 pm2 save
