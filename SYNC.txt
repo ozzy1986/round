@@ -1,0 +1,43 @@
+4-WAY SYNC — FOR AI / NEXT SESSION
+==================================
+After any task that changes code or config, sync to: LOCAL, GITHUB, GITLAB, VPS.
+Read this file to perform the full sync.
+
+REPOSITORY
+----------
+  Branch:    main
+  Origin:    https://github.com/ozzy1986/round.git   (git push origin main)
+  GitLab:    https://gitlab.com/ozzy1986/round.git   (git push gitlab main)
+
+VPS
+---
+  Host:      root@162.246.19.78
+  App dir:   /var/www/round.ozzy1986.com
+  SSH key from this machine to VPS must be set up (passwordless). .env lives on VPS only; not in repo; not overwritten on deploy.
+
+EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
+--------------------------------------------------------------
+1. Local
+   - Edit files, run tests (npm test), run migrations if needed (npm run migrate:up).
+   - Stage and commit:
+     git add -A
+     git commit -m "Your message"
+
+2. Push to GitHub
+   git push origin main
+
+3. Push to GitLab
+   git push gitlab main
+
+4. Deploy on VPS (SSH and run deploy script)
+   ssh -o BatchMode=yes root@162.246.19.78 "cd /var/www/round.ozzy1986.com && bash scripts/deploy-vps.sh"
+
+   This does: git pull, npm ci, npm run migrate:up, npm run build, pm2 restart round-api, pm2 restart round-bot, pm2 save.
+
+DONE. All four (local, GitHub, GitLab, VPS) are in sync.
+
+NOTES
+-----
+- Do not commit .env. It is in .gitignore.
+- To change secrets on VPS (e.g. TELEGRAM_BOT_TOKEN), edit /var/www/round.ozzy1986.com/.env on the server (e.g. via SSH), then restart: ssh root@162.246.19.78 "pm2 restart round-api round-bot".
+- One-time VPS setup (clone, Nginx, PM2): see ENV_CHECK.txt section "VPS DEPLOY".

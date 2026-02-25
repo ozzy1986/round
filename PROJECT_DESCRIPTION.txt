@@ -153,8 +153,9 @@ VPS (production):
   - Domain: round.ozzy1986.com (A record to VPS IP). Apache on 80; Nginx on 8080.
   - App dir: /var/www/round.ozzy1986.com (git clone from GitHub). .env in app root (PG_USER=round, PG_DATABASE=round, PORT=3001, HOST=127.0.0.1, TELEGRAM_BOT_TOKEN); .env persists across deploys.
   - Nginx: config in deploy/nginx-round.ozzy1986.com.conf (listen 8080, server_name round.ozzy1986.com, proxy_pass to 127.0.0.1:3001). On server, use /etc/nginx/sites-available/ copy or symlink; only one server block per server_name on 8080.
-  - Deploy: on VPS run "cd /var/www/round.ozzy1986.com && bash scripts/deploy-vps.sh" (git pull, npm ci, migrate:up, build, pm2 restart round-api). From local PC: scripts/deploy.ps1 (push both remotes then SSH and run deploy-vps.sh); requires SSH key from PC to VPS (ssh-copy-id root@VPS_IP).
-  - PM2 app name: round-api. PostgreSQL user and database: round.
+  - Deploy: on VPS run "cd /var/www/round.ozzy1986.com && bash scripts/deploy-vps.sh" (git pull, npm ci, migrate:up, build, pm2 restart round-api and round-bot). From local PC: scripts/deploy.ps1 (push both remotes then SSH and run deploy-vps.sh); requires SSH key from PC to VPS (ssh-copy-id root@VPS_IP).
+  - PM2: round-api (HTTP server), round-bot (Telegram bot). PostgreSQL user and database: round.
+  - For step-by-step sync procedure (for AI/next session), see SYNC.txt.
 
 
 13. NPM SCRIPTS
@@ -178,4 +179,6 @@ VPS (production):
 
 15. SOURCE OF TRUTH
 -------------------
-This description is derived from the implementation plan and the current codebase. For one-time VPS setup and SSH key steps, see ENV_CHECK.txt (VPS DEPLOY section).
+This description is derived from the implementation plan and the current codebase.
+- One-time VPS setup and SSH key: ENV_CHECK.txt (VPS DEPLOY section).
+- How to sync local / GitHub / GitLab / VPS after changes: SYNC.txt (exact commands for AI or human).
