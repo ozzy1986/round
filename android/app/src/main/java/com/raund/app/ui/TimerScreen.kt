@@ -1,8 +1,11 @@
 package com.raund.app.ui
 
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -74,44 +77,68 @@ fun TimerScreen(
         onDispose { ttsEngine?.shutdown() }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        contentAlignment = Alignment.Center
+    var tickTone by remember { mutableStateOf<ToneGenerator?>(null) }
+    DisposableEffect(context) {
+        val tg = try {
+            ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+        } catch (e: Exception) {
+            null
+        }
+        tickTone = tg
+        onDispose {
+            tg?.release()
+            tickTone = null
+        }
+    }
+
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
+        val maxHeight = maxHeight
+        val timerFontSize = (maxHeight.value / 4.2f).sp.coerceIn(80.sp, 200.sp)
+        val emojiFontSize = (maxHeight.value / 6f).sp.coerceIn(48.sp, 120.sp)
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
+            verticalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxSize()
         ) {
-            Text(profile?.emoji ?: "⏱", fontSize = 64.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                profile?.name ?: "",
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                currentRound,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-            if (roundInfo.isNotEmpty()) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
-                    roundInfo,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    profile?.emoji ?: "⏱",
+                    fontSize = emojiFontSize,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Text(
+                    profile?.name ?: "",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    currentRound,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                if (roundInfo.isNotEmpty()) {
+                    Text(
+                        roundInfo,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "%02d:%02d".format(remaining / 60, remaining % 60),
+                    fontSize = timerFontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                "%02d:%02d".format(remaining / 60, remaining % 60),
-                fontSize = 80.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(24.dp))
             if (finished) {
                 Text(
                     timerFinishedText,
@@ -134,7 +161,12 @@ fun TimerScreen(
                                         roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
                                         tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, null, null)
                                     }
-                                    is TimerEvent.Tick -> remaining = event.remainingSeconds
+                                    is TimerEvent.Tick -> {
+                                        remaining = event.remainingSeconds
+                                        if (event.round.warn10sec && event.remainingSeconds in 1..10) {
+                                            tickTone?.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
+                                        }
+                                    }
                                     is TimerEvent.Warn10 -> {
                                         val msg = warn10Template.format(event.round.name)
                                         tts?.speak(msg, TextToSpeech.QUEUE_ADD, null, null)
