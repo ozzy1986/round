@@ -1,0 +1,44 @@
+To build the APK when Google URLs are blocked, download these files (via VPN, mirror, or another PC) and place them in the local Maven folder. Gradle will use them first.
+
+=== 1. Android Gradle Plugin (required) ===
+
+Gradle resolves plugin id "com.android.application" to this artifact. Create the folder:
+  android/local-maven/com/android/application/com.android.application.gradle.plugin/8.7.2/
+
+Then download (from a network where Google is allowed) and put in that folder:
+
+  File: com.android.application.gradle.plugin-8.7.2.pom
+  URL: https://dl.google.com/dl/android/maven2/com/android/application/com.android.application.gradle.plugin/8.7.2/com.android.application.gradle.plugin-8.7.2.pom
+
+  File: com.android.application.gradle.plugin-8.7.2.jar
+  URL: https://dl.google.com/dl/android/maven2/com/android/application/com.android.application.gradle.plugin/8.7.2/com.android.application.gradle.plugin-8.7.2.jar
+
+If that artifact is not found, use the main AGP artifact instead. Create:
+  android/local-maven/com/android/tools/build/gradle/8.7.2/
+
+  File: gradle-8.7.2.pom
+  URL: https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.7.2/gradle-8.7.2.pom
+
+  File: gradle-8.7.2.jar
+  URL: https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.7.2/gradle-8.7.2.jar
+
+=== 2. Dependencies of the POM ===
+
+After you download the .pom file, open it and look for <dependency> entries whose <groupId> is com.android.* or com.google.* and whose repository is Google. Download those the same way (same URL pattern: base path = groupId with / instead of ., then artifactId, then version; files = artifactId-version.pom and artifactId-version.jar). Put them under android/local-maven/ with the same path structure (e.g. com/android/tools/build/...).
+
+If the build still fails with "could not find X", run:
+  cd android
+  .\gradlew.bat assembleDebug --refresh-dependencies 2>&1
+and note the missing artifact (group:artifact:version). Download that artifact from:
+  https://dl.google.com/dl/android/maven2/<groupId with . replaced by />/<artifactId>/<version>/
+and add to local-maven with the same path structure.
+
+=== 3. Build ===
+
+From project root:
+  .\scripts\build-apk.ps1
+or
+  cd android
+  .\gradlew.bat assembleDebug
+
+APK output: android\app\build\outputs\apk\debug\app-debug.apk (or Round-debug.apk in project root if using the script).

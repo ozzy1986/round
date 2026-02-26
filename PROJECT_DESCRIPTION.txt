@@ -51,7 +51,7 @@ Backend:
 Android:
   - Kotlin 1.9+, Jetpack Compose, Material 3
   - Room (SQLite), Retrofit + Gson
-  - Min SDK 26, target/compile 35
+  - Min SDK 26, target/compile 36
   - Build: Gradle 8.9
 
 
@@ -67,7 +67,7 @@ raund/
     i18n/               - en.json, ru.json, index.ts (getString, localeFromTelegram)
   migrations/           - node-pg-migrate .cjs files (profiles + rounds tables)
   tests/                - Vitest: db/, routes/, timer-engine/, bot/, i18n/
-  scripts/              - run-migrate.ts, run-timer-demo.ts, test-pg.js, deploy-vps.sh (run on VPS), deploy.ps1 (local push + SSH deploy), build-apk.ps1 (build Android APK, copy to root as Round-debug.apk)
+  scripts/              - run-migrate.ts, run-timer-demo.ts, test-pg.js, deploy-vps.sh (run on VPS), deploy.ps1 (local push + SSH deploy), build-apk.ps1 (build Android APK, copy to android/Round-debug.apk)
   deploy/               - nginx-round.ozzy1986.com.conf (Nginx vhost for VPS)
   android/              - Android app (Compose, Room, Retrofit, timer screen)
   package.json, tsconfig.json, vitest.config.ts, .env.example, .gitignore (.env, dist/, coverage/)
@@ -140,9 +140,10 @@ Screens: profile list, profile/round editor (name, emoji, rounds with name/durat
 Package: com.raund.app. API base URL in RaundApplication points to the VPS: http://round.ozzy1986.com:8080/ (for real device / phone). For Android emulator only use http://10.0.2.2:3001/.
 
 Testing on phone: build an APK and install it on the device.
-  - Command line: from project root run "scripts\build-apk.ps1" (or "cd android && .\gradlew.bat assembleDebug"). The script copies the APK to the project root as Round-debug.apk for easy transfer.
+  - Command line: from project root run "scripts\build-apk.ps1" (or "cd android && .\gradlew.bat assembleDebug"). The script copies the APK to android/Round-debug.apk.
   - Android Studio: open the android/ folder as project, then Build > Build Bundle(s) / APK(s) > Build APK(s). Output: android/app/build/outputs/apk/debug/app-debug.apk.
-  - Transfer: copy Round-debug.apk (or app-debug.apk) to the phone via USB, cloud, or email. Open the file on the phone to install (enable "Install from unknown sources" if prompted). No app store required.
+  - APK for transfer: android/Round-debug.apk (or app-debug.apk from the path above). Copy to the phone via USB, cloud, or email; open on the phone to install (enable "Install from unknown sources" if prompted). No app store required.
+  - Build from PC when Google is blocked: gradle.properties has systemProp.http.proxyHost/Port and https equivalents pointing at the project's proxy (VPS Squid). Use proxy for Gradle only; the app on the phone needs no proxy and connects directly to the VPS API.
 
 
 11. I18N

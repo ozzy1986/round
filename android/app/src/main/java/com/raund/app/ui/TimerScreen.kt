@@ -47,19 +47,21 @@ fun TimerScreen(
     var finished by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    val timerFinishedText = stringResource(R.string.timer_finished)
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
     }
 
     DisposableEffect(context) {
-        val engine = TextToSpeech(context) { status ->
+        var ttsEngine: TextToSpeech? = null
+        ttsEngine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                tts = engine
-                engine.setLanguage(Locale.getDefault())
+                tts = ttsEngine
+                ttsEngine?.setLanguage(Locale.getDefault())
             }
         }
-        onDispose { engine.shutdown() }
+        onDispose { ttsEngine?.shutdown() }
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
@@ -73,7 +75,7 @@ fun TimerScreen(
                 fontWeight = FontWeight.Bold
             )
             if (finished) {
-                Text(stringResource(R.string.timer_finished))
+                Text(timerFinishedText)
             }
             Button(
                 onClick = {
@@ -94,7 +96,7 @@ fun TimerScreen(
                                 is TimerEvent.TrainingEnd -> {
                                     running = false
                                     finished = true
-                                    tts?.speak(stringResource(R.string.timer_finished), TextToSpeech.QUEUE_ADD, null, null)
+                                    tts?.speak(timerFinishedText, TextToSpeech.QUEUE_ADD, null, null)
                                 }
                             }
                         }

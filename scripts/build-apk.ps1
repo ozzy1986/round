@@ -1,4 +1,4 @@
-# Build Android debug APK and copy to project root as Round-debug.apk for easy transfer to phone.
+# Build Android debug APK and copy to android/Round-debug.apk for easy transfer to phone.
 # Run from project root: .\scripts\build-apk.ps1
 
 $ErrorActionPreference = "Stop"
@@ -12,7 +12,7 @@ if (-not (Test-Path "$projectRoot\android")) {
 }
 $androidDir = "$projectRoot\android"
 $apkOut = "$androidDir\app\build\outputs\apk\debug\app-debug.apk"
-$copyTo = "$projectRoot\Round-debug.apk"
+$copyTo = "$androidDir\Round-debug.apk"
 
 Push-Location $androidDir
 try {

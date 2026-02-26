@@ -6,12 +6,13 @@ plugins {
 
 android {
     namespace = "com.raund.app"
-    compileSdk = 35
+    compileSdk = 36
+    buildToolsVersion = "36.1.0"
 
     defaultConfig {
         applicationId = "com.raund.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
