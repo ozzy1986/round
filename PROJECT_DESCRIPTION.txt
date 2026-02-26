@@ -7,6 +7,28 @@ Product name shown to users: "Round". Internal/codebase name: "raund".
 
 AFTER EVERY CHANGE (for AI and humans): (1) Sync to all four places — local (commit), GitHub (push origin main), GitLab (push gitlab main), VPS (SSH and run deploy-vps.sh). Exact steps: SYNC.txt. (2) Then update this file (PROJECT_DESCRIPTION.txt) so it reflects the change.
 
+FOR AI: WHEN ASKED TO "RUN AND TEST" THE APP
+----------------------------------------------
+Do NOT start a local PostgreSQL or run the backend locally. The backend, database,
+and Telegram bot already run on the VPS (round.ozzy1986.com). The phone app
+connects directly to the VPS — no local server needed.
+
+Do NOT rebuild the APK unless code in android/ was changed in this session.
+The app is likely already installed on the phone.
+
+Steps (in order):
+1. Verify VPS API:  GET http://round.ozzy1986.com:8080/profiles  (expect 200).
+2. Verify phone:    adb devices  (see ANDROID_TESTING.txt for full ADB path).
+3. Launch app:      adb shell am start -n com.raund.app/.MainActivity
+4. Screenshot:      adb shell screencap + adb pull  (see ANDROID_TESTING.txt).
+5. Check logs:      adb logcat filtered by com.raund.app  (see ANDROID_TESTING.txt).
+6. Only if code changed: rebuild APK, reinstall, then repeat from step 3.
+
+Local PostgreSQL and "npm run dev" are ONLY needed when developing/testing the
+backend on this machine (e.g. running Vitest DB tests, or testing API changes
+before deploying to VPS). They are NOT needed to run the Android app.
+
+
 CORE PRINCIPLES (MANDATORY)
 ---------------------------
 1. Focus on security, speed, stability, scalability.
@@ -139,8 +161,9 @@ Screens: profile list, profile/round editor (name, emoji, rounds with name/durat
 
 Package: com.raund.app. API base URL in RaundApplication points to the VPS: http://round.ozzy1986.com:8080/ (for real device / phone). For Android emulator only use http://10.0.2.2:3001/.
 
-Testing on phone: build an APK and install it on the device.
-  - Command line: from project root run "scripts\build-apk.ps1" (or "cd android && .\gradlew.bat assembleDebug"). The script copies the APK to android/Round-debug.apk.
+Testing on phone: the app is usually already installed. Just launch it via ADB
+(see ANDROID_TESTING.txt). Only rebuild the APK if android/ code was changed.
+  - Rebuild (only when needed): from project root run "scripts\build-apk.ps1" (or "cd android && .\gradlew.bat assembleDebug"). The script copies the APK to android/Round-debug.apk.
   - Android Studio: open the android/ folder as project, then Build > Build Bundle(s) / APK(s) > Build APK(s). Output: android/app/build/outputs/apk/debug/app-debug.apk.
   - APK for transfer: android/Round-debug.apk (or app-debug.apk from the path above). Copy to the phone via USB, cloud, or email; open on the phone to install (enable "Install from unknown sources" if prompted). No app store required.
   - Build from PC when Google is blocked: gradle.properties has systemProp.http.proxyHost/Port and https equivalents pointing at the project's proxy (VPS Squid). Use proxy for Gradle only; the app on the phone needs no proxy and connects directly to the VPS API.
@@ -155,10 +178,13 @@ Android: res/values/strings.xml, res/values-ru/strings.xml.
 
 12. ENVIRONMENT & DEPLOYMENT
 ----------------------------
-Production server: the VPS at round.ozzy1986.com. The Android app and Telegram bot use this server. The local machine is for development only (running backend/bot locally, building the app, emulator).
+Production server (PRIMARY): the VPS at round.ozzy1986.com. The Android app and
+Telegram bot connect here. The backend API + PostgreSQL + PM2 all run on the VPS.
+This is the running system — no local setup needed to use or test the app.
 
-Local (dev only):
-  - Node.js, npm. PostgreSQL (e.g. host 127.0.0.1, port 5432, user postgres, database raund or round).
+Local machine (dev only — NOT required for running/testing the app):
+  - Used only for: editing code, running Vitest, building APKs, then deploying to VPS.
+  - Node.js, npm. PostgreSQL only if running DB/route tests locally (Vitest).
   - .env: PG_* or DATABASE_URL, PORT=3001, TELEGRAM_BOT_TOKEN (optional for bot), GOOGLE_APPLICATION_CREDENTIALS (optional for TTS).
   - npm run migrate:up, npm run dev (or npm run build && npm start).
   - Optional: Nginx or similar to proxy a hostname to 3001.

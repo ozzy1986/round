@@ -1,0 +1,145 @@
+ANDROID ON-DEVICE TESTING — FOR AI / NEXT SESSION
+==================================================
+This file explains how to run, test, screenshot, and debug the Round Android app
+on the developer's physical phone from this PC. The phone is already set up with
+USB Debugging enabled and the PC is authorized.
+
+IMPORTANT: The app is usually ALREADY INSTALLED on the phone. Do NOT rebuild the
+APK unless android/ code was changed in this session. The app connects to the VPS
+API (round.ozzy1986.com:8080) — no local backend or database is needed.
+
+When asked to "run and test": verify ADB connection, launch the app, take a
+screenshot, check logcat. Only rebuild if code changed.
+
+DEVICE
+------
+  Model:       TECNO KL6
+  Serial:      132773749J003906
+  Android:     14 (API 34)
+  Screen:      1080 x 2460 px
+  Connection:  USB cable to this PC
+
+ADB PATH
+--------
+ADB is NOT in PATH. Always invoke it with the full path:
+
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+
+Shorthand for scripts below: $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+
+VERIFY CONNECTION
+-----------------
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" devices
+
+Expected output should include:
+  132773749J003906    device
+
+If status is "unauthorized", the user must tap "Allow USB debugging" on the phone.
+If no device listed, check USB cable and USB mode (should be File Transfer / MTP).
+
+BUILD THE APK
+-------------
+From project root (d:\laragon\www\raund):
+
+  cd android
+  .\gradlew.bat assembleDebug
+
+Output APK: android\app\build\outputs\apk\debug\app-debug.apk
+
+Alternative: run scripts\build-apk.ps1 from project root (builds and copies APK
+to android\Round-debug.apk).
+
+INSTALL THE APK
+---------------
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\debug\app-debug.apk
+
+The -r flag reinstalls, keeping app data.
+
+LAUNCH THE APP
+--------------
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -n com.raund.app/.MainActivity
+
+STOP / FORCE-CLOSE THE APP
+---------------------------
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am force-stop com.raund.app
+
+UNINSTALL THE APP
+-----------------
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" uninstall com.raund.app
+
+TAKE A SCREENSHOT
+-----------------
+Capture phone screen and pull to PC:
+
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell screencap -p /sdcard/screen.png
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" pull /sdcard/screen.png android\screenshot.png
+
+Then read/view android\screenshot.png from the workspace.
+
+READ CRASH LOGS (LOGCAT)
+-------------------------
+All app logs (filter by package):
+
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" logcat --pid=$(& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell pidof com.raund.app) -d
+
+Recent crashes only:
+
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" logcat *:E -d -t 50
+
+Clear logcat before a test run:
+
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" logcat -c
+
+SEND INPUT (TAP, SWIPE, TEXT)
+-----------------------------
+Screen is 1080x2460. Coordinates are in pixels from top-left.
+
+Tap at position (x, y):
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell input tap 540 1230
+
+Swipe from (x1,y1) to (x2,y2) over duration_ms:
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell input swipe 540 1800 540 600 300
+
+Type text (only works when a text field is focused):
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell input text "hello"
+
+Press back button:
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell input keyevent KEYCODE_BACK
+
+Press home button:
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell input keyevent KEYCODE_HOME
+
+GET UI HIERARCHY (for finding tap targets)
+------------------------------------------
+Dump current screen's view hierarchy to XML:
+
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell uiautomator dump /sdcard/ui.xml
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" pull /sdcard/ui.xml android\ui.xml
+
+Then read android\ui.xml to find element bounds for precise taps.
+
+QUICK TEST (no code changes — app already installed)
+-----------------------------------------------------
+1. Verify:     adb devices  (phone connected as "device")
+2. Launch:     adb shell am start -n com.raund.app/.MainActivity
+3. Screenshot: capture and pull (see TAKE A SCREENSHOT above), then view the image.
+4. Logs:       check logcat for errors (see READ CRASH LOGS above).
+
+FULL WORKFLOW (after code changes in android/ folder)
+-----------------------------------------------------
+1. Make code changes in android/ folder.
+2. Build:   cd android && .\gradlew.bat assembleDebug
+3. Install: & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\debug\app-debug.apk
+4. Launch:  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -n com.raund.app/.MainActivity
+5. Screenshot: capture and pull (see above), then view the image.
+6. Logs:    check logcat for errors (see above).
+7. Repeat from step 1.
+
+NOTES
+-----
+- The app connects to the VPS API at http://round.ozzy1986.com:8080/. No local
+  backend needed for the phone to work (unlike emulator which uses 10.0.2.2).
+- USB Debugging is already enabled and this PC is authorized. If the phone is
+  reconnected and asks again, user must tap "Allow USB debugging".
+- Gradle proxy settings are in android/gradle.properties (Squid on VPS) for
+  when Google is blocked. The app itself needs no proxy.
