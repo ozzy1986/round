@@ -1,17 +1,24 @@
 package com.raund.app.ui
 
 import android.speech.tts.TextToSpeech
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -21,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.R
@@ -42,12 +50,14 @@ fun TimerScreen(
     val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<TimerProfile?>(null) }
     var currentRound by remember { mutableStateOf("") }
-    var remaining by remember { mutableStateOf(0) }
+    var remaining by remember { mutableIntStateOf(0) }
+    var roundInfo by remember { mutableStateOf("") }
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     val timerFinishedText = stringResource(R.string.timer_finished)
+    val warn10Template = stringResource(R.string.timer_warn10)
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
@@ -64,51 +74,118 @@ fun TimerScreen(
         onDispose { ttsEngine?.shutdown() }
     }
 
-    Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        Column(modifier = Modifier.align(Alignment.Center).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(profile?.emoji ?: "⏱", fontSize = 48.sp)
-            Text(profile?.name ?: "", style = MaterialTheme.typography.titleLarge)
-            Text(currentRound, style = MaterialTheme.typography.titleMedium)
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(profile?.emoji ?: "⏱", fontSize = 64.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                profile?.name ?: "",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                currentRound,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center
+            )
+            if (roundInfo.isNotEmpty()) {
+                Text(
+                    roundInfo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 "%02d:%02d".format(remaining / 60, remaining % 60),
-                fontSize = 72.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = 80.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
+            Spacer(modifier = Modifier.height(24.dp))
             if (finished) {
-                Text(timerFinishedText)
+                Text(
+                    timerFinishedText,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
             }
-            Button(
-                onClick = {
-                    if (running || finished) return@Button
-                    val p = profile ?: return@Button
-                    running = true
-                    scope.launch {
-                        val engine = TimerEngine(p) { event ->
-                            when (event) {
-                                is TimerEvent.RoundStart -> {
-                                    currentRound = event.round.name
-                                    remaining = event.round.durationSeconds
-                                    tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, null, null)
-                                }
-                                is TimerEvent.Tick -> remaining = event.remainingSeconds
-                                is TimerEvent.Warn10 -> tts?.speak("${event.round.name} in 10 seconds", TextToSpeech.QUEUE_ADD, null, null)
-                                is TimerEvent.RoundEnd -> {}
-                                is TimerEvent.TrainingEnd -> {
-                                    running = false
-                                    finished = true
-                                    tts?.speak(timerFinishedText, TextToSpeech.QUEUE_ADD, null, null)
+            if (!running && !finished) {
+                Button(
+                    onClick = {
+                        val p = profile ?: return@Button
+                        running = true
+                        scope.launch {
+                            val engine = TimerEngine(p) { event ->
+                                when (event) {
+                                    is TimerEvent.RoundStart -> {
+                                        currentRound = event.round.name
+                                        remaining = event.round.durationSeconds
+                                        roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
+                                        tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, null, null)
+                                    }
+                                    is TimerEvent.Tick -> remaining = event.remainingSeconds
+                                    is TimerEvent.Warn10 -> {
+                                        val msg = warn10Template.format(event.round.name)
+                                        tts?.speak(msg, TextToSpeech.QUEUE_ADD, null, null)
+                                    }
+                                    is TimerEvent.RoundEnd -> {}
+                                    is TimerEvent.TrainingEnd -> {
+                                        running = false
+                                        finished = true
+                                        tts?.speak(timerFinishedText, TextToSpeech.QUEUE_ADD, null, null)
+                                    }
                                 }
                             }
+                            engine.advance()
+                            while (scope.isActive && running) {
+                                delay(1000L)
+                                if (!engine.advance()) break
+                            }
                         }
-                        engine.advance()
-                        while (scope.isActive && running) {
-                            delay(1000L)
-                            if (!engine.advance()) break
-                        }
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.start_timer),
+                        fontSize = 20.sp
+                    )
                 }
-            ) { Text(if (running) "…" else stringResource(R.string.start_timer)) }
-            Button(onClick = onBack) { Text("Back") }
+            }
+            if (running) {
+                Button(
+                    onClick = {
+                        running = false
+                        finished = true
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(
+                        stringResource(R.string.stop_timer),
+                        fontSize = 20.sp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(onClick = {
+                running = false
+                onBack()
+            }) {
+                Text(stringResource(R.string.back))
+            }
         }
     }
 }

@@ -49,13 +49,21 @@ class ProfileRepository(
     suspend fun updateProfile(id: String, name: String, emoji: String) = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         profileDao.update(id, name, emoji, now)
-        api?.updateProfile(id, UpdateProfileRequest(name, emoji))
+        try {
+            api?.updateProfile(id, UpdateProfileRequest(name, emoji))
+        } catch (_: Exception) {
+            // Offline or server unknown profile; local update already done
+        }
     }
 
     suspend fun deleteProfile(id: String) = withContext(Dispatchers.IO) {
         roundDao.deleteByProfileId(id)
         profileDao.deleteById(id)
-        api?.deleteProfile(id)
+        try {
+            api?.deleteProfile(id)
+        } catch (_: Exception) {
+            // Offline or server unknown profile; local delete already done
+        }
     }
 
     suspend fun saveRounds(profileId: String, rounds: List<Triple<String, Int, Boolean>>) = withContext(Dispatchers.IO) {
