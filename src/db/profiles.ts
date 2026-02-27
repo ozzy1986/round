@@ -18,22 +18,57 @@ function profileFromRow(row: Record<string, unknown>): Profile {
   };
 }
 
-export async function listProfiles(pool: Pool): Promise<Profile[]> {
-  const result = await pool.query(
-    `SELECT id, name, emoji, user_id, created_at, updated_at
-     FROM profiles ORDER BY updated_at DESC`
-  );
-  return result.rows.map((row) => profileFromRow(row));
+export interface ListProfilesResult {
+  profiles: Profile[];
+  nextCursor: string | null;
+}
+
+export async function listProfiles(
+  pool: Pool,
+  userId: string,
+  limit: number = 20,
+  cursor?: string | null
+): Promise<ListProfilesResult> {
+  const safeLimit = Math.min(Math.max(1, limit), 100);
+  let result;
+  if (cursor) {
+    result = await pool.query(
+      `SELECT id, name, emoji, user_id, created_at, updated_at
+       FROM profiles
+       WHERE user_id = $1 AND updated_at < $2
+       ORDER BY updated_at DESC
+       LIMIT $3`,
+      [userId, cursor, safeLimit + 1]
+    );
+  } else {
+    result = await pool.query(
+      `SELECT id, name, emoji, user_id, created_at, updated_at
+       FROM profiles
+       WHERE user_id = $1
+       ORDER BY updated_at DESC
+       LIMIT $2`,
+      [userId, safeLimit + 1]
+    );
+  }
+  const rows = result.rows;
+  const hasMore = rows.length > safeLimit;
+  const profiles = (hasMore ? rows.slice(0, safeLimit) : rows).map((row) => profileFromRow(row));
+  const nextCursor =
+    profiles.length > 0 && hasMore
+      ? (profiles[profiles.length - 1].updated_at as Date).toISOString()
+      : null;
+  return { profiles, nextCursor };
 }
 
 export async function getProfileById(
   pool: Pool,
-  id: string
+  id: string,
+  userId: string
 ): Promise<Profile | null> {
   const result = await pool.query(
     `SELECT id, name, emoji, user_id, created_at, updated_at
-     FROM profiles WHERE id = $1`,
-    [id]
+     FROM profiles WHERE id = $1 AND user_id = $2`,
+    [id, userId]
   );
   if (result.rows.length === 0) return null;
   return profileFromRow(result.rows[0]);
@@ -41,9 +76,10 @@ export async function getProfileById(
 
 export async function getProfileWithRoundsById(
   pool: Pool,
-  id: string
+  id: string,
+  userId: string
 ): Promise<ProfileWithRounds | null> {
-  const profile = await getProfileById(pool, id);
+  const profile = await getProfileById(pool, id, userId);
   if (!profile) return null;
   const rounds = await getRoundsByProfileId(pool, id);
   return { ...profile, rounds };
@@ -54,10 +90,10 @@ export async function createProfile(
   input: CreateProfileInput
 ): Promise<Profile> {
   const result = await pool.query(
-    `INSERT INTO profiles (name, emoji)
-     VALUES ($1, $2)
+    `INSERT INTO profiles (name, emoji, user_id)
+     VALUES ($1, $2, $3)
      RETURNING id, name, emoji, user_id, created_at, updated_at`,
-    [input.name, input.emoji]
+    [input.name, input.emoji, input.user_id]
   );
   return profileFromRow(result.rows[0]);
 }
@@ -65,6 +101,7 @@ export async function createProfile(
 export async function updateProfile(
   pool: Pool,
   id: string,
+  userId: string,
   input: UpdateProfileInput
 ): Promise<Profile | null> {
   const updates: string[] = [];
@@ -78,12 +115,12 @@ export async function updateProfile(
     updates.push(`emoji = $${i++}`);
     values.push(input.emoji);
   }
-  if (updates.length === 0) return getProfileById(pool, id);
+  if (updates.length === 0) return getProfileById(pool, id, userId);
   updates.push(`updated_at = current_timestamp`);
-  values.push(id);
+  values.push(id, userId);
   const result = await pool.query(
     `UPDATE profiles SET ${updates.join(', ')}
-     WHERE id = $${i}
+     WHERE id = $${i} AND user_id = $${i + 1}
      RETURNING id, name, emoji, user_id, created_at, updated_at`,
     values
   );
@@ -93,11 +130,12 @@ export async function updateProfile(
 
 export async function deleteProfile(
   pool: Pool,
-  id: string
+  id: string,
+  userId: string
 ): Promise<boolean> {
   const result = await pool.query(
-    'DELETE FROM profiles WHERE id = $1 RETURNING id',
-    [id]
+    'DELETE FROM profiles WHERE id = $1 AND user_id = $2 RETURNING id',
+    [id, userId]
   );
   return result.rowCount !== null && result.rowCount > 0;
 }

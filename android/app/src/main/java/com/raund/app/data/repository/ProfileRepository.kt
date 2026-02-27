@@ -5,7 +5,9 @@ import com.raund.app.data.dao.RoundDao
 import com.raund.app.data.dao.RoundStats
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.entity.Round
+import com.raund.app.data.local.TokenStore
 import com.raund.app.data.remote.ApiService
+import com.raund.app.data.remote.AuthService
 import com.raund.app.data.remote.CreateProfileRequest
 import com.raund.app.data.remote.CreateRoundRequest
 import com.raund.app.data.remote.UpdateProfileRequest
@@ -20,7 +22,9 @@ import java.util.UUID
 class ProfileRepository(
     private val profileDao: ProfileDao,
     private val roundDao: RoundDao,
-    private val api: ApiService?
+    private val api: ApiService?,
+    private val tokenStore: TokenStore,
+    private val authService: AuthService
 ) {
 
     val profiles: Flow<List<Profile>> = profileDao.getAll()
@@ -40,7 +44,18 @@ class ProfileRepository(
         )
     }
 
+    private suspend fun ensureToken() {
+        if (tokenStore.getToken() != null) return
+        try {
+            val r = authService.register()
+            tokenStore.setToken(r.token)
+        } catch (_: Exception) {
+            // Offline or server error
+        }
+    }
+
     suspend fun insertProfile(name: String, emoji: String): String = withContext(Dispatchers.IO) {
+        ensureToken()
         val now = System.currentTimeMillis()
         val safeName = name.trim()
         val safeEmoji = emoji.trim().ifBlank { "⏱" }
@@ -54,6 +69,7 @@ class ProfileRepository(
     }
 
     suspend fun updateProfile(id: String, name: String, emoji: String) = withContext(Dispatchers.IO) {
+        ensureToken()
         val now = System.currentTimeMillis()
         val safeName = name.trim()
         val safeEmoji = emoji.trim().ifBlank { "⏱" }
@@ -66,6 +82,7 @@ class ProfileRepository(
     }
 
     suspend fun deleteProfile(id: String) = withContext(Dispatchers.IO) {
+        ensureToken()
         roundDao.deleteByProfileId(id)
         profileDao.deleteById(id)
         try {
@@ -76,6 +93,7 @@ class ProfileRepository(
     }
 
     suspend fun saveRounds(profileId: String, rounds: List<Triple<String, Int, Boolean>>) = withContext(Dispatchers.IO) {
+        ensureToken()
         val sanitizedRounds = rounds.mapNotNull { (name, durationSeconds, warn10sec) ->
             val safeName = name.trim().take(30)
             if (safeName.isBlank()) {
@@ -110,17 +128,23 @@ class ProfileRepository(
     }
 
     suspend fun syncFromApi() = withContext(Dispatchers.IO) {
+        ensureToken()
         try {
-            val list = api?.getProfiles() ?: return@withContext
-            list.forEach { dto ->
-                val profile = Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis())
-                profileDao.insert(profile)
-                val withRounds = api.getProfileWithRounds(dto.id)
-                roundDao.deleteByProfileId(dto.id)
-                roundDao.insertAll(withRounds.rounds.mapIndexed { i, r ->
-                    Round(r.id, r.profile_id, r.name, r.duration_seconds.coerceAtLeast(1), r.warn10sec, i)
-                })
-            }
+            val api = this@ProfileRepository.api ?: return@withContext
+            var cursor: String? = null
+            do {
+                val page = api.getProfilesPage(limit = 100, cursor = cursor)
+                page.data.forEach { dto ->
+                    val profile = Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis())
+                    profileDao.insert(profile)
+                    val withRounds = api.getProfileWithRounds(dto.id)
+                    roundDao.deleteByProfileId(dto.id)
+                    roundDao.insertAll(withRounds.rounds.mapIndexed { i, r ->
+                        Round(r.id, r.profile_id, r.name, r.duration_seconds.coerceAtLeast(1), r.warn10sec, i)
+                    })
+                }
+                cursor = page.next_cursor
+            } while (cursor != null)
         } catch (_: Exception) {
             // Offline or server error; keep existing local data
         }

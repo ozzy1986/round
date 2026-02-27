@@ -6,10 +6,17 @@ import * as profilesDb from '../../src/db/profiles.js';
 
 describe('profiles routes', () => {
   let app: FastifyInstance;
+  let authHeaders: { authorization: string };
+  let testUserId: string;
   const pool = getPool();
 
   beforeAll(async () => {
     app = await buildApp();
+    const registerRes = await app.inject({ method: 'POST', url: '/auth/register' });
+    expect(registerRes.statusCode).toBe(201);
+    const { token, user_id } = registerRes.json() as { token: string; user_id: string };
+    authHeaders = { authorization: `Bearer ${token}` };
+    testUserId = user_id;
   });
 
   afterAll(async () => {
@@ -18,11 +25,13 @@ describe('profiles routes', () => {
   });
 
   describe('GET /profiles', () => {
-    it('returns 200 and array', async () => {
-      const res = await app.inject({ method: 'GET', url: '/profiles' });
+    it('returns 200 and paginated response', async () => {
+      const res = await app.inject({ method: 'GET', url: '/profiles', headers: authHeaders });
       expect(res.statusCode).toBe(200);
-      const body = res.json();
-      expect(Array.isArray(body)).toBe(true);
+      const body = res.json() as { data: unknown[]; next_cursor: string | null };
+      expect(Array.isArray(body.data)).toBe(true);
+      expect(body).toHaveProperty('next_cursor');
+      expect(body.next_cursor).toBeNull();
     });
   });
 
@@ -31,6 +40,7 @@ describe('profiles routes', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/profiles/00000000-0000-0000-0000-000000000000',
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(404);
       expect(res.json()).toMatchObject({ message: 'Profile not found' });
@@ -40,10 +50,12 @@ describe('profiles routes', () => {
       const created = await profilesDb.createProfile(pool, {
         name: 'Route Get',
         emoji: '📡',
+        user_id: testUserId,
       });
       const res = await app.inject({
         method: 'GET',
         url: `/profiles/${created.id}`,
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
@@ -51,7 +63,7 @@ describe('profiles routes', () => {
       expect(body.name).toBe('Route Get');
       expect(body.emoji).toBe('📡');
       expect(Array.isArray(body.rounds)).toBe(true);
-      await profilesDb.deleteProfile(pool, created.id);
+      await profilesDb.deleteProfile(pool, created.id, testUserId);
     });
   });
 
@@ -60,6 +72,7 @@ describe('profiles routes', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/profiles',
+        headers: authHeaders,
         payload: { name: 'New Profile', emoji: '✨' },
       });
       expect(res.statusCode).toBe(201);
@@ -67,13 +80,14 @@ describe('profiles routes', () => {
       expect(body.name).toBe('New Profile');
       expect(body.emoji).toBe('✨');
       expect(body.id).toBeDefined();
-      await profilesDb.deleteProfile(pool, body.id);
+      await profilesDb.deleteProfile(pool, body.id, testUserId);
     });
 
     it('returns 400 for invalid body', async () => {
       const res = await app.inject({
         method: 'POST',
         url: '/profiles',
+        headers: authHeaders,
         payload: { name: '' },
       });
       expect(res.statusCode).toBe(400);
@@ -85,6 +99,7 @@ describe('profiles routes', () => {
       const res = await app.inject({
         method: 'PATCH',
         url: '/profiles/00000000-0000-0000-0000-000000000000',
+        headers: authHeaders,
         payload: { name: 'X' },
       });
       expect(res.statusCode).toBe(404);
@@ -94,17 +109,19 @@ describe('profiles routes', () => {
       const created = await profilesDb.createProfile(pool, {
         name: 'Patch Me',
         emoji: '🔧',
+        user_id: testUserId,
       });
       const res = await app.inject({
         method: 'PATCH',
         url: `/profiles/${created.id}`,
+        headers: authHeaders,
         payload: { name: 'Patched', emoji: '✅' },
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.name).toBe('Patched');
       expect(body.emoji).toBe('✅');
-      await profilesDb.deleteProfile(pool, created.id);
+      await profilesDb.deleteProfile(pool, created.id, testUserId);
     });
   });
 
@@ -113,6 +130,7 @@ describe('profiles routes', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: '/profiles/00000000-0000-0000-0000-000000000000',
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(404);
     });
@@ -121,13 +139,15 @@ describe('profiles routes', () => {
       const created = await profilesDb.createProfile(pool, {
         name: 'Delete Me',
         emoji: '🗑',
+        user_id: testUserId,
       });
       const res = await app.inject({
         method: 'DELETE',
         url: `/profiles/${created.id}`,
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(204);
-      const found = await profilesDb.getProfileById(pool, created.id);
+      const found = await profilesDb.getProfileById(pool, created.id, testUserId);
       expect(found).toBeNull();
     });
   });

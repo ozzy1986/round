@@ -23,6 +23,7 @@ export interface ProfileWithRounds extends Profile {
 export interface CreateProfileInput {
   name: string;
   emoji: string;
+  user_id: string;
 }
 
 export interface UpdateProfileInput {

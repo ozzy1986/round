@@ -8,7 +8,7 @@ const roundBodySchema = {
   required: ['name', 'duration_seconds', 'position'],
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 255 },
-    duration_seconds: { type: 'integer', minimum: 0 },
+    duration_seconds: { type: 'integer', minimum: 0, maximum: 86400 },
     warn10sec: { type: 'boolean' },
     position: { type: 'integer', minimum: 0 },
   },
@@ -56,7 +56,8 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const profile = await profilesDb.getProfileById(pool, req.params.id);
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const profile = await profilesDb.getProfileById(pool, req.params.id, userId);
       if (!profile) return reply.status(404).send({ message: 'Profile not found' });
       const rounds = await roundsDb.getRoundsByProfileId(pool, req.params.id);
       return reply.send(rounds);
@@ -85,7 +86,8 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       }>,
       reply: FastifyReply
     ) => {
-      const profile = await profilesDb.getProfileById(pool, req.params.id);
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const profile = await profilesDb.getProfileById(pool, req.params.id, userId);
       if (!profile) return reply.status(404).send({ message: 'Profile not found' });
       const round = await roundsDb.createRound(pool, req.params.id, {
         name: req.body.name,
@@ -109,7 +111,7 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
           type: 'object',
           properties: {
             name: { type: 'string', minLength: 1, maxLength: 255 },
-            duration_seconds: { type: 'integer', minimum: 0 },
+            duration_seconds: { type: 'integer', minimum: 0, maximum: 86400 },
             warn10sec: { type: 'boolean' },
             position: { type: 'integer', minimum: 0 },
           },
@@ -127,9 +129,13 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       }>,
       reply: FastifyReply
     ) => {
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const round = await roundsDb.getRoundById(pool, req.params.roundId);
+      if (!round) return reply.status(404).send({ message: 'Round not found' });
+      const profile = await profilesDb.getProfileById(pool, round.profile_id, userId);
+      if (!profile) return reply.status(404).send({ message: 'Round not found' });
       const updated = await roundsDb.updateRound(pool, req.params.roundId, req.body);
-      if (!updated) return reply.status(404).send({ message: 'Round not found' });
-      return reply.send(updated);
+      return reply.send(updated!);
     }
   );
 
@@ -145,8 +151,12 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (req: FastifyRequest<{ Params: { roundId: string } }>, reply: FastifyReply) => {
-      const deleted = await roundsDb.deleteRound(pool, req.params.roundId);
-      if (!deleted) return reply.status(404).send({ message: 'Round not found' });
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const round = await roundsDb.getRoundById(pool, req.params.roundId);
+      if (!round) return reply.status(404).send({ message: 'Round not found' });
+      const profile = await profilesDb.getProfileById(pool, round.profile_id, userId);
+      if (!profile) return reply.status(404).send({ message: 'Round not found' });
+      await roundsDb.deleteRound(pool, req.params.roundId);
       return reply.status(204).send();
     }
   );

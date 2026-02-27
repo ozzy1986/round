@@ -11,7 +11,7 @@ export function parseTemplate(spec: string): TimerProfile | null {
   const n = parseInt(match[1], 10);
   const workMin = parseInt(match[2], 10);
   const restMin = parseInt(match[3], 10);
-  if (n < 1 || workMin < 0 || restMin < 0) return null;
+  if (n < 1 || n > 100 || workMin < 0 || restMin < 0) return null;
   const workSec = workMin * 60;
   const restSec = restMin * 60;
   const rounds: TimerRound[] = [];

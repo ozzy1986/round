@@ -1,17 +1,24 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { getPool, closePool } from '../../src/db/pool.js';
 import * as profilesDb from '../../src/db/profiles.js';
 import * as roundsDb from '../../src/db/rounds.js';
+import { createAnonymousUser } from '../../src/db/users.js';
 
 describe('rounds db', () => {
   const pool = getPool();
+  let testUserId: string;
+
+  beforeAll(async () => {
+    const user = await createAnonymousUser(pool);
+    testUserId = user.id;
+  });
 
   afterAll(async () => {
     await closePool();
   });
 
   async function createTestProfile() {
-    return profilesDb.createProfile(pool, { name: 'Rounds Test', emoji: '⏱' });
+    return profilesDb.createProfile(pool, { name: 'Rounds Test', emoji: '⏱', user_id: testUserId });
   }
 
   describe('createRound', () => {
@@ -27,7 +34,7 @@ describe('rounds db', () => {
       expect(round.duration_seconds).toBe(180);
       expect(round.warn10sec).toBe(false);
       expect(round.position).toBe(0);
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
 
     it('creates a round with warn10sec true', async () => {
@@ -39,7 +46,7 @@ describe('rounds db', () => {
         position: 0,
       });
       expect(round.warn10sec).toBe(true);
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 
@@ -60,7 +67,7 @@ describe('rounds db', () => {
       expect(rounds).toHaveLength(2);
       expect(rounds[0].name).toBe('First');
       expect(rounds[1].name).toBe('Second');
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 
@@ -91,7 +98,7 @@ describe('rounds db', () => {
       expect(updated!.name).toBe('New');
       expect(updated!.duration_seconds).toBe(90);
       expect(updated!.warn10sec).toBe(true);
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 
@@ -107,7 +114,7 @@ describe('rounds db', () => {
       expect(deleted).toBe(true);
       const found = await roundsDb.getRoundById(pool, round.id);
       expect(found).toBeNull();
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 });

@@ -6,6 +6,7 @@ import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 data class ProfileDto(
     val id: String,
@@ -45,9 +46,17 @@ data class UpdateRoundRequest(
     val position: Int? = null
 )
 
+data class ProfilesPageDto(
+    val data: List<ProfileDto>,
+    val next_cursor: String?
+)
+
 interface ApiService {
     @GET("profiles")
-    suspend fun getProfiles(): List<ProfileDto>
+    suspend fun getProfilesPage(
+        @Query("limit") limit: Int = 20,
+        @Query("cursor") cursor: String? = null
+    ): ProfilesPageDto
 
     @GET("profiles/{id}")
     suspend fun getProfileWithRounds(@Path("id") id: String): ProfileWithRoundsDto

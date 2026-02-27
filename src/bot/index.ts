@@ -13,6 +13,8 @@ import {
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const API_BASE = process.env.API_URL ?? 'http://127.0.0.1:3001';
+const BOT_SECRET = process.env.BOT_SECRET;
+const FETCH_TIMEOUT_MS = 5000;
 
 const CB = {
   MENU_PROFILES: 'menu:profiles',
@@ -28,6 +30,53 @@ interface RunningTimer {
 }
 
 const runningTimers = new Map<number, RunningTimer>();
+const telegramTokenCache = new Map<number, string>();
+const FILE_ID_CACHE_MAX = 1000;
+const fileIdCache = new Map<string, string>();
+const fileIdCacheKeys: string[] = [];
+
+function evictFileIdOne(): void {
+  if (fileIdCacheKeys.length === 0) return;
+  const k = fileIdCacheKeys.shift();
+  if (k) fileIdCache.delete(k);
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit & { timeout?: number } = {}
+): Promise<Response> {
+  const { timeout = FETCH_TIMEOUT_MS, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(url, { ...fetchOptions, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function getTokenForTelegramUser(telegramId: number): Promise<string | null> {
+  const cached = telegramTokenCache.get(telegramId);
+  if (cached) return cached;
+  if (!BOT_SECRET) return null;
+  try {
+    const res = await fetchWithTimeout(`${API_BASE}/auth/telegram`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bot-Secret': BOT_SECRET,
+      },
+      body: JSON.stringify({ telegram_id: telegramId }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { token: string };
+    telegramTokenCache.set(telegramId, data.token);
+    return data.token;
+  } catch {
+    return null;
+  }
+}
 
 function getLocale(ctx: Context): Locale {
   const from = ctx.from;
@@ -35,14 +84,26 @@ function getLocale(ctx: Context): Locale {
   return localeFromTelegram(langCode);
 }
 
-async function fetchProfiles(): Promise<Array<{ id: string; name: string; emoji: string }>> {
+async function fetchProfiles(token: string | null): Promise<Array<{ id: string; name: string; emoji: string }>> {
+  if (!token) return [];
+  const list: Array<{ id: string; name: string; emoji: string }> = [];
+  let cursor: string | null = null;
   try {
-    const res = await fetch(`${API_BASE}/profiles`);
-    if (!res.ok) return [];
-    const list = (await res.json()) as Array<{ id: string; name: string; emoji: string }>;
+    do {
+      const url = cursor
+        ? `${API_BASE}/profiles?limit=100&cursor=${encodeURIComponent(cursor)}`
+        : `${API_BASE}/profiles?limit=100`;
+      const res = await fetchWithTimeout(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) break;
+      const page = (await res.json()) as { data: Array<{ id: string; name: string; emoji: string }>; next_cursor: string | null };
+      list.push(...page.data);
+      cursor = page.next_cursor;
+    } while (cursor);
     return list;
   } catch {
-    return [];
+    return list;
   }
 }
 
@@ -52,9 +113,12 @@ interface ProfileWithRoundsDto {
   rounds?: Array<{ name: string; duration_seconds: number; warn10sec?: boolean }>;
 }
 
-async function fetchProfileWithRounds(id: string): Promise<TimerProfile | null> {
+async function fetchProfileWithRounds(id: string, token: string | null): Promise<TimerProfile | null> {
+  if (!token) return null;
   try {
-    const res = await fetch(`${API_BASE}/profiles/${id}`);
+    const res = await fetchWithTimeout(`${API_BASE}/profiles/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as ProfileWithRoundsDto;
     return {
@@ -98,20 +162,32 @@ async function runTimer(
   const langCode = ctx.from?.language_code;
   const ttsLang = langCode?.startsWith('ru') ? 'ru-RU' : 'en-US';
 
+  const sendCachedVoice = async (text: string): Promise<void> => {
+    const key = `${text}:${ttsLang}`;
+    const fileId = fileIdCache.get(key);
+    if (fileId) {
+      await ctx.sendVoice(fileId).catch(() => {});
+      return;
+    }
+    const buf = await synthesize(text, ttsLang);
+    if (buf) {
+      const sent = await ctx.sendVoice({ source: buf, filename: 'round.ogg' }).catch(() => null);
+      if (sent?.voice?.file_id) {
+        if (fileIdCache.size >= FILE_ID_CACHE_MAX) evictFileIdOne();
+        fileIdCache.set(key, sent.voice.file_id);
+        fileIdCacheKeys.push(key);
+      }
+    }
+  };
+
   const processEvents = async (events: TimerEvent[]): Promise<boolean> => {
     for (const event of events) {
       if (event.type === 'round_start') {
         const text = getString(locale, 'bot.timer_round', { name: event.round.name });
-        const buf = await synthesize(text, ttsLang);
-        if (buf) {
-          await ctx.sendVoice({ source: buf, filename: 'round.ogg' }).catch(() => {});
-        }
+        await sendCachedVoice(text);
       } else if (event.type === 'warn10') {
         const text = getString(locale, 'bot.timer_warn10', { name: event.round.name });
-        const buf = await synthesize(text, ttsLang);
-        if (buf) {
-          await ctx.sendVoice({ source: buf, filename: 'warn.ogg' }).catch(() => {});
-        }
+        await sendCachedVoice(text);
       } else if (event.type === 'training_end') {
         runningTimers.delete(userId);
         await ctx.reply(getString(locale, 'bot.timer_finished')).catch(() => {});
@@ -147,7 +223,9 @@ export function createBot(): Telegraf {
 
   bot.command('profiles', async (ctx) => {
     const locale = getLocale(ctx);
-    const list = await fetchProfiles();
+    const telegramId = ctx.from?.id;
+    const token = telegramId != null ? await getTokenForTelegramUser(telegramId) : null;
+    const list = await fetchProfiles(token);
     if (list.length === 0) {
       await ctx.reply(getString(locale, 'bot.profiles_empty'), withReplyMarkup(mainMenuKeyboard(locale)));
       return;
@@ -180,12 +258,13 @@ export function createBot(): Telegraf {
 
     let profile: TimerProfile | null = parseTimerSpec(arg);
     if (!profile) {
-      const list = await fetchProfiles();
+      const token = await getTokenForTelegramUser(userId);
+      const list = await fetchProfiles(token);
       const byName = list.find((p) => p.name.toLowerCase() === arg.toLowerCase());
-      if (byName) profile = await fetchProfileWithRounds(byName.id);
+      if (byName) profile = await fetchProfileWithRounds(byName.id, token);
       if (!profile) {
         const byId = list.find((p) => p.id === arg);
-        if (byId) profile = await fetchProfileWithRounds(byId.id);
+        if (byId) profile = await fetchProfileWithRounds(byId.id, token);
       }
     }
     if (!profile || !profile.rounds.length) {
@@ -208,7 +287,9 @@ export function createBot(): Telegraf {
   bot.action(CB.MENU_PROFILES, async (ctx) => {
     await ctx.answerCbQuery?.();
     const locale = getLocale(ctx);
-    const list = await fetchProfiles();
+    const telegramId = ctx.from?.id;
+    const token = telegramId != null ? await getTokenForTelegramUser(telegramId) : null;
+    const list = await fetchProfiles(token);
     if (list.length === 0) {
       await ctx.editMessageText(getString(locale, 'bot.profiles_empty'), withReplyMarkup(mainMenuKeyboard(locale))).catch(() => {});
       return;
@@ -250,7 +331,8 @@ export function createBot(): Telegraf {
       return;
     }
 
-    const profile = await fetchProfileWithRounds(profileId);
+    const token = await getTokenForTelegramUser(userId);
+    const profile = await fetchProfileWithRounds(profileId, token);
     if (!profile || !profile.rounds.length) {
       await ctx.reply(getString(locale, 'bot.profile_not_found'));
       return;

@@ -28,6 +28,11 @@ describe('parser parseTemplate', () => {
     const profile = parseTemplate('0x5 1');
     expect(profile).toBeNull();
   });
+
+  it('returns null for n>100', () => {
+    const profile = parseTemplate('101x5 1');
+    expect(profile).toBeNull();
+  });
 });
 
 describe('parser parseCustomRounds', () => {

@@ -22,10 +22,55 @@ const profileIdParamSchema = {
 export async function profilesRoutes(app: FastifyInstance): Promise<void> {
   const pool = getPool();
 
-  app.get('/profiles', async (_req: FastifyRequest, reply: FastifyReply) => {
-    const list = await profilesDb.listProfiles(pool);
-    return reply.send(list);
-  });
+  app.get<{ Querystring: { limit?: string; cursor?: string } }>(
+    '/profiles',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            limit: { type: 'string', pattern: '^[0-9]+$' },
+            cursor: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            required: ['data', 'next_cursor'],
+            properties: {
+              data: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    emoji: { type: 'string' },
+                    user_id: { type: ['string', 'null'] },
+                    created_at: { type: 'string', format: 'date-time' },
+                    updated_at: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+              next_cursor: { type: ['string', 'null'] },
+            },
+          },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Querystring: { limit?: string; cursor?: string } }>, reply: FastifyReply) => {
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 20;
+      const cursor = req.query.cursor ?? null;
+      const { profiles, nextCursor } = await profilesDb.listProfiles(
+        pool,
+        userId,
+        Number.isNaN(limit) ? 20 : limit,
+        cursor || undefined
+      );
+      return reply.send({ data: profiles, next_cursor: nextCursor });
+    }
+  );
 
   app.get<{ Params: { id: string } }>(
     '/profiles/:id',
@@ -63,7 +108,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const profile = await profilesDb.getProfileWithRoundsById(pool, req.params.id);
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const profile = await profilesDb.getProfileWithRoundsById(pool, req.params.id, userId);
       if (!profile) return reply.status(404).send({ message: 'Profile not found' });
       return reply.send(profile);
     }
@@ -91,7 +137,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (req: FastifyRequest<{ Body: { name: string; emoji: string } }>, reply: FastifyReply) => {
-      const created = await profilesDb.createProfile(pool, req.body);
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const created = await profilesDb.createProfile(pool, { ...req.body, user_id: userId });
       return reply.status(201).send(created);
     }
   );
@@ -134,7 +181,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
       }>,
       reply: FastifyReply
     ) => {
-      const updated = await profilesDb.updateProfile(pool, req.params.id, req.body);
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const updated = await profilesDb.updateProfile(pool, req.params.id, userId, req.body);
       if (!updated) return reply.status(404).send({ message: 'Profile not found' });
       return reply.send(updated);
     }
@@ -152,7 +200,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const deleted = await profilesDb.deleteProfile(pool, req.params.id);
+      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const deleted = await profilesDb.deleteProfile(pool, req.params.id, userId);
       if (!deleted) return reply.status(404).send({ message: 'Profile not found' });
       return reply.status(204).send();
     }

@@ -7,10 +7,17 @@ import * as roundsDb from '../../src/db/rounds.js';
 
 describe('rounds routes', () => {
   let app: FastifyInstance;
+  let authHeaders: { authorization: string };
+  let testUserId: string;
   const pool = getPool();
 
   beforeAll(async () => {
     app = await buildApp();
+    const registerRes = await app.inject({ method: 'POST', url: '/auth/register' });
+    expect(registerRes.statusCode).toBe(201);
+    const { token, user_id } = registerRes.json() as { token: string; user_id: string };
+    authHeaders = { authorization: `Bearer ${token}` };
+    testUserId = user_id;
   });
 
   afterAll(async () => {
@@ -23,6 +30,7 @@ describe('rounds routes', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/profiles/00000000-0000-0000-0000-000000000000/rounds',
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(404);
     });
@@ -31,14 +39,16 @@ describe('rounds routes', () => {
       const profile = await profilesDb.createProfile(pool, {
         name: 'Rounds Route',
         emoji: '📋',
+        user_id: testUserId,
       });
       const res = await app.inject({
         method: 'GET',
         url: `/profiles/${profile.id}/rounds`,
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(200);
       expect(res.json()).toEqual([]);
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 
@@ -47,6 +57,7 @@ describe('rounds routes', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/profiles/00000000-0000-0000-0000-000000000000/rounds',
+        headers: authHeaders,
         payload: {
           name: 'R1',
           duration_seconds: 60,
@@ -60,10 +71,12 @@ describe('rounds routes', () => {
       const profile = await profilesDb.createProfile(pool, {
         name: 'Add Round',
         emoji: '➕',
+        user_id: testUserId,
       });
       const res = await app.inject({
         method: 'POST',
         url: `/profiles/${profile.id}/rounds`,
+        headers: authHeaders,
         payload: {
           name: 'Work',
           duration_seconds: 180,
@@ -78,7 +91,7 @@ describe('rounds routes', () => {
       expect(body.duration_seconds).toBe(180);
       expect(body.warn10sec).toBe(true);
       expect(body.position).toBe(0);
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 
@@ -87,6 +100,7 @@ describe('rounds routes', () => {
       const res = await app.inject({
         method: 'PATCH',
         url: '/rounds/00000000-0000-0000-0000-000000000000',
+        headers: authHeaders,
         payload: { name: 'X' },
       });
       expect(res.statusCode).toBe(404);
@@ -96,6 +110,7 @@ describe('rounds routes', () => {
       const profile = await profilesDb.createProfile(pool, {
         name: 'Patch Round',
         emoji: '🔧',
+        user_id: testUserId,
       });
       const round = await roundsDb.createRound(pool, profile.id, {
         name: 'Old',
@@ -105,13 +120,14 @@ describe('rounds routes', () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/rounds/${round.id}`,
+        headers: authHeaders,
         payload: { name: 'New', duration_seconds: 120 },
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.name).toBe('New');
       expect(body.duration_seconds).toBe(120);
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 
@@ -120,6 +136,7 @@ describe('rounds routes', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: '/rounds/00000000-0000-0000-0000-000000000000',
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(404);
     });
@@ -128,6 +145,7 @@ describe('rounds routes', () => {
       const profile = await profilesDb.createProfile(pool, {
         name: 'Del Round',
         emoji: '🗑',
+        user_id: testUserId,
       });
       const round = await roundsDb.createRound(pool, profile.id, {
         name: 'R',
@@ -137,11 +155,12 @@ describe('rounds routes', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/rounds/${round.id}`,
+        headers: authHeaders,
       });
       expect(res.statusCode).toBe(204);
       const found = await roundsDb.getRoundById(pool, round.id);
       expect(found).toBeNull();
-      await profilesDb.deleteProfile(pool, profile.id);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });
 });
