@@ -32,4 +32,5 @@
     <string name="delete_profile_confirm">Удалить эту тренировку? Действие нельзя отменить.</string>
     <string name="delete_profile_confirm_title">Удалить тренировку</string>
     <string name="cancel">Отмена</string>
+    <string name="sync">Синхронизировать</string>
 </resources>

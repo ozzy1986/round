@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,6 +39,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +61,7 @@ fun ProfileListScreen(
     onAddProfile: () -> Unit,
     onStartTimer: (String) -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     val profiles by repository.profiles.collectAsState(initial = emptyList())
     val roundStats by repository.roundStats.collectAsState(initial = emptyMap())
 
@@ -69,6 +73,16 @@ fun ProfileListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.profiles), fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(
+                        onClick = { scope.launch { repository.syncFromApi() } }
+                    ) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = stringResource(R.string.sync)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
