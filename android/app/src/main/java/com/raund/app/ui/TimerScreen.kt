@@ -509,8 +509,8 @@ fun TimerScreen(
                                                     TrainingEndPending.finishedText = finishedText
                                                     TrainingEndPending.defaultLocale = defaultLocale
                                                 }
-                                                ttsRef?.speak(" ", TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, "warmup_${System.currentTimeMillis()}")
-                                                delay(250)
+                                                ttsRef?.playSilentUtterance(600, TextToSpeech.QUEUE_FLUSH, "warmup_${System.currentTimeMillis()}")
+                                                delay(650)
                                                 val nameId = "training_end_name_${System.currentTimeMillis()}"
                                                 if (nameHasCyrillic && defaultLocale != null) {
                                                     ttsRef?.speak(p.name, TextToSpeech.QUEUE_ADD, ttsVolumeParams, nameId)
