@@ -68,12 +68,13 @@ export async function buildApp() {
     { prefix: '' }
   );
 
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: unknown, request, reply) => {
     request.log.error(error);
-    if (process.env.SENTRY_DSN && (error as { statusCode?: number }).statusCode >= 500) {
-      import('@sentry/node').then((S) => S.captureException(error)).catch(() => {});
+    const status = error && typeof error === 'object' && 'statusCode' in error ? (error as { statusCode: number }).statusCode : 500;
+    if (process.env.SENTRY_DSN && status >= 500) {
+      import('@sentry/node').then((S) => { if (S && S.captureException) S.captureException(error); }).catch(() => {});
     }
-    const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
+    const statusCode = status;
     void reply.status(statusCode).send({
       message: statusCode >= 500 ? 'Internal server error' : (error as Error).message,
     });
