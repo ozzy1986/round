@@ -1,10 +1,10 @@
 {
   "bot.welcome": "Round — interval timer. Choose an option below.",
-  "bot.btn_profiles": "Profiles",
+  "bot.btn_profiles": "Trainings",
   "bot.btn_quick_timer": "Quick timer",
   "bot.btn_back": "Back",
-  "bot.profiles_title": "Your profiles (tap to start):",
-  "bot.profiles_empty": "No profiles yet. Create one via the app or use Quick timer.",
+  "bot.profiles_title": "Your trainings (tap to start):",
+  "bot.profiles_empty": "No trainings yet. Create one via the app or use Quick timer.",
   "bot.quick_title": "Quick timer (tap to start):",
   "bot.template_3x5_1": "3×5+1",
   "bot.template_5x3_1": "5×3+1",
@@ -13,7 +13,7 @@
   "bot.timer_round": "{name}",
   "bot.timer_warn10": "{name} in 10 seconds",
   "bot.timer_finished": "Training finished.",
-  "bot.profile_not_found": "Profile not found.",
+  "bot.profile_not_found": "Training not found.",
   "bot.timer_already_running": "Timer already running. Wait for it to finish.",
   "bot.error": "Something went wrong."
 }

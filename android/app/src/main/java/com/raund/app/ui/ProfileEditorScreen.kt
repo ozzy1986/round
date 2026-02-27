@@ -192,7 +192,9 @@ fun ProfileEditorScreen(
                                 value = dur,
                                 onValueChange = {
                                     val digitsOnly = it.filter { char -> char.isDigit() }
-                                    rounds[index] = Triple(rName, digitsOnly, warn)
+                                    val currentDur = digitsOnly.toIntOrNull() ?: 0
+                                    val newWarn = if (currentDur <= 10) false else warn
+                                    rounds[index] = Triple(rName, digitsOnly, newWarn)
                                 },
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
@@ -208,9 +210,11 @@ fun ProfileEditorScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
+                                val currentDur = dur.toIntOrNull() ?: 0
                                 Switch(
-                                    checked = warn,
-                                    onCheckedChange = { rounds[index] = Triple(rName, dur, it) }
+                                    checked = warn && currentDur > 10,
+                                    onCheckedChange = { rounds[index] = Triple(rName, dur, it) },
+                                    enabled = currentDur > 10
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(

@@ -1,10 +1,10 @@
 {
   "bot.welcome": "Раунд — интервальный таймер. Выберите действие ниже.",
-  "bot.btn_profiles": "Профили",
+  "bot.btn_profiles": "Тренировки",
   "bot.btn_quick_timer": "Быстрый таймер",
   "bot.btn_back": "Назад",
-  "bot.profiles_title": "Ваши профили (нажмите для старта):",
-  "bot.profiles_empty": "Профилей пока нет. Создайте в приложении или выберите быстрый таймер.",
+  "bot.profiles_title": "Ваши тренировки (нажмите для старта):",
+  "bot.profiles_empty": "Тренировок пока нет. Создайте в приложении или выберите быстрый таймер.",
   "bot.quick_title": "Быстрый таймер (нажмите для старта):",
   "bot.template_3x5_1": "3×5+1",
   "bot.template_5x3_1": "5×3+1",
@@ -13,7 +13,7 @@
   "bot.timer_round": "{name}",
   "bot.timer_warn10": "{name} через 10 секунд",
   "bot.timer_finished": "Тренировка завершена.",
-  "bot.profile_not_found": "Профиль не найден.",
+  "bot.profile_not_found": "Тренировка не найдена.",
   "bot.timer_already_running": "Таймер уже запущен. Дождитесь окончания.",
   "bot.error": "Что-то пошло не так."
 }

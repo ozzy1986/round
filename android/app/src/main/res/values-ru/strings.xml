@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Раунд</string>
-    <string name="profiles">Профили</string>
-    <string name="add_profile">Добавить профиль</string>
-    <string name="edit_profile">Редактировать профиль</string>
-    <string name="new_profile">Новый профиль</string>
+    <string name="profiles">Тренировки</string>
+    <string name="add_profile">Добавить тренировку</string>
+    <string name="edit_profile">Редактировать тренировку</string>
+    <string name="new_profile">Новая тренировка</string>
     <string name="profile_name">Название</string>
     <string name="profile_emoji">Эмодзи</string>
     <string name="rounds">Раунды</string>
@@ -20,16 +20,16 @@
     <string name="back">Назад</string>
     <string name="restart_timer">Повторить</string>
     <string name="add_round">Добавить раунд</string>
-    <string name="no_profiles">Нет профилей. Нажмите + чтобы создать.</string>
-    <string name="create_first_profile">Создать первый профиль</string>
-    <string name="delete_profile">Удалить профиль</string>
+    <string name="no_profiles">Нет тренировок. Нажмите + чтобы создать.</string>
+    <string name="create_first_profile">Создать первую тренировку</string>
+    <string name="delete_profile">Удалить тренировку</string>
     <string name="delete_round">Удалить раунд</string>
-    <string name="no_rounds">Добавьте хотя бы один раунд в этот профиль.</string>
+    <string name="no_rounds">Добавьте хотя бы один раунд в эту тренировку.</string>
     <string name="no_rounds_short">Без раундов</string>
     <string name="profile_summary">Раундов: %1$d \u2022 %2$s</string>
-    <string name="profile_name_required">Название профиля обязательно.</string>
+    <string name="profile_name_required">Название тренировки обязательно.</string>
     <string name="unnamed_profile">Без названия</string>
-    <string name="delete_profile_confirm">Удалить этот профиль? Действие нельзя отменить.</string>
-    <string name="delete_profile_confirm_title">Удалить профиль</string>
+    <string name="delete_profile_confirm">Удалить эту тренировку? Действие нельзя отменить.</string>
+    <string name="delete_profile_confirm_title">Удалить тренировку</string>
     <string name="cancel">Отмена</string>
 </resources>

@@ -6,7 +6,10 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
 import android.view.WindowManager
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,7 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -84,7 +89,6 @@ fun TimerScreen(
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     val timerFinishedText = stringResource(R.string.timer_finished)
     val timerStoppedText = stringResource(R.string.timer_stopped)
-    val warn10Template = stringResource(R.string.timer_warn10)
     val restartTimerText = stringResource(R.string.restart_timer)
 
     LaunchedEffect(profileId) {
@@ -160,10 +164,23 @@ fun TimerScreen(
         }
     }
 
+    val defaultBgColor = MaterialTheme.colorScheme.background
+    val progressRatioForBg = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
+    val targetBgColor = if (running && !finished) {
+        lerp(Color(0xFF8B0000), Color(0xFF006400), progressRatioForBg)
+    } else {
+        defaultBgColor
+    }
+    val animatedBgColor by animateColorAsState(
+        targetValue = targetBgColor,
+        animationSpec = tween(1000, easing = LinearEasing),
+        label = "bgColor"
+    )
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(animatedBgColor)
     ) {
         val maxW = maxWidth.value
         val maxH = maxHeight.value
@@ -335,17 +352,11 @@ fun TimerScreen(
                                             }
                                         }
                                         is TimerEvent.Warn10 -> {
-                                            val msg = warn10Template.format(event.round.name)
-                                            tts?.speak(msg, TextToSpeech.QUEUE_ADD, null, null)
+                                            // Voice warning removed per user request
                                         }
                                         is TimerEvent.RoundEnd -> {
                                             scope.launch {
-                                                val tone = alarmTone
-                                                if (tone != null) {
-                                                    tone.startTone(piercingTone, longBeepMs)
-                                                    delay(longBeepGapMs)
-                                                    tone.startTone(piercingTone, longBeepMs)
-                                                }
+                                                alarmTone?.startTone(piercingTone, 1000)
                                             }
                                         }
                                         is TimerEvent.TrainingEnd -> {
