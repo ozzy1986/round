@@ -152,6 +152,7 @@ fun TimerScreen(
                 val ttsLocale = when (appLang) {
                     "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
                     "az", "uz" -> Locale.forLanguageTag("tr")
+                    "zh" -> Locale.CHINESE
                     else -> Locale.forLanguageTag(appLang)
                 }
                 ttsEngine.setLanguage(ttsLocale)

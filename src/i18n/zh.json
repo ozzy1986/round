@@ -1,0 +1,19 @@
+{
+  "bot.welcome": "Round — 间歇计时器。请选择以下操作。",
+  "bot.btn_profiles": "训练",
+  "bot.btn_quick_timer": "快速计时",
+  "bot.btn_back": "返回",
+  "bot.profiles_title": "您的训练（点击开始）：",
+  "bot.profiles_empty": "暂无训练。请在应用中创建或选择快速计时。",
+  "bot.quick_title": "快速计时（点击开始）：",
+  "bot.template_3x5_1": "3×5+1",
+  "bot.template_5x3_1": "5×3+1",
+  "bot.template_5run_5walk": "5分钟跑步，5分钟步行",
+  "bot.timer_starting": "开始：{name}",
+  "bot.timer_round": "{name}",
+  "bot.timer_warn10": "{name} 还剩10秒",
+  "bot.timer_finished": "训练结束。",
+  "bot.profile_not_found": "未找到训练。",
+  "bot.timer_already_running": "计时器正在运行，请等待结束。",
+  "bot.error": "出现错误。"
+}

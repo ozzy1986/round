@@ -83,6 +83,7 @@ function ttsLangFromCode(langCode: string | undefined): string {
   const lower = langCode.slice(0, 2).toLowerCase();
   if (['ru', 'kk', 'tg', 'tt'].includes(lower)) return 'ru-RU';
   if (['az', 'uz'].includes(lower)) return 'tr-TR';
+  if (lower === 'zh') return 'cmn-CN';
   return 'en-US';
 }
 

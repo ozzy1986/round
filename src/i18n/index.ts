@@ -15,10 +15,11 @@ const kk = loadBundle('kk.json');
 const az = loadBundle('az.json');
 const tg = loadBundle('tg.json');
 const tt = loadBundle('tt.json');
+const zh = loadBundle('zh.json');
 
-export type Locale = 'en' | 'ru' | 'uz' | 'kk' | 'az' | 'tg' | 'tt';
+export type Locale = 'en' | 'ru' | 'uz' | 'kk' | 'az' | 'tg' | 'tt' | 'zh';
 
-const bundles: Record<Locale, Record<string, string>> = { en, ru, uz, kk, az, tg, tt };
+const bundles: Record<Locale, Record<string, string>> = { en, ru, uz, kk, az, tg, tt, zh };
 
 const FALLBACK: Locale = 'en';
 
@@ -44,7 +45,7 @@ export function getString(
  * Normalizes Telegram language_code to our Locale.
  */
 const LOCALE_MAP: Record<string, Locale> = {
-  ru: 'ru', uz: 'uz', kk: 'kk', az: 'az', tg: 'tg', tt: 'tt',
+  ru: 'ru', uz: 'uz', kk: 'kk', az: 'az', tg: 'tg', tt: 'tt', zh: 'zh',
 };
 
 export function localeFromTelegram(langCode: string | undefined): Locale {

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Round</string>
+    <string name="profiles">训练</string>
+    <string name="add_profile">添加训练</string>
+    <string name="edit_profile">编辑训练</string>
+    <string name="new_profile">新建训练</string>
+    <string name="profile_name">名称</string>
+    <string name="profile_emoji">表情</string>
+    <string name="rounds">回合</string>
+    <string name="round_name">回合名称</string>
+    <string name="duration_seconds">秒</string>
+    <string name="warn_10_sec">10秒预警</string>
+    <string name="start_timer">开始</string>
+    <string name="stop_timer">停止</string>
+    <string name="pause_timer">暂停</string>
+    <string name="resume_timer">继续</string>
+    <string name="timer_paused">已暂停</string>
+    <string name="timer_finished">训练结束</string>
+    <string name="timer_stopped">训练已停止</string>
+    <string name="timer_warn10">%s 还剩10秒</string>
+    <string name="timer_finished_name">训练 %s 结束</string>
+    <string name="save">保存</string>
+    <string name="back">返回</string>
+    <string name="restart_timer">重新开始</string>
+    <string name="add_round">添加回合</string>
+    <string name="no_profiles">暂无训练。点击 + 创建。</string>
+    <string name="create_first_profile">创建第一个训练</string>
+    <string name="delete_profile">删除训练</string>
+    <string name="delete_round">删除回合</string>
+    <string name="no_rounds">请至少添加一个回合。</string>
+    <string name="no_rounds_short">无回合</string>
+    <string name="profile_summary">回合：%1$d \u2022 %2$s</string>
+    <string name="profile_name_required">训练名称为必填项。</string>
+    <string name="unnamed_profile">未命名训练</string>
+    <string name="delete_profile_confirm">删除此训练？此操作无法撤销。</string>
+    <string name="delete_profile_confirm_title">删除训练</string>
+    <string name="cancel">取消</string>
+    <string name="sync">同步</string>
+    <string name="copy_selected_n_times">复制 %d 个选中回合</string>
+    <string name="number_of_copies">复制次数</string>
+    <string name="copy_rounds">复制</string>
+    <string name="move_round_up">上移</string>
+    <string name="move_round_down">下移</string>
+    <string name="reorder_round">长按拖动以重新排序</string>
+</resources>

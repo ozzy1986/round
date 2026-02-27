@@ -70,6 +70,7 @@ private val supportedLanguages = listOf(
     "az" to "Azərbaycan",
     "tg" to "Тоҷикӣ",
     "tt" to "Татар",
+    "zh" to "中文",
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

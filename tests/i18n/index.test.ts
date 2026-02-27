@@ -6,7 +6,7 @@ import { getString, localeFromTelegram } from '../../src/i18n/index.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
-const ALL_LOCALES = ['en', 'ru', 'uz', 'kk', 'az', 'tg', 'tt'] as const;
+const ALL_LOCALES = ['en', 'ru', 'uz', 'kk', 'az', 'tg', 'tt', 'zh'] as const;
 
 function loadKeys(locale: string): string[] {
   return Object.keys(
@@ -50,6 +50,11 @@ describe('i18n getString', () => {
     expect(s).toContain('интервал таймер');
   });
 
+  it('returns zh string for zh locale', () => {
+    const s = getString('zh', 'bot.welcome');
+    expect(s).toContain('间歇计时器');
+  });
+
   it('replaces params', () => {
     const s = getString('en', 'bot.timer_starting', { name: 'Test' });
     expect(s).toBe('Starting: Test');
@@ -82,6 +87,9 @@ describe('i18n localeFromTelegram', () => {
   });
   it('returns tt for tt', () => {
     expect(localeFromTelegram('tt')).toBe('tt');
+  });
+  it('returns zh for zh', () => {
+    expect(localeFromTelegram('zh')).toBe('zh');
   });
   it('returns en for undefined', () => {
     expect(localeFromTelegram(undefined)).toBe('en');
