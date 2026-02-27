@@ -8,22 +8,31 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,11 +81,19 @@ fun ProfileEditorScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(stringResource(if (isNew) R.string.new_profile else R.string.edit_profile))
+                    Text(
+                        stringResource(if (isNew) R.string.new_profile else R.string.edit_profile),
+                        fontWeight = FontWeight.Bold
+                    )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Text("<", fontSize = 20.sp) }
-                }
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         }
     ) { padding ->
@@ -85,33 +103,38 @@ fun ProfileEditorScreen(
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text(stringResource(R.string.profile_name)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = emoji,
                 onValueChange = { emoji = it },
                 label = { Text(stringResource(R.string.profile_emoji)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 stringResource(R.string.rounds),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 8.dp)
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 16.dp)
             )
             rounds.forEachIndexed { index, (rName, dur, warn) ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
@@ -121,16 +144,25 @@ fun ProfileEditorScreen(
                                 onValueChange = { rounds[index] = Triple(it, dur, warn) },
                                 label = { Text(stringResource(R.string.round_name)) },
                                 singleLine = true,
-                                modifier = Modifier.weight(1f).padding(end = 4.dp)
+                                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface
+                                )
                             )
                             IconButton(
                                 onClick = { rounds.removeAt(index) },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
-                                Text("✕", color = MaterialTheme.colorScheme.error, fontSize = 18.sp)
+                                Icon(
+                                    Icons.Filled.Delete,
+                                    contentDescription = "Delete Round",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
@@ -141,28 +173,42 @@ fun ProfileEditorScreen(
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f).padding(end = 8.dp)
+                                modifier = Modifier.weight(1f).padding(end = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface
+                                )
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Checkbox(
                                     checked = warn,
                                     onCheckedChange = { rounds[index] = Triple(rName, dur, it) }
                                 )
                                 Text(
                                     stringResource(R.string.warn_10_sec),
-                                    style = MaterialTheme.typography.bodySmall
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(onClick = { rounds.add(Triple("", 60, false)) }) {
-                Text(stringResource(R.string.add_round))
+            OutlinedButton(
+                onClick = { rounds.add(Triple("", 60, false)) },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.add_round), fontSize = 16.sp)
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = {
                     scope.launch {
@@ -172,10 +218,13 @@ fun ProfileEditorScreen(
                         onBack()
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(stringResource(R.string.save)) }
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) { 
+                Text(stringResource(R.string.save), fontSize = 18.sp, fontWeight = FontWeight.Bold) 
+            }
             if (!isNew) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
                     onClick = {
                         scope.launch {
@@ -183,13 +232,18 @@ fun ProfileEditorScreen(
                             onBack()
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
-                ) { Text(stringResource(R.string.delete_profile)) }
+                ) { 
+                    Icon(Icons.Filled.Delete, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.delete_profile), fontSize = 16.sp) 
+                }
             }
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }

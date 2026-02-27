@@ -3,17 +3,31 @@ package com.raund.app.ui
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -28,8 +42,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,6 +71,7 @@ fun TimerScreen(
     var profile by remember { mutableStateOf<TimerProfile?>(null) }
     var currentRound by remember { mutableStateOf("") }
     var remaining by remember { mutableIntStateOf(0) }
+    var roundTotal by remember { mutableIntStateOf(1) }
     var roundInfo by remember { mutableStateOf("") }
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
@@ -95,155 +113,258 @@ fun TimerScreen(
         val p = profile ?: return@LaunchedEffect
         if (!running && !finished && p.rounds.isNotEmpty()) {
             remaining = p.rounds[0].durationSeconds
+            roundTotal = p.rounds[0].durationSeconds
             currentRound = p.rounds[0].name
             roundInfo = "1 / ${p.rounds.size}"
         }
     }
 
     BoxWithConstraints(
-        modifier = Modifier.fillMaxSize().padding(16.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        val timerFontSize = minOf(maxWidth.value / 5f, maxHeight.value / 10f).coerceIn(36f, 72f).sp
-        val emojiFontSize = minOf(maxWidth.value / 8f, maxHeight.value / 16f).coerceIn(24f, 48f).sp
-
+        val maxW = maxWidth.value
+        val maxH = maxHeight.value
+        val timerFontSize = minOf(maxW / 3.5f, maxH / 8f).coerceIn(48f, 120f).sp
+        val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
+        val primaryColor = MaterialTheme.colorScheme.primary
+        val onBgColor = MaterialTheme.colorScheme.onBackground
+        val onSurfaceVarColor = MaterialTheme.colorScheme.onSurfaceVariant
+        val errorColor = MaterialTheme.colorScheme.error
+        
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxSize()
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.Center
+            // Top Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    profile?.emoji ?: "⏱",
-                    fontSize = emojiFontSize,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
+                IconButton(onClick = {
+                    running = false
+                    onBack()
+                }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     profile?.name ?: "",
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    currentRound,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.Center
-                )
-                if (roundInfo.isNotEmpty()) {
-                    Text(
-                        roundInfo,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    "%02d:%02d".format(remaining / 60, remaining % 60),
-                    fontSize = timerFontSize,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
+                    color = onBgColor
                 )
-            }
-            if (finished) {
-                Text(
-                    timerFinishedText,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-            if (!running && !finished) {
-                val hasRounds = profile?.rounds?.isNotEmpty() == true
-                if (!hasRounds && profile != null) {
-                    Text(
-                        stringResource(R.string.no_rounds),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                Spacer(modifier = Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(surfaceVarColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(profile?.emoji ?: "⏱", fontSize = 24.sp)
                 }
-                Button(
-                    onClick = {
-                        val p = profile ?: return@Button
-                        if (p.rounds.isEmpty()) return@Button
-                        running = true
-                        scope.launch {
-                            var waited = 0
-                            while (tts == null && waited < 1500 && running) {
-                                delay(100)
-                                waited += 100
-                            }
-                            val engine = TimerEngine(p) { event ->
-                                when (event) {
-                                    is TimerEvent.RoundStart -> {
-                                        currentRound = event.round.name
-                                        remaining = event.round.durationSeconds
-                                        roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
-                                        tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, null, null)
-                                    }
-                                    is TimerEvent.Tick -> {
-                                        remaining = event.remainingSeconds
-                                        if (event.round.warn10sec && event.remainingSeconds in 1..10) {
-                                            tickTone?.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 24.dp)
+            ) {
+                if (finished) {
+                    Text(
+                        timerFinishedText,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = primaryColor,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Text(
+                        currentRound,
+                        style = MaterialTheme.typography.displaySmall,
+                        color = primaryColor,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (roundInfo.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            roundInfo,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = onSurfaceVarColor
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(48.dp))
+
+                    Box(contentAlignment = Alignment.Center) {
+                        val progressRatio = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
+                        val animatedProgress by animateFloatAsState(
+                            targetValue = progressRatio,
+                            label = "progress"
+                        )
+                        
+                        CircularProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier.size(minOf(this@BoxWithConstraints.maxWidth, 320.dp)),
+                            strokeWidth = 20.dp,
+                            trackColor = surfaceVarColor,
+                            color = primaryColor,
+                            strokeCap = StrokeCap.Round
+                        )
+                        
+                        Text(
+                            "%02d:%02d".format(remaining / 60, remaining % 60),
+                            fontSize = timerFontSize,
+                            fontWeight = FontWeight.Bold,
+                            color = onBgColor,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            style = TextStyle(fontFeatureSettings = "tnum")
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                if (!running && !finished) {
+                    val hasRounds = profile?.rounds?.isNotEmpty() == true
+                    if (!hasRounds && profile != null) {
+                        Text(
+                            stringResource(R.string.no_rounds),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = errorColor,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp)
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            val p = profile ?: return@Button
+                            if (p.rounds.isEmpty()) return@Button
+                            running = true
+                            scope.launch {
+                                var waited = 0
+                                while (tts == null && waited < 1500 && running) {
+                                    delay(100)
+                                    waited += 100
+                                }
+                                val engine = TimerEngine(p) { event ->
+                                    when (event) {
+                                        is TimerEvent.RoundStart -> {
+                                            currentRound = event.round.name
+                                            remaining = event.round.durationSeconds
+                                            roundTotal = event.round.durationSeconds
+                                            roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
+                                            tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, null, null)
+                                        }
+                                        is TimerEvent.Tick -> {
+                                            remaining = event.remainingSeconds
+                                            if (event.round.warn10sec && event.remainingSeconds in 1..10) {
+                                                tickTone?.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
+                                            }
+                                        }
+                                        is TimerEvent.Warn10 -> {
+                                            val msg = warn10Template.format(event.round.name)
+                                            tts?.speak(msg, TextToSpeech.QUEUE_ADD, null, null)
+                                        }
+                                        is TimerEvent.RoundEnd -> {}
+                                        is TimerEvent.TrainingEnd -> {
+                                            running = false
+                                            finished = true
+                                            tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
                                         }
                                     }
-                                    is TimerEvent.Warn10 -> {
-                                        val msg = warn10Template.format(event.round.name)
-                                        tts?.speak(msg, TextToSpeech.QUEUE_ADD, null, null)
-                                    }
-                                    is TimerEvent.RoundEnd -> {}
-                                    is TimerEvent.TrainingEnd -> {
-                                        running = false
-                                        finished = true
-                                        tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
-                                    }
+                                }
+                                engine.advance()
+                                while (scope.isActive && running) {
+                                    delay(1000L)
+                                    if (!engine.advance()) break
                                 }
                             }
-                            engine.advance()
-                            while (scope.isActive && running) {
-                                delay(1000L)
-                                if (!engine.advance()) break
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        shape = RoundedCornerShape(32.dp),
+                        enabled = hasRounds,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.start_timer),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
+                if (running) {
+                    Button(
+                        onClick = {
+                            running = false
+                            finished = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        shape = RoundedCornerShape(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.stop_timer),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (finished) {
+                    Button(
+                        onClick = {
+                            finished = false
+                            val p = profile
+                            if (p != null && p.rounds.isNotEmpty()) {
+                                remaining = p.rounds[0].durationSeconds
+                                roundTotal = p.rounds[0].durationSeconds
+                                currentRound = p.rounds[0].name
+                                roundInfo = "1 / ${p.rounds.size}"
                             }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    enabled = hasRounds
-                ) {
-                    Text(
-                        stringResource(R.string.start_timer),
-                        fontSize = 20.sp
-                    )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        shape = RoundedCornerShape(32.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.back), // Reusing "Back" or "Reset"
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
-            }
-            if (running) {
-                Button(
-                    onClick = {
-                        running = false
-                        finished = true
-                    },
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text(
-                        stringResource(R.string.stop_timer),
-                        fontSize = 20.sp
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(onClick = {
-                running = false
-                onBack()
-            }) {
-                Text(stringResource(R.string.back))
+                
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
