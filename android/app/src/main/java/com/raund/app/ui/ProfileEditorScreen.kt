@@ -2,7 +2,6 @@ package com.raund.app.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
@@ -264,11 +263,43 @@ fun ProfileEditorScreen(
                                         if (isSelected) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                                     )
-                                    .clickable {
-                                        selectedRoundIndices = if (isSelected)
-                                            selectedRoundIndices - index
-                                        else
-                                            selectedRoundIndices + index
+                                    .pointerInput(index) {
+                                        awaitEachGesture {
+                                            val down = awaitFirstDown(requireUnconsumed = false)
+                                            down.consume()
+                                            val longPress = awaitLongPressOrCancellation(down.id)
+                                            if (longPress != null) {
+                                                longPress.consume()
+                                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                draggedIndex = index
+                                                dragOffset = 0f
+                                                selectedRoundIndices = emptySet()
+                                                val dragged = drag(longPress.id) { change ->
+                                                    dragOffset += change.positionChange().y
+                                                    change.consume()
+                                                }
+                                                if (dragged) {
+                                                    val di = draggedIndex
+                                                    if (di != null && itemHeightPx > 0f) {
+                                                        val spacerPx = with(localDensity) { 12.dp.toPx() }
+                                                        val stepPx = itemHeightPx + spacerPx
+                                                        val positions = (dragOffset / stepPx).roundToInt()
+                                                        val targetIdx = (di + positions).coerceIn(0, rounds.size - 1)
+                                                        if (targetIdx != di) {
+                                                            val item = rounds.removeAt(di)
+                                                            rounds.add(targetIdx, item)
+                                                        }
+                                                    }
+                                                }
+                                                draggedIndex = null
+                                                dragOffset = 0f
+                                            } else {
+                                                selectedRoundIndices = if (index in selectedRoundIndices)
+                                                    selectedRoundIndices - index
+                                                else
+                                                    selectedRoundIndices + index
+                                            }
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {

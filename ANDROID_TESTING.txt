@@ -161,8 +161,8 @@ C. PROFILE EDITOR UX + VALIDATION
 15) Add round works.
 16) Delete round works.
 17) Round name is limited to 30 characters (input truncated; saved names truncated in repository).
-18) Round selection and copy: each round shows a numbered circle on the left; tapping the circle toggles selection (highlighted card with primary border). When rounds are selected, "Copy × N" and Cancel buttons appear. Tapping "Copy × N" opens a dialog for number of copies (1–99). On confirm, the selected block (in order) is appended (N−1) times. Selection is cleared after copy, move, or delete.
-19) Round reordering: long press on non-interactive card area (padding/spacing) to pick up a round; drag vertically to move it; release to drop at the target position. Card lifts visually during drag (scale, shadow). Scroll is disabled while dragging.
+18) Round selection and copy: each round shows a numbered circle on the left. Tap the circle to toggle selection (highlighted card with primary border). When rounds are selected, "Copy × N" and Cancel buttons appear. Tapping "Copy × N" opens a dialog for number of copies (1–99). On confirm, the selected block (in order) is appended (N−1) times. Selection is cleared after copy, move, or delete.
+19) Round reordering: long press on the round number circle OR on non-interactive card area (padding/spacing) to pick up a round; drag vertically to move it; release to drop. Short tap on the number = select only; long press = drag. Card lifts visually during drag (scale, shadow). Scroll is disabled while dragging.
 20) Emoji field is limited to a single emoji/character (uses BreakIterator grapheme cluster detection).
 21) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
 22) Save persists profile and returns to list.
