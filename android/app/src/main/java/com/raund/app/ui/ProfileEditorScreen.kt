@@ -1,7 +1,12 @@
 package com.raund.app.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,16 +21,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Switch
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -38,8 +39,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -53,13 +55,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.raund.app.R
 import com.raund.app.data.repository.ProfileRepository
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,6 +91,12 @@ fun ProfileEditorScreen(
     val rounds = remember { mutableStateListOf<Triple<String, String, Boolean>>() }
     val isNew = profileId == null || profileId == "new"
     val isNameValid = name.trim().isNotEmpty()
+
+    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    var dragOffset by remember { mutableStateOf(0f) }
+    var itemHeightPx by remember { mutableStateOf(0f) }
+    val localDensity = LocalDensity.current
+    val haptics = LocalHapticFeedback.current
 
     LaunchedEffect(profileId) {
         if (!isNew && profileId != null) {
@@ -117,7 +134,7 @@ fun ProfileEditorScreen(
             modifier = Modifier
                 .padding(padding)
                 .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState(), enabled = draggedIndex == null)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
@@ -171,8 +188,58 @@ fun ProfileEditorScreen(
             )
             rounds.forEachIndexed { index, (rName, dur, warn) ->
                 val isSelected = selectedRoundIndices.contains(index)
+                val isDragged = draggedIndex == index
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            if (itemHeightPx == 0f) {
+                                itemHeightPx = coords.size.height.toFloat()
+                            }
+                        }
+                        .zIndex(if (isDragged) 1f else 0f)
+                        .graphicsLayer {
+                            if (isDragged) {
+                                translationY = dragOffset
+                                scaleX = 1.03f
+                                scaleY = 1.03f
+                                shadowElevation = 16f
+                            }
+                        }
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = true)
+                                val longPress = awaitLongPressOrCancellation(down.id)
+                                if (longPress != null) {
+                                    longPress.consume()
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    draggedIndex = index
+                                    dragOffset = 0f
+                                    selectedRoundIndices = emptySet()
+
+                                    val dragged = drag(longPress.id) { change ->
+                                        dragOffset += change.positionChange().y
+                                        change.consume()
+                                    }
+
+                                    if (dragged) {
+                                        val di = draggedIndex
+                                        if (di != null && itemHeightPx > 0f) {
+                                            val spacerPx = with(localDensity) { 12.dp.toPx() }
+                                            val stepPx = itemHeightPx + spacerPx
+                                            val positions = (dragOffset / stepPx).roundToInt()
+                                            val targetIdx = (di + positions).coerceIn(0, rounds.size - 1)
+                                            if (targetIdx != di) {
+                                                val item = rounds.removeAt(di)
+                                                rounds.add(targetIdx, item)
+                                            }
+                                        }
+                                    }
+                                    draggedIndex = null
+                                    dragOffset = 0f
+                                }
+                            }
+                        },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelected)
@@ -220,7 +287,7 @@ fun ProfileEditorScreen(
                                 label = { Text(stringResource(R.string.round_name)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).padding(end = 8.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -229,50 +296,15 @@ fun ProfileEditorScreen(
                             )
                             IconButton(
                                 onClick = {
-                                    if (index > 0) {
-                                        val item = rounds.removeAt(index)
-                                        rounds.add(index - 1, item)
-                                        selectedRoundIndices = emptySet()
-                                    }
-                                },
-                                modifier = Modifier.size(36.dp),
-                                enabled = index > 0
-                            ) {
-                                Icon(
-                                    Icons.Filled.KeyboardArrowUp,
-                                    contentDescription = stringResource(R.string.move_round_up),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            IconButton(
-                                onClick = {
-                                    if (index < rounds.size - 1) {
-                                        val item = rounds.removeAt(index)
-                                        rounds.add(index + 1, item)
-                                        selectedRoundIndices = emptySet()
-                                    }
-                                },
-                                modifier = Modifier.size(36.dp),
-                                enabled = index < rounds.size - 1
-                            ) {
-                                Icon(
-                                    Icons.Filled.KeyboardArrowDown,
-                                    contentDescription = stringResource(R.string.move_round_down),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            IconButton(
-                                onClick = {
                                     rounds.removeAt(index)
                                     selectedRoundIndices = emptySet()
                                 },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     Icons.Filled.Delete,
                                     contentDescription = stringResource(R.string.delete_round),
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
