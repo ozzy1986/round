@@ -1,0 +1,19 @@
+{
+  "bot.welcome": "Round — таймери интервалӣ. Амалро аз поён интихоб кунед.",
+  "bot.btn_profiles": "Машқҳо",
+  "bot.btn_quick_timer": "Таймери зуд",
+  "bot.btn_back": "Бозгашт",
+  "bot.profiles_title": "Машқҳои шумо (барои оғоз пахш кунед):",
+  "bot.profiles_empty": "Ҳанӯз машқҳо нестанд. Дар барнома созед ё таймери зудро интихоб кунед.",
+  "bot.quick_title": "Таймери зуд (барои оғоз пахш кунед):",
+  "bot.template_3x5_1": "3×5+1",
+  "bot.template_5x3_1": "5×3+1",
+  "bot.template_5run_5walk": "5 давидан, 5 қадамзанӣ",
+  "bot.timer_starting": "Оғоз: {name}",
+  "bot.timer_round": "{name}",
+  "bot.timer_warn10": "{name} пас аз 10 сония",
+  "bot.timer_finished": "Машқ анҷом ёфт.",
+  "bot.profile_not_found": "Машқ ёфт нашуд.",
+  "bot.timer_already_running": "Таймер аллакай кор мекунад. Анҷомро интизор шавед.",
+  "bot.error": "Хатогӣ рӯй дод."
+}

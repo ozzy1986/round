@@ -19,6 +19,7 @@
     <string name="timer_finished">Тренировка завершена</string>
     <string name="timer_stopped">Тренировка остановлена</string>
     <string name="timer_warn10">%s через 10 секунд</string>
+    <string name="timer_finished_name">Тренировка %s завершена</string>
     <string name="save">Сохранить</string>
     <string name="back">Назад</string>
     <string name="restart_timer">Повторить</string>

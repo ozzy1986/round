@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Round</string>
+    <string name="profiles">Жаттығулар</string>
+    <string name="add_profile">Жаттығу қосу</string>
+    <string name="edit_profile">Жаттығуды өңдеу</string>
+    <string name="new_profile">Жаңа жаттығу</string>
+    <string name="profile_name">Атауы</string>
+    <string name="profile_emoji">Эмодзи</string>
+    <string name="rounds">Раундтар</string>
+    <string name="round_name">Раунд атауы</string>
+    <string name="duration_seconds">Сек.</string>
+    <string name="warn_10_sec">10 сек ескерту</string>
+    <string name="start_timer">Бастау</string>
+    <string name="stop_timer">Тоқтату</string>
+    <string name="pause_timer">Кідірту</string>
+    <string name="resume_timer">Жалғастыру</string>
+    <string name="timer_paused">Кідіртілді</string>
+    <string name="timer_finished">Жаттығу аяқталды</string>
+    <string name="timer_stopped">Жаттығу тоқтатылды</string>
+    <string name="timer_warn10">%s 10 секундтан кейін</string>
+    <string name="timer_finished_name">Жаттығу %s аяқталды</string>
+    <string name="save">Сақтау</string>
+    <string name="back">Артқа</string>
+    <string name="restart_timer">Қайталау</string>
+    <string name="add_round">Раунд қосу</string>
+    <string name="no_profiles">Жаттығулар жоқ. + басыңыз.</string>
+    <string name="create_first_profile">Бірінші жаттығу жасау</string>
+    <string name="delete_profile">Жаттығуды жою</string>
+    <string name="delete_round">Раундты жою</string>
+    <string name="no_rounds">Осы жаттығуға кемінде бір раунд қосыңыз.</string>
+    <string name="no_rounds_short">Раундсыз</string>
+    <string name="profile_summary">Раундтар: %1$d \u2022 %2$s</string>
+    <string name="profile_name_required">Жаттығу атауы міндетті.</string>
+    <string name="unnamed_profile">Атаусыз жаттығу</string>
+    <string name="delete_profile_confirm">Бұл жаттығуды жоясыз ба? Бұл әрекетті қайтару мүмкін емес.</string>
+    <string name="delete_profile_confirm_title">Жаттығуды жою</string>
+    <string name="cancel">Болдырмау</string>
+    <string name="sync">Синхрондау</string>
+    <string name="copy_selected_n_times">%d таңдалған раундты көшіру</string>
+    <string name="number_of_copies">Көшірмелер саны</string>
+    <string name="copy_rounds">Көшіру</string>
+    <string name="move_round_up">Жоғарыға</string>
+    <string name="move_round_down">Төменге</string>
+    <string name="reorder_round">Реттеу үшін ұстап сүйреңіз</string>
+</resources>

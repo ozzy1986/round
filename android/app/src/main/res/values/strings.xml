@@ -19,6 +19,7 @@
     <string name="timer_finished">Training finished</string>
     <string name="timer_stopped">Training stopped</string>
     <string name="timer_warn10">%s in 10 seconds</string>
+    <string name="timer_finished_name">Training %s finished</string>
     <string name="save">Save</string>
     <string name="back">Back</string>
     <string name="restart_timer">Restart</string>

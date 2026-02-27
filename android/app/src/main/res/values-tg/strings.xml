@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Round</string>
+    <string name="profiles">Машқҳо</string>
+    <string name="add_profile">Машқ илова кардан</string>
+    <string name="edit_profile">Машқро таҳрир кардан</string>
+    <string name="new_profile">Машқи нав</string>
+    <string name="profile_name">Ном</string>
+    <string name="profile_emoji">Эмоҷӣ</string>
+    <string name="rounds">Раундҳо</string>
+    <string name="round_name">Номи раунд</string>
+    <string name="duration_seconds">Сон.</string>
+    <string name="warn_10_sec">Огоҳӣ 10 сония</string>
+    <string name="start_timer">Оғоз</string>
+    <string name="stop_timer">Истодан</string>
+    <string name="pause_timer">Таваққуф</string>
+    <string name="resume_timer">Идома додан</string>
+    <string name="timer_paused">Таваққуф</string>
+    <string name="timer_finished">Машқ анҷом ёфт</string>
+    <string name="timer_stopped">Машқ бозистонда шуд</string>
+    <string name="timer_warn10">%s пас аз 10 сония</string>
+    <string name="timer_finished_name">Машқи %s анҷом ёфт</string>
+    <string name="save">Нигоҳ доштан</string>
+    <string name="back">Бозгашт</string>
+    <string name="restart_timer">Такрор</string>
+    <string name="add_round">Раунд илова кардан</string>
+    <string name="no_profiles">Ҳанӯз машқҳо нестанд. + -ро пахш кунед.</string>
+    <string name="create_first_profile">Машқи аввалинро созед</string>
+    <string name="delete_profile">Машқро нест кардан</string>
+    <string name="delete_round">Раундро нест кардан</string>
+    <string name="no_rounds">Ба ин машқ ҳадди ақал як раунд илова кунед.</string>
+    <string name="no_rounds_short">Бе раунд</string>
+    <string name="profile_summary">Раундҳо: %1$d \u2022 %2$s</string>
+    <string name="profile_name_required">Номи машқ ҳатмист.</string>
+    <string name="unnamed_profile">Машқи беном</string>
+    <string name="delete_profile_confirm">Ин машқро нест мекунед? Ин амал бозгашт надорад.</string>
+    <string name="delete_profile_confirm_title">Машқро нест кардан</string>
+    <string name="cancel">Бекор кардан</string>
+    <string name="sync">Ҳамоҳангсозӣ</string>
+    <string name="copy_selected_n_times">%d раунди интихобшударо нусхабардорӣ</string>
+    <string name="number_of_copies">Миқдори нусхаҳо</string>
+    <string name="copy_rounds">Нусхабардорӣ</string>
+    <string name="move_round_up">Боло</string>
+    <string name="move_round_down">Поён</string>
+    <string name="reorder_round">Барои тартибдиҳӣ пахш карда нигоҳ доред</string>
+</resources>

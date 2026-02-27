@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Round</string>
+    <string name="profiles">Күнегүләр</string>
+    <string name="add_profile">Күнегү өстәү</string>
+    <string name="edit_profile">Күнегүне үзгәртү</string>
+    <string name="new_profile">Яңа күнегү</string>
+    <string name="profile_name">Исем</string>
+    <string name="profile_emoji">Эмодзи</string>
+    <string name="rounds">Раундлар</string>
+    <string name="round_name">Раунд исеме</string>
+    <string name="duration_seconds">Сек.</string>
+    <string name="warn_10_sec">10 сек кисәтү</string>
+    <string name="start_timer">Башлау</string>
+    <string name="stop_timer">Туктату</string>
+    <string name="pause_timer">Тукталыш</string>
+    <string name="resume_timer">Дәвам итү</string>
+    <string name="timer_paused">Тукталыш</string>
+    <string name="timer_finished">Күнегү тәмамланды</string>
+    <string name="timer_stopped">Күнегү тукталтылды</string>
+    <string name="timer_warn10">%s 10 секундтан соң</string>
+    <string name="timer_finished_name">Күнегү %s тәмамланды</string>
+    <string name="save">Саклау</string>
+    <string name="back">Артка</string>
+    <string name="restart_timer">Кабатлау</string>
+    <string name="add_round">Раунд өстәү</string>
+    <string name="no_profiles">Әлегә күнегүләр юк. + басыгыз.</string>
+    <string name="create_first_profile">Беренче күнегүне ясагыз</string>
+    <string name="delete_profile">Күнегүне бетерү</string>
+    <string name="delete_round">Раундны бетерү</string>
+    <string name="no_rounds">Бу күнегүгә кимендә бер раунд өстәгез.</string>
+    <string name="no_rounds_short">Раундсыз</string>
+    <string name="profile_summary">Раундлар: %1$d \u2022 %2$s</string>
+    <string name="profile_name_required">Күнегү исеме кирәк.</string>
+    <string name="unnamed_profile">Исемсез күнегү</string>
+    <string name="delete_profile_confirm">Бу күнегүне бетерәсезме? Бу кире кайтарылмый.</string>
+    <string name="delete_profile_confirm_title">Күнегүне бетерү</string>
+    <string name="cancel">Баш тарту</string>
+    <string name="sync">Синхронлау</string>
+    <string name="copy_selected_n_times">%d сайланган раундны күчермәләү</string>
+    <string name="number_of_copies">Күчермәләр саны</string>
+    <string name="copy_rounds">Күчермәләү</string>
+    <string name="move_round_up">Өскә</string>
+    <string name="move_round_down">Аска</string>
+    <string name="reorder_round">Тәртипкә китерү өчен басып тотыгыз</string>
+</resources>

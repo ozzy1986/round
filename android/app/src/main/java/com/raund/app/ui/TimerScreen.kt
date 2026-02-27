@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerEngine
@@ -136,6 +137,7 @@ fun TimerScreen(
     val pauseTimerText = stringResource(R.string.pause_timer)
     val resumeTimerText = stringResource(R.string.resume_timer)
     val timerPausedText = stringResource(R.string.timer_paused)
+    val timerFinishedNameFmt = stringResource(R.string.timer_finished_name)
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
@@ -146,8 +148,13 @@ fun TimerScreen(
         ttsEngine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts = ttsEngine
-                val locale = if (Locale.getDefault().language == "ru") Locale.forLanguageTag("ru") else Locale.getDefault()
-                ttsEngine.setLanguage(locale)
+                val appLang = LocaleManager.currentLanguageTag(context)
+                val ttsLocale = when (appLang) {
+                    "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
+                    "az", "uz" -> Locale.forLanguageTag("tr")
+                    else -> Locale.forLanguageTag(appLang)
+                }
+                ttsEngine.setLanguage(ttsLocale)
                 val audioAttributes = android.media.AudioAttributes.Builder()
                     .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -425,7 +432,7 @@ fun TimerScreen(
                                             paused = false
                                             val trainingName = p.name
                                             scope.launch {
-                                                val phrase = "Тренировка $trainingName завершена"
+                                                val phrase = String.format(timerFinishedNameFmt, trainingName)
                                                 tts?.speak(phrase, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
                                         }

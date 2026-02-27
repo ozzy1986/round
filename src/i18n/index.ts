@@ -3,12 +3,22 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const en = JSON.parse(readFileSync(join(__dirname, 'en.json'), 'utf-8')) as Record<string, string>;
-const ru = JSON.parse(readFileSync(join(__dirname, 'ru.json'), 'utf-8')) as Record<string, string>;
 
-export type Locale = 'en' | 'ru';
+function loadBundle(file: string): Record<string, string> {
+  return JSON.parse(readFileSync(join(__dirname, file), 'utf-8')) as Record<string, string>;
+}
 
-const bundles: Record<Locale, Record<string, string>> = { en, ru };
+const en = loadBundle('en.json');
+const ru = loadBundle('ru.json');
+const uz = loadBundle('uz.json');
+const kk = loadBundle('kk.json');
+const az = loadBundle('az.json');
+const tg = loadBundle('tg.json');
+const tt = loadBundle('tt.json');
+
+export type Locale = 'en' | 'ru' | 'uz' | 'kk' | 'az' | 'tg' | 'tt';
+
+const bundles: Record<Locale, Record<string, string>> = { en, ru, uz, kk, az, tg, tt };
 
 const FALLBACK: Locale = 'en';
 
@@ -33,9 +43,12 @@ export function getString(
 /**
  * Normalizes Telegram language_code to our Locale.
  */
+const LOCALE_MAP: Record<string, Locale> = {
+  ru: 'ru', uz: 'uz', kk: 'kk', az: 'az', tg: 'tg', tt: 'tt',
+};
+
 export function localeFromTelegram(langCode: string | undefined): Locale {
   if (!langCode) return FALLBACK;
   const lower = langCode.slice(0, 2).toLowerCase();
-  if (lower === 'ru') return 'ru';
-  return 'en';
+  return LOCALE_MAP[lower] ?? FALLBACK;
 }

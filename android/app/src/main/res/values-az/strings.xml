@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Round</string>
+    <string name="profiles">Məşqlər</string>
+    <string name="add_profile">Məşq əlavə et</string>
+    <string name="edit_profile">Məşqi redaktə et</string>
+    <string name="new_profile">Yeni məşq</string>
+    <string name="profile_name">Ad</string>
+    <string name="profile_emoji">Emoji</string>
+    <string name="rounds">Raundlar</string>
+    <string name="round_name">Raund adı</string>
+    <string name="duration_seconds">San.</string>
+    <string name="warn_10_sec">10 san xəbərdarlıq</string>
+    <string name="start_timer">Başla</string>
+    <string name="stop_timer">Dayandır</string>
+    <string name="pause_timer">Fasilə</string>
+    <string name="resume_timer">Davam et</string>
+    <string name="timer_paused">Fasilə</string>
+    <string name="timer_finished">Məşq başa çatdı</string>
+    <string name="timer_stopped">Məşq dayandırıldı</string>
+    <string name="timer_warn10">%s 10 saniyəyə</string>
+    <string name="timer_finished_name">Məşq %s başa çatdı</string>
+    <string name="save">Saxla</string>
+    <string name="back">Geri</string>
+    <string name="restart_timer">Təkrarla</string>
+    <string name="add_round">Raund əlavə et</string>
+    <string name="no_profiles">Hələ məşq yoxdur. + basın.</string>
+    <string name="create_first_profile">İlk məşqi yaradın</string>
+    <string name="delete_profile">Məşqi sil</string>
+    <string name="delete_round">Raundu sil</string>
+    <string name="no_rounds">Bu məşqə ən azı bir raund əlavə edin.</string>
+    <string name="no_rounds_short">Raundsuz</string>
+    <string name="profile_summary">Raundlar: %1$d \u2022 %2$s</string>
+    <string name="profile_name_required">Məşq adı tələb olunur.</string>
+    <string name="unnamed_profile">Adsız məşq</string>
+    <string name="delete_profile_confirm">Bu məşqi siləcəksiniz? Bu əməliyyatı geri qaytarmaq olmaz.</string>
+    <string name="delete_profile_confirm_title">Məşqi sil</string>
+    <string name="cancel">Ləğv et</string>
+    <string name="sync">Sinxronizasiya</string>
+    <string name="copy_selected_n_times">%d seçilmiş raundu kopyala</string>
+    <string name="number_of_copies">Kopya sayı</string>
+    <string name="copy_rounds">Kopyala</string>
+    <string name="move_round_up">Yuxarı</string>
+    <string name="move_round_down">Aşağı</string>
+    <string name="reorder_round">Sıralamaq üçün basıb saxlayın</string>
+</resources>

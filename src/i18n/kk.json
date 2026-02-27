@@ -1,0 +1,19 @@
+{
+  "bot.welcome": "Round — интервалды таймер. Төмендегі әрекетті таңдаңыз.",
+  "bot.btn_profiles": "Жаттығулар",
+  "bot.btn_quick_timer": "Жылдам таймер",
+  "bot.btn_back": "Артқа",
+  "bot.profiles_title": "Сіздің жаттығуларыңыз (бастау үшін басыңыз):",
+  "bot.profiles_empty": "Әзірге жаттығулар жоқ. Қолданбада жасаңыз немесе жылдам таймерді таңдаңыз.",
+  "bot.quick_title": "Жылдам таймер (бастау үшін басыңыз):",
+  "bot.template_3x5_1": "3×5+1",
+  "bot.template_5x3_1": "5×3+1",
+  "bot.template_5run_5walk": "5 жүгіру, 5 жүру",
+  "bot.timer_starting": "Басталуда: {name}",
+  "bot.timer_round": "{name}",
+  "bot.timer_warn10": "{name} 10 секундтан кейін",
+  "bot.timer_finished": "Жаттығу аяқталды.",
+  "bot.profile_not_found": "Жаттығу табылмады.",
+  "bot.timer_already_running": "Таймер қазірдің өзінде жұмыс істеп тұр. Аяқталуын күтіңіз.",
+  "bot.error": "Бірдеңе дұрыс болмады."
+}

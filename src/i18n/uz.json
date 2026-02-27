@@ -1,0 +1,19 @@
+{
+  "bot.welcome": "Round — interval taymer. Quyidagi amalni tanlang.",
+  "bot.btn_profiles": "Mashg'ulotlar",
+  "bot.btn_quick_timer": "Tezkor taymer",
+  "bot.btn_back": "Orqaga",
+  "bot.profiles_title": "Sizning mashg'ulotlaringiz (boshlash uchun bosing):",
+  "bot.profiles_empty": "Hali mashg'ulotlar yo'q. Ilovada yarating yoki tezkor taymerni tanlang.",
+  "bot.quick_title": "Tezkor taymer (boshlash uchun bosing):",
+  "bot.template_3x5_1": "3×5+1",
+  "bot.template_5x3_1": "5×3+1",
+  "bot.template_5run_5walk": "5 yugurish, 5 yurish",
+  "bot.timer_starting": "Boshlanmoqda: {name}",
+  "bot.timer_round": "{name}",
+  "bot.timer_warn10": "{name} 10 soniyadan keyin",
+  "bot.timer_finished": "Mashg'ulot tugadi.",
+  "bot.profile_not_found": "Mashg'ulot topilmadi.",
+  "bot.timer_already_running": "Taymer allaqachon ishlayapti. Tugashini kuting.",
+  "bot.error": "Xatolik yuz berdi."
+}

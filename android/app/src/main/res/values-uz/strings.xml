@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Round</string>
+    <string name="profiles">Mashg\'ulotlar</string>
+    <string name="add_profile">Mashg\'ulot qo\'shish</string>
+    <string name="edit_profile">Mashg\'ulotni tahrirlash</string>
+    <string name="new_profile">Yangi mashg\'ulot</string>
+    <string name="profile_name">Nomi</string>
+    <string name="profile_emoji">Emoji</string>
+    <string name="rounds">Raundlar</string>
+    <string name="round_name">Raund nomi</string>
+    <string name="duration_seconds">Son.</string>
+    <string name="warn_10_sec">10 son oldin ogohlantirish</string>
+    <string name="start_timer">Boshlash</string>
+    <string name="stop_timer">To\'xtatish</string>
+    <string name="pause_timer">Pauza</string>
+    <string name="resume_timer">Davom ettirish</string>
+    <string name="timer_paused">Pauzada</string>
+    <string name="timer_finished">Mashg\'ulot tugadi</string>
+    <string name="timer_stopped">Mashg\'ulot to\'xtatildi</string>
+    <string name="timer_warn10">%s 10 soniyadan keyin</string>
+    <string name="timer_finished_name">Mashg\'ulot %s tugadi</string>
+    <string name="save">Saqlash</string>
+    <string name="back">Orqaga</string>
+    <string name="restart_timer">Qaytadan</string>
+    <string name="add_round">Raund qo\'shish</string>
+    <string name="no_profiles">Hali mashg\'ulotlar yo\'q. + bosing.</string>
+    <string name="create_first_profile">Birinchi mashg\'ulotni yarating</string>
+    <string name="delete_profile">Mashg\'ulotni o\'chirish</string>
+    <string name="delete_round">Raundni o\'chirish</string>
+    <string name="no_rounds">Bu mashg\'ulotga kamida bitta raund qo\'shing.</string>
+    <string name="no_rounds_short">Raundsiz</string>
+    <string name="profile_summary">Raundlar: %1$d \u2022 %2$s</string>
+    <string name="profile_name_required">Mashg\'ulot nomi kiritilishi shart.</string>
+    <string name="unnamed_profile">Nomsiz mashg\'ulot</string>
+    <string name="delete_profile_confirm">Bu mashg\'ulotni o\'chirasizmi? Buni qaytarib bo\'lmaydi.</string>
+    <string name="delete_profile_confirm_title">Mashg\'ulotni o\'chirish</string>
+    <string name="cancel">Bekor qilish</string>
+    <string name="sync">Sinxronlash</string>
+    <string name="copy_selected_n_times">%d tanlangan raundni nusxalash</string>
+    <string name="number_of_copies">Nusxalar soni</string>
+    <string name="copy_rounds">Nusxalash</string>
+    <string name="move_round_up">Yuqoriga</string>
+    <string name="move_round_down">Pastga</string>
+    <string name="reorder_round">Tartibni o\'zgartirish uchun bosib turing</string>
+</resources>

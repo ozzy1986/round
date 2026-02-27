@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -60,6 +62,16 @@ import com.raund.app.R
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 
+private val supportedLanguages = listOf(
+    "en" to "English",
+    "ru" to "Русский",
+    "uz" to "Oʻzbek",
+    "kk" to "Қазақ",
+    "az" to "Azərbaycan",
+    "tg" to "Тоҷикӣ",
+    "tt" to "Татар",
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileListScreen(
@@ -83,23 +95,52 @@ fun ProfileListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.profiles), fontWeight = FontWeight.Bold) },
                 actions = {
-                    Surface(
-                        onClick = {
-                            val newLang = if (currentLang == "ru") "en" else "ru"
-                            currentLang = newLang
-                            LocaleManager.setLanguage(context, newLang)
-                            (context as? Activity)?.recreate()
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ) {
-                        Text(
-                            currentLang.uppercase(),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Box {
+                        var langMenuExpanded by remember { mutableStateOf(false) }
+                        Surface(
+                            onClick = { langMenuExpanded = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ) {
+                            Text(
+                                currentLang.uppercase(),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = langMenuExpanded,
+                            onDismissRequest = { langMenuExpanded = false }
+                        ) {
+                            supportedLanguages.forEach { (code, name) ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                code.uppercase(),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.width(28.dp)
+                                            )
+                                            Text(name, style = MaterialTheme.typography.bodyMedium)
+                                        }
+                                    },
+                                    onClick = {
+                                        langMenuExpanded = false
+                                        if (code != currentLang) {
+                                            currentLang = code
+                                            LocaleManager.setLanguage(context, code)
+                                            (context as? Activity)?.recreate()
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                     IconButton(
                         onClick = { scope.launch { repository.syncFromApi() } }

@@ -78,6 +78,14 @@ async function getTokenForTelegramUser(telegramId: number): Promise<string | nul
   }
 }
 
+function ttsLangFromCode(langCode: string | undefined): string {
+  if (!langCode) return 'en-US';
+  const lower = langCode.slice(0, 2).toLowerCase();
+  if (['ru', 'kk', 'tg', 'tt'].includes(lower)) return 'ru-RU';
+  if (['az', 'uz'].includes(lower)) return 'tr-TR';
+  return 'en-US';
+}
+
 function getLocale(ctx: Context): Locale {
   const from = ctx.from;
   const langCode = from?.language_code;
@@ -160,7 +168,7 @@ async function runTimer(
 
   let state: TimerState | null = getInitialState(profile);
   const langCode = ctx.from?.language_code;
-  const ttsLang = langCode?.startsWith('ru') ? 'ru-RU' : 'en-US';
+  const ttsLang = ttsLangFromCode(langCode);
 
   const sendCachedVoice = async (text: string): Promise<void> => {
     const key = `${text}:${ttsLang}`;
