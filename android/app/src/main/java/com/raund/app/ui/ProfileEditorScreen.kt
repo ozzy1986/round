@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Switch
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -66,6 +67,9 @@ fun ProfileEditorScreen(
     var emoji by remember { mutableStateOf("⏱") }
     var showNameError by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var selectedRoundIndices by remember { mutableStateOf(setOf<Int>()) }
+    var showCopyNDialog by remember { mutableStateOf(false) }
+    var copyNValue by remember { mutableStateOf("12") }
     val rounds = remember { mutableStateListOf<Triple<String, String, Boolean>>() }
     val isNew = profileId == null || profileId == "new"
     val isNameValid = name.trim().isNotEmpty()
@@ -159,9 +163,16 @@ fun ProfileEditorScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            Checkbox(
+                                checked = selectedRoundIndices.contains(index),
+                                onCheckedChange = {
+                                    selectedRoundIndices = if (it) selectedRoundIndices + index else selectedRoundIndices - index
+                                },
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
                             OutlinedTextField(
                                 value = rName,
-                                onValueChange = { rounds[index] = Triple(it, dur, warn) },
+                                onValueChange = { newVal -> rounds[index] = Triple(newVal.take(30), dur, warn) },
                                 label = { Text(stringResource(R.string.round_name)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
@@ -173,7 +184,10 @@ fun ProfileEditorScreen(
                                 )
                             )
                             IconButton(
-                                onClick = { rounds.removeAt(index) },
+                                onClick = {
+                                    rounds.removeAt(index)
+                                    selectedRoundIndices = emptySet()
+                                },
                                 modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
@@ -227,6 +241,31 @@ fun ProfileEditorScreen(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
+            if (selectedRoundIndices.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            copyNValue = "12"
+                            showCopyNDialog = true
+                        },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.copy_rounds) + " × N",
+                            fontSize = 14.sp
+                        )
+                    }
+                    TextButton(onClick = { selectedRoundIndices = emptySet() }) {
+                        Text(stringResource(R.string.cancel), fontSize = 14.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = { rounds.add(Triple("", "60", false)) },
@@ -249,9 +288,9 @@ fun ProfileEditorScreen(
                     scope.launch {
                         val id = if (isNew) repository.insertProfile(safeName, safeEmoji) else profileId!!
                         if (!isNew) repository.updateProfile(profileId!!, safeName, safeEmoji)
-                        val roundsToSave = rounds.map { (name, durString, warn) ->
+                        val roundsToSave = rounds.map { (rName, durString, warn) ->
                             val durInt = durString.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            Triple(name, durInt, warn)
+                            Triple(rName.take(30), durInt, warn)
                         }
                         repository.saveRounds(id, roundsToSave)
                         onBack()
@@ -301,6 +340,45 @@ fun ProfileEditorScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+        if (showCopyNDialog) {
+            val sortedIndices = selectedRoundIndices.sorted()
+            val block = sortedIndices.map { rounds[it] }
+            AlertDialog(
+                onDismissRequest = { showCopyNDialog = false },
+                title = { Text(stringResource(R.string.number_of_copies), fontWeight = FontWeight.SemiBold) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.copy_selected_n_times, block.size), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = copyNValue,
+                            onValueChange = { copyNValue = it.filter { c -> c.isDigit() }.take(2) },
+                            label = { Text(stringResource(R.string.number_of_copies)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showCopyNDialog = false
+                            val copies = copyNValue.toIntOrNull()?.coerceIn(1, 99) ?: 1
+                            repeat(copies - 1) { block.forEach { rounds.add(it) } }
+                            selectedRoundIndices = emptySet()
+                        }
+                    ) {
+                        Text(stringResource(R.string.copy_rounds))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showCopyNDialog = false }) {
                         Text(stringResource(R.string.cancel))
                     }
                 }

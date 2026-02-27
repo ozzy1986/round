@@ -33,4 +33,7 @@
     <string name="delete_profile_confirm_title">Удалить тренировку</string>
     <string name="cancel">Отмена</string>
     <string name="sync">Синхронизировать</string>
+    <string name="copy_selected_n_times">Копировать выбранные %d раунд(ов) N раз</string>
+    <string name="number_of_copies">Количество копий</string>
+    <string name="copy_rounds">Копировать</string>
 </resources>

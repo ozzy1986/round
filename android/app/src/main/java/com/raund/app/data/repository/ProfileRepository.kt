@@ -77,7 +77,7 @@ class ProfileRepository(
 
     suspend fun saveRounds(profileId: String, rounds: List<Triple<String, Int, Boolean>>) = withContext(Dispatchers.IO) {
         val sanitizedRounds = rounds.mapNotNull { (name, durationSeconds, warn10sec) ->
-            val safeName = name.trim()
+            val safeName = name.trim().take(30)
             if (safeName.isBlank()) {
                 null
             } else {

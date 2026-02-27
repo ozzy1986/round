@@ -160,15 +160,17 @@ C. PROFILE EDITOR UX + VALIDATION
 14) Emoji blank fallback is handled as stopwatch emoji after save.
 15) Add round works.
 16) Delete round works.
-17) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
-18) Save persists profile and returns to list.
-19) Delete profile: tapping "Delete profile" shows confirmation dialog (title + message in RU/EN); Cancel dismisses; Confirm deletes and returns to list.
-20) Back navigation from editor returns to list without crash.
+17) Round name is limited to 30 characters (input truncated; saved names truncated in repository).
+18) Copy selected rounds N times: each round has a checkbox; when one or more rounds are selected, "Copy × N" and Cancel appear; tapping "Copy × N" opens a dialog for number of copies (1–99); on confirm, the selected block (in order) is appended (N−1) times (so the block appears N times in total); selection is cleared after copy and when any round is deleted.
+19) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
+20) Save persists profile and returns to list.
+21) Delete profile: tapping "Delete profile" shows confirmation dialog (title + message in RU/EN); Cancel dismisses; Confirm deletes and returns to list.
+22) Back navigation from editor returns to list without crash.
 
 D. TIMER UX / STATE MACHINE
-21) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.
-22) Start begins countdown and transitions between rounds correctly.
-23) Warn-10: ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No ticks for short rounds (e.g. 5 sec). TTS says "%s через 10 секунд" when remainingSeconds hits 10 (for rounds >= 10 sec with warn enabled).
+23) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.
+24) Start begins countdown and transitions between rounds correctly.
+25) Warn-10: ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No ticks for short rounds (e.g. 5 sec). TTS says "%s через 10 секунд" when remainingSeconds hits 10 (for rounds >= 10 sec with warn enabled).
 24) Manual Stop shows "Тренировка остановлена" (or EN equivalent).
 25) Natural completion shows "Тренировка завершена" (or EN equivalent).
 26) Restart button returns to initial timer state.
@@ -218,6 +220,11 @@ Run in order. After any code change, re-run from scenario 1.
     4.3 "Добавить раунд" / "Add round": add round name "Работа", duration 15, tick "Предупредить за 10 сек". Add second round: "Отдых", 10, no tick.
     4.4 Save → back to list, profile appears with "Раундов: 2 • 00:25" (or similar).
     4.5 Tap profile card → editor opens with same data.
+
+ 4a. COPY ROUNDS N TIMES (e.g. boxing 12×3+1)
+    4a.1 New profile: name "Бой 12 раундов", add round "Работа" 180 sec (3 min), add round "Отдых" 60 sec (1 min).
+    4a.2 Select both rounds (checkboxes), tap "Копировать × N", enter 12, confirm. List has 24 rounds (12 work + 12 rest).
+    4a.3 Delete last round (no rest after final bell). Save. Profile has 23 rounds. Run timer to verify order and transitions.
 
  5. EDIT PROFILE
     5.1 Open profile, change name/emoji, add/remove round, change duration. Save → list updated.
