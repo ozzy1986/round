@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -233,12 +234,18 @@ fun TimerScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     if (roundInfo.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            roundInfo,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = onSurfaceVarColor
-                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = surfaceVarColor
+                        ) {
+                            Text(
+                                roundInfo,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = onSurfaceVarColor,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                     
                     Spacer(modifier = Modifier.height(48.dp))
@@ -375,7 +382,7 @@ fun TimerScreen(
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.start_timer), modifier = Modifier.size(32.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             stringResource(R.string.start_timer),
@@ -402,7 +409,7 @@ fun TimerScreen(
                             contentColor = MaterialTheme.colorScheme.onError
                         )
                     ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(32.dp))
+                        Icon(Icons.Filled.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(32.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             stringResource(R.string.stop_timer),

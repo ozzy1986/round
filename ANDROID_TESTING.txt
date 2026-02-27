@@ -162,11 +162,11 @@ C. PROFILE EDITOR UX + VALIDATION
 16) Delete round works.
 17) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
 18) Save persists profile and returns to list.
-19) Delete profile removes it and returns to list.
+19) Delete profile: tapping "Delete profile" shows confirmation dialog (title + message in RU/EN); Cancel dismisses; Confirm deletes and returns to list.
 20) Back navigation from editor returns to list without crash.
 
 D. TIMER UX / STATE MACHINE
-21) Pre-start timer shows current round name, step indicator, and countdown.
+21) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.
 22) Start begins countdown and transitions between rounds correctly.
 23) Warn-10: ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No ticks for short rounds (e.g. 5 sec). TTS says "%s через 10 секунд" when remainingSeconds hits 10 (for rounds >= 10 sec with warn enabled).
 24) Manual Stop shows "Тренировка остановлена" (or EN equivalent).
@@ -186,14 +186,15 @@ E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with d
 
 F. ACCESSIBILITY / I18N (Russian as primary check)
 35) When device locale is RU: all UI and TTS use Russian (Профили, Старт, Стоп, Тренировка завершена, Повторить, "X через 10 секунд"). Round names spoken by TTS use device locale (use Russian names in profile for full RU experience).
-36) contentDescription labels are localized (check via UI dump XML).
+36) contentDescription labels are localized (check via UI dump XML); all icon buttons have contentDescription (Add, Delete, Start, Stop, Back).
 37) English strings used when device locale is EN.
+38) "Add round" button shows icon + "Add round" / "Добавить раунд" (no duplicate plus in label).
 
 G. STABILITY / LOGS / QUALITY
-38) `adb logcat --pid=<appPid> -d` contains no app crash stack traces.
-39) No repeated app-specific error loops after 1-2 minute idle.
-40) `cd android && .\gradlew.bat :app:lintDebug` passes (0 errors).
-41) Build + install + launch cycle repeats cleanly.
+39) `adb logcat --pid=<appPid> -d` contains no app crash stack traces.
+40) No repeated app-specific error loops after 1-2 minute idle.
+41) `cd android && .\gradlew.bat :app:lintDebug` passes (0 errors).
+42) Build + install + launch cycle repeats cleanly.
 
 FULL LIST OF TEST SCENARIOS (go through all; restart from top if any fix is made)
 ===============================================================================
@@ -214,13 +215,13 @@ Run in order. After any code change, re-run from scenario 1.
  4. CREATE PROFILE
     4.1 FAB or "Создать первый профиль" → editor with empty name, emoji, no rounds.
     4.2 Save disabled while name blank. Enter name → Save enabled.
-    4.3 Add round: name "Работа", duration 15, tick "Предупредить за 10 сек". Add second round: "Отдых", 10, no tick.
+    4.3 "Добавить раунд" / "Add round": add round name "Работа", duration 15, tick "Предупредить за 10 сек". Add second round: "Отдых", 10, no tick.
     4.4 Save → back to list, profile appears with "Раундов: 2 • 00:25" (or similar).
     4.5 Tap profile card → editor opens with same data.
 
  5. EDIT PROFILE
     5.1 Open profile, change name/emoji, add/remove round, change duration. Save → list updated.
-    5.2 Delete round, save. Delete profile → confirm, back to list, profile gone.
+    5.2 Delete round, save. Tap "Delete profile" → confirmation dialog (title "Удалить профиль" / "Delete profile", message, Cancel / Confirm); Confirm → profile deleted, back to list.
 
  6. PROFILE WITHOUT ROUNDS
     6.1 Create profile with name only, no rounds. Save. In list, Start (play) is disabled; subtitle "Без раундов".
@@ -254,12 +255,6 @@ Run in order. After any code change, re-run from scenario 1.
 13. LINT AND BUILD
     13.1 :app:lintDebug 0 errors.
     13.2 assembleDebug, install, launch — no crash.
-
-F. STABILITY / LOGS / QUALITY
-32) `adb logcat --pid=<appPid> -d` contains no app crash stack traces.
-33) No repeated app-specific error loops after 1-2 minute idle.
-34) `cd android && .\gradlew.bat :app:lintDebug` passes (0 errors).
-35) Build + install + launch cycle repeats cleanly.
 
 NOTES
 -----

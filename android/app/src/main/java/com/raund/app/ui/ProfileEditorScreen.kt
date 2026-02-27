@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -30,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -63,6 +65,7 @@ fun ProfileEditorScreen(
     var name by remember { mutableStateOf("") }
     var emoji by remember { mutableStateOf("⏱") }
     var showNameError by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val rounds = remember { mutableStateListOf<Triple<String, String, Boolean>>() }
     val isNew = profileId == null || profileId == "new"
     val isNameValid = name.trim().isNotEmpty()
@@ -226,7 +229,7 @@ fun ProfileEditorScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Filled.Add, contentDescription = null)
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_round))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.add_round), fontSize = 16.sp)
             }
@@ -259,24 +262,45 @@ fun ProfileEditorScreen(
             if (!isNew) {
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            repository.deleteProfile(profileId!!)
-                            onBack()
-                        }
-                    },
+                    onClick = { showDeleteConfirm = true },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
-                ) { 
-                    Icon(Icons.Filled.Delete, contentDescription = null)
+                ) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete_profile))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.delete_profile), fontSize = 16.sp) 
+                    Text(stringResource(R.string.delete_profile), fontSize = 16.sp)
                 }
             }
             Spacer(modifier = Modifier.height(48.dp))
+        }
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text(stringResource(R.string.delete_profile_confirm_title), fontWeight = FontWeight.SemiBold) },
+                text = { Text(stringResource(R.string.delete_profile_confirm)) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDeleteConfirm = false
+                            scope.launch {
+                                repository.deleteProfile(profileId!!)
+                                onBack()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text(stringResource(R.string.delete_profile))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
         }
     }
 }

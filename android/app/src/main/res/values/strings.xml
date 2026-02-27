@@ -19,7 +19,7 @@
     <string name="save">Save</string>
     <string name="back">Back</string>
     <string name="restart_timer">Restart</string>
-    <string name="add_round">+ Round</string>
+    <string name="add_round">Add round</string>
     <string name="no_profiles">No profiles yet. Tap + to create one.</string>
     <string name="create_first_profile">Create first profile</string>
     <string name="delete_profile">Delete profile</string>
@@ -29,4 +29,7 @@
     <string name="profile_summary">Rounds: %1$d \u2022 %2$s</string>
     <string name="profile_name_required">Profile name is required.</string>
     <string name="unnamed_profile">Unnamed profile</string>
+    <string name="delete_profile_confirm">Delete this profile? This cannot be undone.</string>
+    <string name="delete_profile_confirm_title">Delete profile</string>
+    <string name="cancel">Cancel</string>
 </resources>

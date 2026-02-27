@@ -19,7 +19,7 @@
     <string name="save">Сохранить</string>
     <string name="back">Назад</string>
     <string name="restart_timer">Повторить</string>
-    <string name="add_round">+ Раунд</string>
+    <string name="add_round">Добавить раунд</string>
     <string name="no_profiles">Нет профилей. Нажмите + чтобы создать.</string>
     <string name="create_first_profile">Создать первый профиль</string>
     <string name="delete_profile">Удалить профиль</string>
@@ -29,4 +29,7 @@
     <string name="profile_summary">Раундов: %1$d \u2022 %2$s</string>
     <string name="profile_name_required">Название профиля обязательно.</string>
     <string name="unnamed_profile">Без названия</string>
+    <string name="delete_profile_confirm">Удалить этот профиль? Действие нельзя отменить.</string>
+    <string name="delete_profile_confirm_title">Удалить профиль</string>
+    <string name="cancel">Отмена</string>
 </resources>

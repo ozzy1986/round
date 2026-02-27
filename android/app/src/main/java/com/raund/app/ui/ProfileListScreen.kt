@@ -94,7 +94,7 @@ fun ProfileListScreen(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
                     modifier = Modifier.padding(32.dp)
                 ) {
                     Text(
@@ -103,8 +103,12 @@ fun ProfileListScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
-                    Button(onClick = onAddProfile) {
-                        Text(stringResource(R.string.create_first_profile))
+                    Button(
+                        onClick = onAddProfile,
+                        modifier = Modifier.height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text(stringResource(R.string.create_first_profile), fontSize = 16.sp)
                     }
                 }
             }
