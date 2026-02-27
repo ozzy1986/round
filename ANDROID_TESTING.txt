@@ -161,11 +161,13 @@ C. PROFILE EDITOR UX + VALIDATION
 15) Add round works.
 16) Delete round works.
 17) Round name is limited to 30 characters (input truncated; saved names truncated in repository).
-18) Copy selected rounds N times: each round has a checkbox; when one or more rounds are selected, "Copy × N" and Cancel appear; tapping "Copy × N" opens a dialog for number of copies (1–99); on confirm, the selected block (in order) is appended (N−1) times (so the block appears N times in total); selection is cleared after copy and when any round is deleted.
-19) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
-20) Save persists profile and returns to list.
-21) Delete profile: tapping "Delete profile" shows confirmation dialog (title + message in RU/EN); Cancel dismisses; Confirm deletes and returns to list.
-22) Back navigation from editor returns to list without crash.
+18) Round selection and copy: each round shows a numbered circle on the left; tapping the circle toggles selection (highlighted card with primary border). When rounds are selected, "Copy × N" and Cancel buttons appear. Tapping "Copy × N" opens a dialog for number of copies (1–99). On confirm, the selected block (in order) is appended (N−1) times. Selection is cleared after copy, move, or delete.
+19) Round reordering: each round card has up/down arrow buttons to move it in the list. First round's up arrow is disabled; last round's down arrow is disabled.
+20) Emoji field is limited to a single emoji/character (uses BreakIterator grapheme cluster detection).
+21) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
+22) Save persists profile and returns to list.
+23) Delete profile: tapping "Delete profile" shows confirmation dialog (title + message in RU/EN); Cancel dismisses; Confirm deletes and returns to list.
+24) Back navigation from editor returns to list without crash.
 
 D. TIMER UX / STATE MACHINE
 23) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.

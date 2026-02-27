@@ -33,7 +33,9 @@
     <string name="delete_profile_confirm_title">Delete training</string>
     <string name="cancel">Cancel</string>
     <string name="sync">Sync</string>
-    <string name="copy_selected_n_times">Copy selected %d round(s) N times</string>
+    <string name="copy_selected_n_times">Copy %d selected round(s)</string>
     <string name="number_of_copies">Number of copies</string>
     <string name="copy_rounds">Copy</string>
+    <string name="move_round_up">Move up</string>
+    <string name="move_round_down">Move down</string>
 </resources>

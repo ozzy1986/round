@@ -1,6 +1,9 @@
 package com.raund.app.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,16 +13,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Switch
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +52,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -139,7 +146,17 @@ fun ProfileEditorScreen(
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = emoji,
-                onValueChange = { emoji = it },
+                onValueChange = { newValue ->
+                    if (newValue.isEmpty()) {
+                        emoji = ""
+                    } else {
+                        val bi = java.text.BreakIterator.getCharacterInstance()
+                        bi.setText(newValue)
+                        val firstEnd = bi.next()
+                        emoji = if (firstEnd != java.text.BreakIterator.DONE)
+                            newValue.substring(0, firstEnd) else newValue
+                    }
+                },
                 label = { Text(stringResource(R.string.profile_emoji)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -153,30 +170,57 @@ fun ProfileEditorScreen(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             rounds.forEachIndexed { index, (rName, dur, warn) ->
+                val isSelected = selectedRoundIndices.contains(index)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    border = if (isSelected)
+                        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                    else null
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Checkbox(
-                                checked = selectedRoundIndices.contains(index),
-                                onCheckedChange = {
-                                    selectedRoundIndices = if (it) selectedRoundIndices + index else selectedRoundIndices - index
-                                },
-                                modifier = Modifier.padding(end = 4.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                    )
+                                    .clickable {
+                                        selectedRoundIndices = if (isSelected)
+                                            selectedRoundIndices - index
+                                        else
+                                            selectedRoundIndices + index
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "${index + 1}",
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
                             OutlinedTextField(
                                 value = rName,
                                 onValueChange = { newVal -> rounds[index] = Triple(newVal.take(30), dur, warn) },
                                 label = { Text(stringResource(R.string.round_name)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
-                                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -185,15 +229,50 @@ fun ProfileEditorScreen(
                             )
                             IconButton(
                                 onClick = {
+                                    if (index > 0) {
+                                        val item = rounds.removeAt(index)
+                                        rounds.add(index - 1, item)
+                                        selectedRoundIndices = emptySet()
+                                    }
+                                },
+                                modifier = Modifier.size(36.dp),
+                                enabled = index > 0
+                            ) {
+                                Icon(
+                                    Icons.Filled.KeyboardArrowUp,
+                                    contentDescription = stringResource(R.string.move_round_up),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    if (index < rounds.size - 1) {
+                                        val item = rounds.removeAt(index)
+                                        rounds.add(index + 1, item)
+                                        selectedRoundIndices = emptySet()
+                                    }
+                                },
+                                modifier = Modifier.size(36.dp),
+                                enabled = index < rounds.size - 1
+                            ) {
+                                Icon(
+                                    Icons.Filled.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.move_round_down),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
                                     rounds.removeAt(index)
                                     selectedRoundIndices = emptySet()
                                 },
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Filled.Delete,
                                     contentDescription = stringResource(R.string.delete_round),
-                                    tint = MaterialTheme.colorScheme.error
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
