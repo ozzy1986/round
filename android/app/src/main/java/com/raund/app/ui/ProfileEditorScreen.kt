@@ -72,6 +72,9 @@ import com.raund.app.data.repository.ProfileRepository
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
+private const val MAX_PROFILE_NAME_LENGTH = 30
+private const val MAX_ROUND_NAME_LENGTH = 20
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileEditorScreen(
@@ -138,9 +141,10 @@ fun ProfileEditorScreen(
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = name,
-                onValueChange = {
-                    name = it
-                    if (showNameError && it.trim().isNotEmpty()) {
+                onValueChange = { newValue ->
+                    val limited = newValue.take(MAX_PROFILE_NAME_LENGTH)
+                    name = limited
+                    if (showNameError && limited.trim().isNotEmpty()) {
                         showNameError = false
                     }
                 },
@@ -314,7 +318,9 @@ fun ProfileEditorScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             OutlinedTextField(
                                 value = rName,
-                                onValueChange = { newVal -> rounds[index] = Triple(newVal.take(30), dur, warn) },
+                                onValueChange = { newVal ->
+                                    rounds[index] = Triple(newVal.take(MAX_ROUND_NAME_LENGTH), dur, warn)
+                                },
                                 label = { Text(stringResource(R.string.round_name)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
@@ -431,8 +437,8 @@ fun ProfileEditorScreen(
                         val id = if (isNew) repository.insertProfile(safeName, safeEmoji) else profileId!!
                         if (!isNew) repository.updateProfile(profileId!!, safeName, safeEmoji)
                         val roundsToSave = rounds.map { (rName, durString, warn) ->
-                            val durInt = durString.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            Triple(rName.take(30), durInt, warn)
+                            val durInt = durString.toIntOrNull()?.coerceAtLeast(5) ?: 5
+                            Triple(rName.take(MAX_ROUND_NAME_LENGTH), durInt, warn)
                         }
                         repository.saveRounds(id, roundsToSave)
                         onBack()

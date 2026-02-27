@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -142,14 +141,6 @@ fun ProfileListScreen(
                                 )
                             }
                         }
-                    }
-                    IconButton(
-                        onClick = { scope.launch { repository.syncFromApi() } }
-                    ) {
-                        Icon(
-                            Icons.Filled.Refresh,
-                            contentDescription = stringResource(R.string.sync)
-                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

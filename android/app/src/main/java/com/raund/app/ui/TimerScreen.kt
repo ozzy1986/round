@@ -425,7 +425,10 @@ fun TimerScreen(
                                             // Voice warning removed per user request
                                         }
                                         is TimerEvent.RoundEnd -> {
-                                            scope.launch { playProlongedAlarmTone(prolongedToneMs) }
+                                            val isLastRound = event.roundIndex == event.totalRounds - 1
+                                            if (!isLastRound) {
+                                                scope.launch { playProlongedAlarmTone(prolongedToneMs) }
+                                            }
                                         }
                                         is TimerEvent.TrainingEnd -> {
                                             running = false
