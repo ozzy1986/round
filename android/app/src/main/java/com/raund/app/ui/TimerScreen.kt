@@ -12,6 +12,7 @@ import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Build
 import android.media.ToneGenerator
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.view.WindowManager
 import androidx.compose.animation.animateColorAsState
@@ -92,13 +93,21 @@ private object TrainingEndPending {
 
 private fun Char.isCyrillic(): Boolean = this in '\u0400'..'\u04FF'
 
+private const val TONE_VOLUME = 0.55f
+
+private val ttsVolumeParams: Bundle by lazy {
+    Bundle().apply {
+        putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f)
+    }
+}
+
 private suspend fun playProlongedAlarmTone(durationMs: Int) = withContext(Dispatchers.IO) {
     val sampleRate = 44100
     val numSamples = sampleRate * durationMs / 1000
     val buffer = ShortArray(numSamples)
     val freq = 880.0
     for (i in 0 until numSamples) {
-        buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * 0.85).toInt().toShort()
+        buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * TONE_VOLUME).toInt().toShort()
     }
     val minBufSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
     val bufSizeBytes = (numSamples * 2).coerceAtLeast(minBufSize)
@@ -120,7 +129,7 @@ private suspend fun playProlongedAlarmTone(durationMs: Int) = withContext(Dispat
         .setTransferMode(AudioTrack.MODE_STATIC)
         .build()
     try {
-        track.setVolume(1f)
+        track.setVolume(TONE_VOLUME)
         track.write(buffer, 0, buffer.size)
         track.play()
         delay(durationMs.toLong())
@@ -182,7 +191,7 @@ fun TimerScreen(
                             if (text != null && locale != null) {
                                 Handler(Looper.getMainLooper()).post {
                                     ttsEngine.setLanguage(locale)
-                                    ttsEngine.speak(text, TextToSpeech.QUEUE_ADD, null, "training_end_done_${System.currentTimeMillis()}")
+                                    ttsEngine.speak(text, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
                                 }
                             }
                         }
@@ -209,7 +218,7 @@ fun TimerScreen(
     val tickTone = ToneGenerator.TONE_CDMA_PIP
     DisposableEffect(context) {
         val tg = try {
-            ToneGenerator(AudioManager.STREAM_ALARM, 100)
+            ToneGenerator(AudioManager.STREAM_ALARM, 55)
         } catch (e: Exception) {
             null
         }
@@ -470,7 +479,7 @@ fun TimerScreen(
                                                 if (isFirstRound) {
                                                     playProlongedAlarmTone(prolongedToneMs)
                                                 }
-                                                tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, null, null)
+                                                tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, null)
                                             }
                                         }
                                         is TimerEvent.Tick -> {
@@ -500,12 +509,14 @@ fun TimerScreen(
                                                     TrainingEndPending.finishedText = finishedText
                                                     TrainingEndPending.defaultLocale = defaultLocale
                                                 }
+                                                ttsRef?.speak(" ", TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, "warmup_${System.currentTimeMillis()}")
+                                                delay(250)
                                                 val nameId = "training_end_name_${System.currentTimeMillis()}"
                                                 if (nameHasCyrillic && defaultLocale != null) {
-                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
+                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_ADD, ttsVolumeParams, nameId)
                                                 } else {
-                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
-                                                    ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, null, "training_end_done_${System.currentTimeMillis()}")
+                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_ADD, ttsVolumeParams, nameId)
+                                                    ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
                                                 }
                                                 delay(5000)
                                             }
