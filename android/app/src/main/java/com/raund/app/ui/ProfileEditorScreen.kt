@@ -13,6 +13,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -105,46 +107,56 @@ fun ProfileEditorScreen(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
             rounds.forEachIndexed { index, (rName, dur, warn) ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    OutlinedTextField(
-                        value = rName,
-                        onValueChange = { rounds[index] = Triple(it, dur, warn) },
-                        label = { Text(stringResource(R.string.round_name)) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f).padding(end = 4.dp)
-                    )
-                    OutlinedTextField(
-                        value = dur.toString(),
-                        onValueChange = { rounds[index] = Triple(rName, it.toIntOrNull() ?: 0, warn) },
-                        label = { Text(stringResource(R.string.duration_seconds)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(0.6f).padding(horizontal = 4.dp)
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 4.dp)
-                    ) {
-                        Checkbox(
-                            checked = warn,
-                            onCheckedChange = { rounds[index] = Triple(rName, dur, it) }
-                        )
-                        Text(
-                            stringResource(R.string.warn_10_sec),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    IconButton(
-                        onClick = { rounds.removeAt(index) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Text("✕", color = MaterialTheme.colorScheme.error, fontSize = 18.sp)
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = rName,
+                                onValueChange = { rounds[index] = Triple(it, dur, warn) },
+                                label = { Text(stringResource(R.string.round_name)) },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).padding(end = 4.dp)
+                            )
+                            IconButton(
+                                onClick = { rounds.removeAt(index) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Text("✕", color = MaterialTheme.colorScheme.error, fontSize = 18.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = dur.toString(),
+                                onValueChange = { rounds[index] = Triple(rName, it.toIntOrNull() ?: 0, warn) },
+                                label = { Text(stringResource(R.string.duration_seconds)) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f).padding(end = 8.dp)
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = warn,
+                                    onCheckedChange = { rounds[index] = Triple(rName, dur, it) }
+                                )
+                                Text(
+                                    stringResource(R.string.warn_10_sec),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(onClick = { rounds.add(Triple("", 60, false)) }) {

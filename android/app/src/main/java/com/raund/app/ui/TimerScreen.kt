@@ -91,12 +91,20 @@ fun TimerScreen(
         }
     }
 
+    LaunchedEffect(profile) {
+        val p = profile ?: return@LaunchedEffect
+        if (!running && !finished && p.rounds.isNotEmpty()) {
+            remaining = p.rounds[0].durationSeconds
+            currentRound = p.rounds[0].name
+            roundInfo = "1 / ${p.rounds.size}"
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
-        val maxHeight = maxHeight
-        val timerFontSize = (maxHeight.value / 4.2f).coerceIn(80f, 200f).sp
-        val emojiFontSize = (maxHeight.value / 6f).coerceIn(48f, 120f).sp
+        val timerFontSize = minOf(maxWidth.value / 5f, maxHeight.value / 10f).coerceIn(36f, 72f).sp
+        val emojiFontSize = minOf(maxWidth.value / 8f, maxHeight.value / 16f).coerceIn(24f, 48f).sp
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -111,7 +119,7 @@ fun TimerScreen(
                 Text(
                     profile?.emoji ?: "⏱",
                     fontSize = emojiFontSize,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(vertical = 4.dp)
                 )
                 Text(
                     profile?.name ?: "",
@@ -131,12 +139,14 @@ fun TimerScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     "%02d:%02d".format(remaining / 60, remaining % 60),
                     fontSize = timerFontSize,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
                 )
             }
             if (finished) {
