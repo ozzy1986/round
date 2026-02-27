@@ -79,18 +79,33 @@ class ProfileRepository(
             )
         }
         roundDao.insertAll(entities)
+        try {
+            api?.let { api ->
+                val existing = api.getRounds(profileId)
+                existing.forEach { api.deleteRound(it.id) }
+                rounds.forEachIndexed { index, (name, durationSeconds, warn10sec) ->
+                    api.createRound(profileId, CreateRoundRequest(name, durationSeconds, warn10sec, index))
+                }
+            }
+        } catch (_: Exception) {
+            // Offline or server error; local state is already saved
+        }
     }
 
     suspend fun syncFromApi() = withContext(Dispatchers.IO) {
-        val list = api?.getProfiles() ?: return@withContext
-        list.forEach { dto ->
-            val profile = Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis())
-            profileDao.insert(profile)
-            val withRounds = api.getProfileWithRounds(dto.id)
-            roundDao.deleteByProfileId(dto.id)
-            roundDao.insertAll(withRounds.rounds.mapIndexed { i, r ->
-                Round(r.id, r.profile_id, r.name, r.duration_seconds, r.warn10sec, i)
-            })
+        try {
+            val list = api?.getProfiles() ?: return@withContext
+            list.forEach { dto ->
+                val profile = Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis())
+                profileDao.insert(profile)
+                val withRounds = api.getProfileWithRounds(dto.id)
+                roundDao.deleteByProfileId(dto.id)
+                roundDao.insertAll(withRounds.rounds.mapIndexed { i, r ->
+                    Round(r.id, r.profile_id, r.name, r.duration_seconds, r.warn10sec, i)
+                })
+            }
+        } catch (_: Exception) {
+            // Offline or server error; keep existing local data
         }
     }
 }

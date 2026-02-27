@@ -124,10 +124,19 @@ fun ProfileEditorScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(0.6f).padding(horizontal = 4.dp)
                     )
-                    Checkbox(
-                        checked = warn,
-                        onCheckedChange = { rounds[index] = Triple(rName, dur, it) }
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Checkbox(
+                            checked = warn,
+                            onCheckedChange = { rounds[index] = Triple(rName, dur, it) }
+                        )
+                        Text(
+                            stringResource(R.string.warn_10_sec),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     IconButton(
                         onClick = { rounds.removeAt(index) },
                         modifier = Modifier.size(36.dp)

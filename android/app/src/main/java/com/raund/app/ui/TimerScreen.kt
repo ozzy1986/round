@@ -95,8 +95,8 @@ fun TimerScreen(
         modifier = Modifier.fillMaxSize().padding(16.dp)
     ) {
         val maxHeight = maxHeight
-        val timerFontSize = (maxHeight.value / 4.2f).sp.coerceIn(80.sp, 200.sp)
-        val emojiFontSize = (maxHeight.value / 6f).sp.coerceIn(48.sp, 120.sp)
+        val timerFontSize = (maxHeight.value / 4.2f).coerceIn(80f, 200f).sp
+        val emojiFontSize = (maxHeight.value / 6f).coerceIn(48f, 120f).sp
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -148,9 +148,20 @@ fun TimerScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
             if (!running && !finished) {
+                val hasRounds = profile?.rounds?.isNotEmpty() == true
+                if (!hasRounds && profile != null) {
+                    Text(
+                        stringResource(R.string.no_rounds),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
                 Button(
                     onClick = {
                         val p = profile ?: return@Button
+                        if (p.rounds.isEmpty()) return@Button
                         running = true
                         scope.launch {
                             val engine = TimerEngine(p) { event ->
@@ -186,7 +197,8 @@ fun TimerScreen(
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(56.dp)
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    enabled = hasRounds
                 ) {
                     Text(
                         stringResource(R.string.start_timer),

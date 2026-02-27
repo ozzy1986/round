@@ -22,4 +22,5 @@
     <string name="no_profiles">No profiles yet. Tap + to create one.</string>
     <string name="delete_profile">Delete profile</string>
     <string name="round_number">Round %d</string>
+    <string name="no_rounds">Add at least one round to this profile.</string>
 </resources>

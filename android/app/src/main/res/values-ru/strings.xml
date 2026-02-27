@@ -22,4 +22,5 @@
     <string name="no_profiles">Нет профилей. Нажмите + чтобы создать.</string>
     <string name="delete_profile">Удалить профиль</string>
     <string name="round_number">Раунд %d</string>
+    <string name="no_rounds">Добавьте хотя бы один раунд в этот профиль.</string>
 </resources>
