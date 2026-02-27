@@ -432,10 +432,23 @@ fun TimerScreen(
                                         }
                                         is TimerEvent.TrainingEnd -> {
                                             val phrase = String.format(timerFinishedNameFmt, p.name)
-                                            tts?.speak(phrase, TextToSpeech.QUEUE_FLUSH, null, null)
+                                            val ttsRef = tts
                                             running = false
                                             finished = true
                                             paused = false
+                                            scope.launch(Dispatchers.Main) speakJob@{
+                                                delay(400)
+                                                repeat(3) {
+                                                    val ok = ttsRef?.speak(
+                                                        phrase,
+                                                        TextToSpeech.QUEUE_FLUSH,
+                                                        null,
+                                                        "training_end"
+                                                    ) == TextToSpeech.SUCCESS
+                                                    if (ok) return@speakJob
+                                                    delay(600)
+                                                }
+                                            }
                                         }
                                     }
                                 }
