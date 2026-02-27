@@ -431,14 +431,11 @@ fun TimerScreen(
                                             }
                                         }
                                         is TimerEvent.TrainingEnd -> {
+                                            val phrase = String.format(timerFinishedNameFmt, p.name)
+                                            tts?.speak(phrase, TextToSpeech.QUEUE_FLUSH, null, null)
                                             running = false
                                             finished = true
                                             paused = false
-                                            val trainingName = p.name
-                                            scope.launch {
-                                                val phrase = String.format(timerFinishedNameFmt, trainingName)
-                                                tts?.speak(phrase, TextToSpeech.QUEUE_FLUSH, null, null)
-                                            }
                                         }
                                     }
                                 }
