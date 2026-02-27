@@ -502,20 +502,18 @@ fun TimerScreen(
                                             finished = true
                                             paused = false
                                             finalTtsJob = scope.launch(Dispatchers.Main) {
-                                                pendingToneJob?.join()
                                                 val nameHasCyrillic = p.name.any { it.isCyrillic() }
                                                 if (nameHasCyrillic && defaultLocale != null) {
                                                     ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
                                                     TrainingEndPending.finishedText = finishedText
                                                     TrainingEndPending.defaultLocale = defaultLocale
                                                 }
-                                                ttsRef?.playSilentUtterance(600, TextToSpeech.QUEUE_FLUSH, "warmup_${System.currentTimeMillis()}")
-                                                delay(650)
+                                                delay((prolongedToneMs - 400).coerceAtLeast(0).toLong())
                                                 val nameId = "training_end_name_${System.currentTimeMillis()}"
                                                 if (nameHasCyrillic && defaultLocale != null) {
-                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_ADD, ttsVolumeParams, nameId)
+                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
                                                 } else {
-                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_ADD, ttsVolumeParams, nameId)
+                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
                                                     ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
                                                 }
                                                 delay(5000)

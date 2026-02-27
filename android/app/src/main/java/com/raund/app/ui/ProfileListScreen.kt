@@ -61,14 +61,14 @@ import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 
 private val supportedLanguages = listOf(
-    "en" to "English",
-    "ru" to "Русский",
-    "uz" to "Oʻzbek",
-    "kk" to "Қазақ",
-    "az" to "Azərbaycan",
-    "tg" to "Тоҷикӣ",
-    "tt" to "Татар",
-    "zh" to "中文",
+    Triple("en", "English", "🇬🇧"),
+    Triple("ru", "Русский", "🇷🇺"),
+    Triple("uz", "Oʻzbek", "🇺🇿"),
+    Triple("kk", "Қазақ", "🇰🇿"),
+    Triple("az", "Azərbaycan", "🇦🇿"),
+    Triple("tg", "Тоҷикӣ", "🇹🇯"),
+    Triple("tt", "Татар", "🇷🇺"),
+    Triple("zh", "中文", "🇨🇳"),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,30 +92,38 @@ fun ProfileListScreen(
                 actions = {
                     Box {
                         var langMenuExpanded by remember { mutableStateOf(false) }
+                        val currentFlag = supportedLanguages.find { it.first == currentLang }?.third ?: "🌐"
                         Surface(
                             onClick = { langMenuExpanded = true },
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         ) {
-                            Text(
-                                currentLang.uppercase(),
+                            Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(currentFlag, fontSize = 18.sp)
+                                Text(
+                                    currentLang.uppercase(),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                         DropdownMenu(
                             expanded = langMenuExpanded,
                             onDismissRequest = { langMenuExpanded = false }
                         ) {
-                            supportedLanguages.forEach { (code, name) ->
+                            supportedLanguages.forEach { (code, name, flag) ->
                                 DropdownMenuItem(
                                     text = {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
+                                            Text(flag, fontSize = 20.sp, modifier = Modifier.width(32.dp))
                                             Text(
                                                 code.uppercase(),
                                                 style = MaterialTheme.typography.labelLarge,
