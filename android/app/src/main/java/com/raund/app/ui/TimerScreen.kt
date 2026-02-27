@@ -2,6 +2,9 @@ package com.raund.app.ui
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.speech.tts.UtteranceProgressListener
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
@@ -78,6 +81,13 @@ import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.sin
 
+private object TrainingEndPending {
+    var finishedText: String? = null
+    var defaultLocale: Locale? = null
+}
+
+private fun Char.isCyrillic(): Boolean = this in '\u0400'..'\u04FF'
+
 private suspend fun playProlongedAlarmTone(durationMs: Int) = withContext(Dispatchers.IO) {
     val sampleRate = 44100
     val numSamples = sampleRate * durationMs / 1000
@@ -132,6 +142,7 @@ fun TimerScreen(
     var paused by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var defaultTtsLocale by remember { mutableStateOf<Locale?>(null) }
     val timerFinishedText = stringResource(R.string.timer_finished)
     val restartTimerText = stringResource(R.string.restart_timer)
     val pauseTimerText = stringResource(R.string.pause_timer)
@@ -155,6 +166,27 @@ fun TimerScreen(
                     else -> Locale.forLanguageTag(appLang)
                 }
                 ttsEngine.setLanguage(ttsLocale)
+                defaultTtsLocale = ttsLocale
+                ttsEngine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {
+                        if (utteranceId != null && utteranceId.startsWith("training_end_name_")) {
+                            val text = TrainingEndPending.finishedText
+                            val locale = TrainingEndPending.defaultLocale
+                            TrainingEndPending.finishedText = null
+                            TrainingEndPending.defaultLocale = null
+                            if (text != null && locale != null) {
+                                Handler(Looper.getMainLooper()).post {
+                                    ttsEngine.setLanguage(locale)
+                                    ttsEngine.speak(text, TextToSpeech.QUEUE_ADD, null, "training_end_done_${System.currentTimeMillis()}")
+                                }
+                            }
+                        }
+                    }
+                    @Deprecated("Deprecated")
+                    override fun onError(utteranceId: String?) {}
+                    override fun onError(utteranceId: String?, errorCode: Int) {}
+                })
                 val audioAttributes = android.media.AudioAttributes.Builder()
                     .setUsage(android.media.AudioAttributes.USAGE_ALARM)
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -432,13 +464,23 @@ fun TimerScreen(
                                         is TimerEvent.TrainingEnd -> {
                                             val ttsRef = tts
                                             val finishedText = timerFinishedText
+                                            val defaultLocale = defaultTtsLocale
                                             running = false
                                             finished = true
                                             paused = false
                                             scope.launch(Dispatchers.Main) {
                                                 delay(400)
-                                                ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, "training_end_name_${System.currentTimeMillis()}")
-                                                ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, null, "training_end_done_${System.currentTimeMillis()}")
+                                                val nameId = "training_end_name_${System.currentTimeMillis()}"
+                                                val nameHasCyrillic = p.name.any { it.isCyrillic() }
+                                                if (nameHasCyrillic && defaultLocale != null) {
+                                                    ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
+                                                    TrainingEndPending.finishedText = finishedText
+                                                    TrainingEndPending.defaultLocale = defaultLocale
+                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
+                                                } else {
+                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
+                                                    ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, null, "training_end_done_${System.currentTimeMillis()}")
+                                                }
                                             }
                                         }
                                     }
