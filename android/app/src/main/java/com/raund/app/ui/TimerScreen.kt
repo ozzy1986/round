@@ -5,9 +5,12 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.UtteranceProgressListener
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.Build
 import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
 import android.view.WindowManager
@@ -73,6 +76,7 @@ import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
 import com.raund.app.timer.TimerProfile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -425,9 +429,24 @@ fun TimerScreen(
                                     waited += 100
                                 }
                                 val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                val focusListener = AudioManager.OnAudioFocusChangeListener { }
-                                am?.requestAudioFocus(focusListener, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
+                                val focusRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                                        .setAudioAttributes(
+                                            AudioAttributes.Builder()
+                                                .setUsage(AudioAttributes.USAGE_ALARM)
+                                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                                .build()
+                                        )
+                                        .build()
+                                } else null
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                                    am?.requestAudioFocus(focusRequest)
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    am?.requestAudioFocus({}, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
+                                }
                                 try {
+                                var pendingToneJob: Job? = null
                                 val engine = TimerEngine(p) { event ->
                                     when (event) {
                                         is TimerEvent.RoundStart -> {
@@ -438,6 +457,7 @@ fun TimerScreen(
                                             val roundName = event.round.name
                                             val isFirstRound = event.roundIndex == 0
                                             scope.launch {
+                                                pendingToneJob?.join()
                                                 if (isFirstRound) {
                                                     playProlongedAlarmTone(prolongedToneMs)
                                                 }
@@ -454,10 +474,7 @@ fun TimerScreen(
                                             // Voice warning removed per user request
                                         }
                                         is TimerEvent.RoundEnd -> {
-                                            val isLastRound = event.roundIndex == event.totalRounds - 1
-                                            if (!isLastRound) {
-                                                scope.launch { playProlongedAlarmTone(prolongedToneMs) }
-                                            }
+                                            pendingToneJob = scope.launch { playProlongedAlarmTone(prolongedToneMs) }
                                         }
                                         is TimerEvent.TrainingEnd -> {
                                             val ttsRef = tts
@@ -467,7 +484,8 @@ fun TimerScreen(
                                             finished = true
                                             paused = false
                                             scope.launch(Dispatchers.Main) {
-                                                delay(400)
+                                                pendingToneJob?.join()
+                                                delay(300)
                                                 val nameId = "training_end_name_${System.currentTimeMillis()}"
                                                 val nameHasCyrillic = p.name.any { it.isCyrillic() }
                                                 if (nameHasCyrillic && defaultLocale != null) {
@@ -493,7 +511,12 @@ fun TimerScreen(
                                     }
                                 }
                                 } finally {
-                                    am?.abandonAudioFocus(focusListener)
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                                        am?.abandonAudioFocusRequest(focusRequest)
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        am?.abandonAudioFocus {}
+                                    }
                                 }
                             }
                         },
