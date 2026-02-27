@@ -11,10 +11,7 @@ export async function authVerify(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const decoded = await request.jwtVerify<{ sub: string }>();
-    (request as AuthenticatedRequest).user = {
-      id: decoded.sub,
-    };
+    await request.jwtVerify();
   } catch {
     await reply.status(401).send({ message: 'Unauthorized' });
   }
