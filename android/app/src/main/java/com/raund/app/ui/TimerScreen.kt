@@ -97,6 +97,11 @@ fun TimerScreen(
                 tts = ttsEngine
                 val locale = if (Locale.getDefault().language == "ru") Locale.forLanguageTag("ru") else Locale.getDefault()
                 ttsEngine.setLanguage(locale)
+                val audioAttributes = android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                ttsEngine.setAudioAttributes(audioAttributes)
             }
         }
         onDispose {
@@ -109,6 +114,7 @@ fun TimerScreen(
     // Piercing high-pitched alarm: short ticks, long round-end/training-end beeps — audible across the hall
     var alarmTone by remember { mutableStateOf<ToneGenerator?>(null) }
     val piercingTone = ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD
+    val tickTone = ToneGenerator.TONE_CDMA_PIP
     DisposableEffect(context) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (am != null) {
@@ -127,7 +133,7 @@ fun TimerScreen(
         }
     }
 
-    val tickMs = 100
+    val tickMs = 150
     val longBeepMs = 450
     val longBeepGapMs = 400L
 
@@ -318,7 +324,7 @@ fun TimerScreen(
                                         is TimerEvent.Tick -> {
                                             remaining = event.remainingSeconds
                                             if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
-                                                alarmTone?.startTone(piercingTone, tickMs)
+                                                alarmTone?.startTone(tickTone, tickMs)
                                             }
                                         }
                                         is TimerEvent.Warn10 -> {

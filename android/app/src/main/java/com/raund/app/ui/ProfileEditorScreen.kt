@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Switch
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,7 +22,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -116,6 +116,7 @@ fun ProfileEditorScreen(
                 },
                 label = { Text(stringResource(R.string.profile_name)) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = showNameError && !isNameValid
@@ -160,6 +161,7 @@ fun ProfileEditorScreen(
                                 onValueChange = { rounds[index] = Triple(it, dur, warn) },
                                 label = { Text(stringResource(R.string.round_name)) },
                                 singleLine = true,
+                                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
                                 modifier = Modifier.weight(1f).padding(end = 8.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -203,10 +205,11 @@ fun ProfileEditorScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Checkbox(
+                                Switch(
                                     checked = warn,
                                     onCheckedChange = { rounds[index] = Triple(rName, dur, it) }
                                 )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     stringResource(R.string.warn_10_sec),
                                     style = MaterialTheme.typography.bodyMedium

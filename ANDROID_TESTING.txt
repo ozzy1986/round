@@ -178,7 +178,7 @@ D. TIMER UX / STATE MACHINE
 
 E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with device volume up)
 30) Start of training / start of round: two long beeps (450 ms each), then TTS speaks round name in Russian (e.g. "Работа", "Отдых") when profile uses Russian names.
-31) Last 10 seconds: one short tick (100 ms) per second only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining.
+31) Last 10 seconds: one short tick (150 ms, TONE_CDMA_PIP) per second only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining (TTS uses USAGE_ALARM stream to prevent ducking).
 32) End of round: two long beeps (450 ms each) when round ends.
 33) End of training: three long beeps (450 ms each), then TTS "Тренировка завершена".
 34) No ticks for rounds with duration < 10 sec even if "Предупредить за 10 сек" is ON.
