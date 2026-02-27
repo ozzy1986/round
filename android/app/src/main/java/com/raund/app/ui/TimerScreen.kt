@@ -484,14 +484,15 @@ fun TimerScreen(
                                             finished = true
                                             paused = false
                                             scope.launch(Dispatchers.Main) {
-                                                pendingToneJob?.join()
-                                                delay(300)
-                                                val nameId = "training_end_name_${System.currentTimeMillis()}"
                                                 val nameHasCyrillic = p.name.any { it.isCyrillic() }
                                                 if (nameHasCyrillic && defaultLocale != null) {
                                                     ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
                                                     TrainingEndPending.finishedText = finishedText
                                                     TrainingEndPending.defaultLocale = defaultLocale
+                                                }
+                                                delay((prolongedToneMs - 350).coerceAtLeast(0).toLong())
+                                                val nameId = "training_end_name_${System.currentTimeMillis()}"
+                                                if (nameHasCyrillic && defaultLocale != null) {
                                                     ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
                                                 } else {
                                                     ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
