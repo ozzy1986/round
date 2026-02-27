@@ -98,7 +98,7 @@ fun TimerScreen(
     var tickTone by remember { mutableStateOf<ToneGenerator?>(null) }
     DisposableEffect(context) {
         val tg = try {
-            ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+            ToneGenerator(AudioManager.STREAM_ALARM, 100)
         } catch (e: Exception) {
             null
         }
@@ -212,7 +212,7 @@ fun TimerScreen(
                         CircularProgressIndicator(
                             progress = { animatedProgress },
                             modifier = Modifier.size(minOf(this@BoxWithConstraints.maxWidth, 320.dp)),
-                            strokeWidth = 20.dp,
+                            strokeWidth = 36.dp,
                             trackColor = surfaceVarColor,
                             color = primaryColor,
                             strokeCap = StrokeCap.Round
@@ -272,7 +272,7 @@ fun TimerScreen(
                                         is TimerEvent.Tick -> {
                                             remaining = event.remainingSeconds
                                             if (event.round.warn10sec && event.remainingSeconds in 1..10) {
-                                                tickTone?.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
+                                                tickTone?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
                                             }
                                         }
                                         is TimerEvent.Warn10 -> {
@@ -284,6 +284,15 @@ fun TimerScreen(
                                             running = false
                                             finished = true
                                             tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
+                                            scope.launch {
+                                                val tone = tickTone
+                                                if (tone != null) {
+                                                    for (i in 1..3) {
+                                                        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 250)
+                                                        delay(400L)
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
