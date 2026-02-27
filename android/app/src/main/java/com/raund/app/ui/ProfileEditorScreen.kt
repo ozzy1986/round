@@ -62,8 +62,10 @@ fun ProfileEditorScreen(
     val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
     var emoji by remember { mutableStateOf("⏱") }
+    var showNameError by remember { mutableStateOf(false) }
     val rounds = remember { mutableStateListOf<Triple<String, Int, Boolean>>() }
     val isNew = profileId == null || profileId == "new"
+    val isNameValid = name.trim().isNotEmpty()
 
     LaunchedEffect(profileId) {
         if (!isNew && profileId != null) {
@@ -88,7 +90,7 @@ fun ProfileEditorScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -106,12 +108,26 @@ fun ProfileEditorScreen(
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = {
+                    name = it
+                    if (showNameError && it.trim().isNotEmpty()) {
+                        showNameError = false
+                    }
+                },
                 label = { Text(stringResource(R.string.profile_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                isError = showNameError && !isNameValid
             )
+            if (showNameError && !isNameValid) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.profile_name_required),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
                 value = emoji,
@@ -157,7 +173,7 @@ fun ProfileEditorScreen(
                             ) {
                                 Icon(
                                     Icons.Filled.Delete,
-                                    contentDescription = "Delete Round",
+                                    contentDescription = stringResource(R.string.delete_round),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -169,7 +185,11 @@ fun ProfileEditorScreen(
                         ) {
                             OutlinedTextField(
                                 value = dur.toString(),
-                                onValueChange = { rounds[index] = Triple(rName, it.toIntOrNull() ?: 0, warn) },
+                                onValueChange = {
+                                    val digitsOnly = it.filter { char -> char.isDigit() }
+                                    val parsedValue = digitsOnly.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                                    rounds[index] = Triple(rName, parsedValue, warn)
+                                },
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -211,15 +231,22 @@ fun ProfileEditorScreen(
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = {
+                    val safeName = name.trim()
+                    if (safeName.isBlank()) {
+                        showNameError = true
+                        return@Button
+                    }
+                    val safeEmoji = emoji.trim().ifBlank { "⏱" }
                     scope.launch {
-                        val id = if (isNew) repository.insertProfile(name, emoji) else profileId!!
-                        if (!isNew) repository.updateProfile(profileId!!, name, emoji)
-                        repository.saveRounds(id, rounds.filter { it.first.isNotBlank() })
+                        val id = if (isNew) repository.insertProfile(safeName, safeEmoji) else profileId!!
+                        if (!isNew) repository.updateProfile(profileId!!, safeName, safeEmoji)
+                        repository.saveRounds(id, rounds.toList())
                         onBack()
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = isNameValid
             ) { 
                 Text(stringResource(R.string.save), fontSize = 18.sp, fontWeight = FontWeight.Bold) 
             }

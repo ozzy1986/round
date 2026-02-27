@@ -9,3 +9,4 @@ android/Round-debug.apk
 android/local.properties
 android/app/build/
 android/.gradle/
+*.hprof

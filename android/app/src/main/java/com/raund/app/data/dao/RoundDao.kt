@@ -7,6 +7,12 @@ import androidx.room.Query
 import com.raund.app.data.entity.Round
 import kotlinx.coroutines.flow.Flow
 
+data class RoundStats(
+    val profileId: String,
+    val roundsCount: Long,
+    val totalDurationSeconds: Long
+)
+
 @Dao
 interface RoundDao {
     @Query("SELECT * FROM rounds WHERE profileId = :profileId ORDER BY position ASC")
@@ -20,4 +26,16 @@ interface RoundDao {
 
     @Query("DELETE FROM rounds WHERE profileId = :profileId")
     suspend fun deleteByProfileId(profileId: String)
+
+    @Query(
+        """
+        SELECT
+            profileId AS profileId,
+            COUNT(*) AS roundsCount,
+            COALESCE(SUM(durationSeconds), 0) AS totalDurationSeconds
+        FROM rounds
+        GROUP BY profileId
+        """
+    )
+    fun getStatsByProfile(): Flow<List<RoundStats>>
 }

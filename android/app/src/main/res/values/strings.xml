@@ -14,13 +14,19 @@
     <string name="start_timer">Start</string>
     <string name="stop_timer">Stop</string>
     <string name="timer_finished">Training finished</string>
+    <string name="timer_stopped">Training stopped</string>
     <string name="timer_warn10">%s in 10 seconds</string>
     <string name="save">Save</string>
-    <string name="delete">Delete</string>
     <string name="back">Back</string>
+    <string name="restart_timer">Restart</string>
     <string name="add_round">+ Round</string>
     <string name="no_profiles">No profiles yet. Tap + to create one.</string>
+    <string name="create_first_profile">Create first profile</string>
     <string name="delete_profile">Delete profile</string>
-    <string name="round_number">Round %d</string>
+    <string name="delete_round">Delete round</string>
     <string name="no_rounds">Add at least one round to this profile.</string>
+    <string name="no_rounds_short">No rounds</string>
+    <string name="profile_summary">Rounds: %1$d \u2022 %2$s</string>
+    <string name="profile_name_required">Profile name is required.</string>
+    <string name="unnamed_profile">Unnamed profile</string>
 </resources>

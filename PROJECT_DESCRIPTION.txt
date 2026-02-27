@@ -157,7 +157,7 @@ Env: TELEGRAM_BOT_TOKEN required. On VPS, API_URL is set so the bot talks to the
 ---------------
 Location: android/ (Gradle, Kotlin, Compose).
 
-Screens: profile list, profile/round editor (name, emoji, rounds with name/duration/warn10 and label), timer. The UI uses Material 3 components, dynamic colors, elevated cards, and Material icons (`material-icons-extended`). The timer features a large dynamic CircularProgressIndicator (thick stroke, 36dp) and tabular numerals for the countdown. One-tap start. Data in Room; sync with backend on VPS when online (Retrofit). Timer: same event contract; TTS for round name and "X in 10 seconds" (locale from device); loud distinguishable per-second beeps (STREAM_ALARM, 120ms) when warn10sec in last 10 sec; three loud beeps at training end; app waits for TTS ready before first announcement. If profile has no rounds, message is shown and Start is disabled. i18n: values/strings.xml (EN), values-ru/strings.xml (RU).
+Screens: profile list, profile/round editor (name, emoji, rounds with name/duration/warn10 and label), timer. The UI uses Material 3 components, dynamic colors, elevated cards, and Material icons (`material-icons-extended`). Profile cards now show quick stats (round count + total duration), and Start is disabled for profiles without rounds. The editor validates required profile name (Save disabled until valid), sanitizes emoji fallback (`⏱`), and enforces round durations >= 1 sec before save/sync. The timer features a large dynamic CircularProgressIndicator (thick stroke, 36dp) and tabular numerals for the countdown. Timer state UX distinguishes "stopped by user" vs natural "training finished" and uses a dedicated "Restart/Повторить" action. Data in Room; sync with backend on VPS when online (Retrofit). Timer: same event contract; TTS for round name and "X in 10 seconds" (locale from device); loud distinguishable per-second beeps (STREAM_ALARM, 120ms) when warn10sec in last 10 sec; three loud beeps at training end; app waits for TTS ready before first announcement. Accessibility: content descriptions are localized (EN/RU) and Android 14 back-invoked callback is enabled in manifest.
 
 Package: com.raund.app. API base URL in RaundApplication points to the VPS: http://round.ozzy1986.com:8080/ (for real device / phone). For Android emulator only use http://10.0.2.2:3001/.
 
@@ -221,6 +221,7 @@ Aligned with CORE PRINCIPLES above: security, speed, stability, scalability; DRY
 - Validate all input (Fastify schemas), parameterized queries only, no secrets in logs, .env not committed.
 - Shared timer core; Vitest with coverage (timer-engine 100%, others high).
 - Offline-first and data validation. UI: minimal, big countdown, clear typography.
+- Android QA gate: `assembleDebug` + on-device ADB regression + `:app:lintDebug` (current lint: 0 errors; warnings are dependency update suggestions only).
 
 
 15. SOURCE OF TRUTH

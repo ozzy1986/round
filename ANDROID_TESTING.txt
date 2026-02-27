@@ -135,6 +135,57 @@ FULL WORKFLOW (after code changes in android/ folder)
 6. Logs:    check logcat for errors (see above).
 7. Repeat from step 1.
 
+REGRESSION CHECKLIST (RUN FROM TOP AFTER EVERY CODE CHANGE)
+------------------------------------------------------------
+If any scenario fails: fix code, rebuild/reinstall (if android/ changed), then restart from A.
+
+A. CONNECTION / BOOT
+1) API health: GET http://round.ozzy1986.com:8080/profiles returns 200.
+2) ADB health: device appears as "device" (not unauthorized/offline).
+3) Clean app launch: force-stop app, clear logcat, launch MainActivity.
+4) Baseline screenshot captured successfully.
+
+B. PROFILE LIST UX
+5) Existing profiles are visible and tappable (open editor on card tap).
+6) Start icon opens timer only for profiles with rounds.
+7) Profiles without rounds show disabled Start button.
+8) Profile card subtitle shows round count and total duration (e.g., "Раундов: 2 • 00:35").
+9) FAB opens "New profile" screen.
+10) Empty state (if no profiles) shows explanatory text + CTA button for creating first profile.
+
+C. PROFILE EDITOR UX + VALIDATION
+11) Save is disabled when profile name is blank.
+12) Name required validation is shown (if save attempted via enabled state transitions).
+13) Name with valid text enables Save.
+14) Emoji blank fallback is handled as stopwatch emoji after save.
+15) Add round works.
+16) Delete round works.
+17) Round duration input accepts digits and persists as >= 1 second.
+18) Save persists profile and returns to list.
+19) Delete profile removes it and returns to list.
+20) Back navigation from editor returns to list without crash.
+
+D. TIMER UX / STATE MACHINE
+21) Pre-start timer shows current round name, step indicator, and countdown.
+22) Start begins countdown and transitions between rounds correctly.
+23) Warn-10 behavior: TTS warning + per-second beeps in last 10 seconds when enabled.
+24) Manual Stop shows "Training stopped/Тренировка остановлена".
+25) Natural completion shows "Training finished/Тренировка завершена".
+26) Restart button returns to initial timer state.
+27) Back from timer returns to profile list and stops active speech playback.
+28) Profiles without rounds: timer start remains disabled and helper text is shown.
+
+E. ACCESSIBILITY / I18N
+29) contentDescription labels are localized (check via UI dump XML).
+30) Russian strings are used when device locale is RU.
+31) English strings are used when device locale is EN (spot-check when possible).
+
+F. STABILITY / LOGS / QUALITY
+32) `adb logcat --pid=<appPid> -d` contains no app crash stack traces.
+33) No repeated app-specific error loops after 1-2 minute idle.
+34) `cd android && .\gradlew.bat :app:lintDebug` passes (0 errors).
+35) Build + install + launch cycle repeats cleanly.
+
 NOTES
 -----
 - The app connects to the VPS API at http://round.ozzy1986.com:8080/. No local

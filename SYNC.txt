@@ -19,6 +19,12 @@ EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
 --------------------------------------------------------------
 1. Local
    - Edit files, run tests (npm test), run migrations if needed (npm run migrate:up).
+   - If android/ changed: run build and QA gate before commit:
+     cd android
+     .\gradlew.bat assembleDebug
+     .\gradlew.bat :app:lintDebug
+     cd ..
+     Then run on-device checklist from ANDROID_TESTING.txt.
    - Stage and commit:
      git add -A
      git commit -m "Your message"
@@ -34,7 +40,10 @@ EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
 
    This does: git pull, npm ci, npm run migrate:up, npm run build, pm2 restart round-api, pm2 restart round-bot, pm2 save.
 
-5. Update PROJECT_DESCRIPTION.txt so it reflects the change (for AI: update after every task).
+5. Update text docs so they reflect the change:
+   - PROJECT_DESCRIPTION.txt (always)
+   - ANDROID_TESTING.txt (when test flow/checklist changed)
+   - Any other operational .txt docs touched by this task
 
 DONE. All four (local, GitHub, GitLab, VPS) are in sync, and the project description is up to date.
 

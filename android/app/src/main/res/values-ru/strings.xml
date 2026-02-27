@@ -14,13 +14,19 @@
     <string name="start_timer">Старт</string>
     <string name="stop_timer">Стоп</string>
     <string name="timer_finished">Тренировка завершена</string>
+    <string name="timer_stopped">Тренировка остановлена</string>
     <string name="timer_warn10">%s через 10 секунд</string>
     <string name="save">Сохранить</string>
-    <string name="delete">Удалить</string>
     <string name="back">Назад</string>
+    <string name="restart_timer">Повторить</string>
     <string name="add_round">+ Раунд</string>
     <string name="no_profiles">Нет профилей. Нажмите + чтобы создать.</string>
+    <string name="create_first_profile">Создать первый профиль</string>
     <string name="delete_profile">Удалить профиль</string>
-    <string name="round_number">Раунд %d</string>
+    <string name="delete_round">Удалить раунд</string>
     <string name="no_rounds">Добавьте хотя бы один раунд в этот профиль.</string>
+    <string name="no_rounds_short">Без раундов</string>
+    <string name="profile_summary">Раундов: %1$d \u2022 %2$s</string>
+    <string name="profile_name_required">Название профиля обязательно.</string>
+    <string name="unnamed_profile">Без названия</string>
 </resources>

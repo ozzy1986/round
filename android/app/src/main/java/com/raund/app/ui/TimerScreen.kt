@@ -75,24 +75,31 @@ fun TimerScreen(
     var roundInfo by remember { mutableStateOf("") }
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
+    var stoppedByUser by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     val timerFinishedText = stringResource(R.string.timer_finished)
+    val timerStoppedText = stringResource(R.string.timer_stopped)
     val warn10Template = stringResource(R.string.timer_warn10)
+    val restartTimerText = stringResource(R.string.restart_timer)
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
     }
 
     DisposableEffect(context) {
-        var ttsEngine: TextToSpeech? = null
+        lateinit var ttsEngine: TextToSpeech
         ttsEngine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts = ttsEngine
-                ttsEngine?.setLanguage(Locale.getDefault())
+                ttsEngine.setLanguage(Locale.getDefault())
             }
         }
-        onDispose { ttsEngine?.shutdown() }
+        onDispose {
+            tts = null
+            ttsEngine.stop()
+            ttsEngine.shutdown()
+        }
     }
 
     var tickTone by remember { mutableStateOf<ToneGenerator?>(null) }
@@ -145,13 +152,14 @@ fun TimerScreen(
             ) {
                 IconButton(onClick = {
                     running = false
+                    tts?.stop()
                     onBack()
                 }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    profile?.name ?: "",
+                    profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = onBgColor
@@ -164,7 +172,7 @@ fun TimerScreen(
                         .background(surfaceVarColor),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(profile?.emoji ?: "⏱", fontSize = 24.sp)
+                    Text(profile?.emoji?.ifBlank { "⏱" } ?: "⏱", fontSize = 24.sp)
                 }
             }
 
@@ -178,7 +186,7 @@ fun TimerScreen(
             ) {
                 if (finished) {
                     Text(
-                        timerFinishedText,
+                        if (stoppedByUser) timerStoppedText else timerFinishedText,
                         style = MaterialTheme.typography.displaySmall,
                         color = primaryColor,
                         textAlign = TextAlign.Center
@@ -254,6 +262,7 @@ fun TimerScreen(
                             val p = profile ?: return@Button
                             if (p.rounds.isEmpty()) return@Button
                             running = true
+                            stoppedByUser = false
                             scope.launch {
                                 var waited = 0
                                 while (tts == null && waited < 1500 && running) {
@@ -283,6 +292,7 @@ fun TimerScreen(
                                         is TimerEvent.TrainingEnd -> {
                                             running = false
                                             finished = true
+                                            stoppedByUser = false
                                             tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
                                             scope.launch {
                                                 val tone = tickTone
@@ -328,6 +338,8 @@ fun TimerScreen(
                         onClick = {
                             running = false
                             finished = true
+                            stoppedByUser = true
+                            tts?.stop()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -352,6 +364,7 @@ fun TimerScreen(
                     Button(
                         onClick = {
                             finished = false
+                            stoppedByUser = false
                             val p = profile
                             if (p != null && p.rounds.isNotEmpty()) {
                                 remaining = p.rounds[0].durationSeconds
@@ -366,7 +379,7 @@ fun TimerScreen(
                         shape = RoundedCornerShape(32.dp)
                     ) {
                         Text(
-                            stringResource(R.string.back), // Reusing "Back" or "Reset"
+                            restartTimerText,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold
                         )

@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -58,6 +59,7 @@ fun ProfileListScreen(
     onStartTimer: (String) -> Unit
 ) {
     val profiles by repository.profiles.collectAsState(initial = emptyList())
+    val roundStats by repository.roundStats.collectAsState(initial = emptyMap())
 
     LaunchedEffect(Unit) {
         repository.syncFromApi()
@@ -79,30 +81,58 @@ fun ProfileListScreen(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add Profile")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_profile))
             }
         }
     ) { padding ->
         if (profiles.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    stringResource(R.string.no_profiles),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = Modifier.padding(32.dp)
-                )
+                ) {
+                    Text(
+                        stringResource(R.string.no_profiles),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(onClick = onAddProfile) {
+                        Text(stringResource(R.string.create_first_profile))
+                    }
+                }
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item { Spacer(modifier = Modifier.height(4.dp)) }
                 items(profiles, key = { it.id }) { profile: Profile ->
+                    val stats = roundStats[profile.id]
+                    val roundsCount = (stats?.roundsCount ?: 0L).toInt()
+                    val totalDurationSeconds = (stats?.totalDurationSeconds ?: 0L).toInt()
+                    val hasRounds = roundsCount > 0
+                    val profileName = profile.name.ifBlank { stringResource(R.string.unnamed_profile) }
+                    val profileSummary = if (hasRounds) {
+                        stringResource(
+                            R.string.profile_summary,
+                            roundsCount,
+                            formatDurationShort(totalDurationSeconds)
+                        )
+                    } else {
+                        stringResource(R.string.no_rounds_short)
+                    }
+
                     ElevatedCard(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -139,9 +169,15 @@ fun ProfileListScreen(
                                 }
                                 Column {
                                     Text(
-                                        profile.name,
+                                        profileName,
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        profileSummary,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -150,9 +186,12 @@ fun ProfileListScreen(
                             IconButton(
                                 onClick = { onStartTimer(profile.id) },
                                 modifier = Modifier.size(56.dp),
+                                enabled = hasRounds,
                                 colors = IconButtonDefaults.filledIconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surface,
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             ) {
                                 Icon(
@@ -168,4 +207,11 @@ fun ProfileListScreen(
             }
         }
     }
+}
+
+private fun formatDurationShort(totalSeconds: Int): String {
+    val safeSeconds = totalSeconds.coerceAtLeast(0)
+    val minutes = safeSeconds / 60
+    val seconds = safeSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
 }
