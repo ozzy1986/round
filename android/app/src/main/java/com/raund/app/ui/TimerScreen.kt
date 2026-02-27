@@ -91,10 +91,16 @@ private fun Char.isCyrillic(): Boolean = this in '\u0400'..'\u04FF'
 private suspend fun playProlongedAlarmTone(durationMs: Int) = withContext(Dispatchers.IO) {
     val sampleRate = 44100
     val numSamples = sampleRate * durationMs / 1000
+    val fadeFrames = (sampleRate * 0.03).toInt()
     val buffer = ShortArray(numSamples)
     val freq = 880.0
     for (i in 0 until numSamples) {
-        buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * 0.85).toInt().toShort()
+        val envelope = when {
+            i < fadeFrames -> i.toDouble() / fadeFrames
+            i > numSamples - fadeFrames -> (numSamples - i).toDouble() / fadeFrames
+            else -> 1.0
+        }
+        buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * 0.85 * envelope).toInt().toShort()
     }
     val minBufSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
     val bufSizeBytes = (numSamples * 2).coerceAtLeast(minBufSize)
@@ -201,15 +207,9 @@ fun TimerScreen(
         }
     }
 
-    // Short ticks for last 10 sec (ToneGenerator); prolonged start/end tone via AudioTrack
     var alarmTone by remember { mutableStateOf<ToneGenerator?>(null) }
     val tickTone = ToneGenerator.TONE_CDMA_PIP
     DisposableEffect(context) {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        if (am != null) {
-            val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-            am.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
-        }
         val tg = try {
             ToneGenerator(AudioManager.STREAM_ALARM, 100)
         } catch (e: Exception) {
