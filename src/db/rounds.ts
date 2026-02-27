@@ -33,6 +33,13 @@ export interface RoundsForProfileResult {
   rounds: Round[];
 }
 
+export interface ReplaceRoundsInput {
+  name: string;
+  duration_seconds: number;
+  warn10sec?: boolean;
+  position: number;
+}
+
 export async function getRoundsForProfileOwner(
   pool: Pool,
   profileId: string,
@@ -183,4 +190,44 @@ export async function deleteRound(pool: Pool, id: string): Promise<boolean> {
     [id]
   );
   return result.rowCount !== null && result.rowCount > 0;
+}
+
+export async function replaceRoundsForProfile(
+  pool: Pool,
+  profileId: string,
+  userId: string,
+  rounds: ReplaceRoundsInput[]
+): Promise<Round[] | null> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const profileCheck = await client.query(
+      'SELECT id FROM profiles WHERE id = $1 AND user_id = $2',
+      [profileId, userId]
+    );
+    if (profileCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    await client.query('DELETE FROM rounds WHERE profile_id = $1', [profileId]);
+    const result: Round[] = [];
+    for (let i = 0; i < rounds.length; i++) {
+      const r = rounds[i];
+      const warn10sec = r.warn10sec ?? false;
+      const ins = await client.query(
+        `INSERT INTO rounds (profile_id, name, duration_seconds, warn10sec, position)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, profile_id, name, duration_seconds, warn10sec, position`,
+        [profileId, r.name, r.duration_seconds, warn10sec, r.position]
+      );
+      result.push(roundFromRow(ins.rows[0]));
+    }
+    await client.query('COMMIT');
+    return result;
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }

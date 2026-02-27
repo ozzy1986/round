@@ -5,6 +5,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -51,12 +52,33 @@ data class ProfilesPageDto(
     val next_cursor: String?
 )
 
+data class ProfilesWithRoundsPageDto(
+    val data: List<ProfileWithRoundsDto>,
+    val next_cursor: String?
+)
+
+data class PutRoundsRequest(val rounds: List<PutRoundItem>)
+data class PutRoundItem(
+    val name: String,
+    val duration_seconds: Int,
+    val warn10sec: Boolean = false,
+    val position: Int
+)
+
 interface ApiService {
     @GET("profiles")
     suspend fun getProfilesPage(
         @Query("limit") limit: Int = 20,
         @Query("cursor") cursor: String? = null
     ): ProfilesPageDto
+
+    @GET("profiles")
+    suspend fun getProfilesWithRoundsPage(
+        @Query("limit") limit: Int = 100,
+        @Query("cursor") cursor: String? = null,
+        @Query("include") include: String = "rounds",
+        @Query("updated_since") updatedSince: String? = null
+    ): ProfilesWithRoundsPageDto
 
     @GET("profiles/{id}")
     suspend fun getProfileWithRounds(@Path("id") id: String): ProfileWithRoundsDto
@@ -81,4 +103,10 @@ interface ApiService {
 
     @DELETE("rounds/{roundId}")
     suspend fun deleteRound(@Path("roundId") roundId: String): Unit
+
+    @PUT("profiles/{id}/rounds")
+    suspend fun putRounds(
+        @Path("id") profileId: String,
+        @Body body: PutRoundsRequest
+    ): List<RoundDto>
 }

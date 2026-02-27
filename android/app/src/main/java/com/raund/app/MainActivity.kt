@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -11,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.raund.app.sync.SyncOnConnectivityEffect
 import com.raund.app.ui.ProfileListScreen
 import com.raund.app.ui.ProfileEditorScreen
 import com.raund.app.ui.TimerScreen
@@ -26,8 +28,10 @@ class MainActivity : ComponentActivity() {
         val app = application as RaundApplication
         setContent {
             RaundTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    val navController = rememberNavController()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    SyncOnConnectivityEffect(app.profileRepository)
+                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        val navController = rememberNavController()
                     NavHost(navController = navController, startDestination = "profiles") {
                         composable("profiles") {
                             ProfileListScreen(
@@ -53,6 +57,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                    }
                     }
                 }
             }

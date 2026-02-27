@@ -163,4 +163,67 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(204).send();
     }
   );
+
+  app.put<{
+    Params: { id: string };
+    Body: { rounds: Array<{ name: string; duration_seconds: number; warn10sec?: boolean; position: number }> };
+  }>(
+    '/profiles/:id/rounds',
+    {
+      schema: {
+        params: profileIdParamSchema,
+        body: {
+          type: 'object',
+          required: ['rounds'],
+          properties: {
+            rounds: {
+              type: 'array',
+              maxItems: 500,
+              items: {
+                type: 'object',
+                required: ['name', 'duration_seconds', 'position'],
+                properties: {
+                  name: { type: 'string', minLength: 1, maxLength: 255 },
+                  duration_seconds: { type: 'integer', minimum: 5, maximum: 86400 },
+                  warn10sec: { type: 'boolean' },
+                  position: { type: 'integer', minimum: 0 },
+                },
+              },
+            },
+          },
+        },
+        response: {
+          200: {
+            type: 'array',
+            items: roundResponseSchema,
+          },
+          404: { type: 'object', properties: { message: { type: 'string' } } },
+        },
+      },
+    },
+    async (
+      req: FastifyRequest<{
+        Params: { id: string };
+        Body: { rounds: Array<{ name: string; duration_seconds: number; warn10sec?: boolean; position: number }> };
+      }> & AuthenticatedRequest,
+      reply: FastifyReply
+    ) => {
+      const userId = getUserId(req);
+      const result = await roundsDb.replaceRoundsForProfile(
+        pool,
+        req.params.id,
+        userId,
+        req.body.rounds.map((r) => ({
+          name: r.name,
+          duration_seconds: r.duration_seconds,
+          warn10sec: r.warn10sec,
+          position: r.position,
+        }))
+      );
+      if (result === null) {
+        return reply.status(404).send({ message: 'Profile not found' });
+      }
+      return reply.send(result);
+    }
+  );
 }

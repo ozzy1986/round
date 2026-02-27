@@ -1,5 +1,6 @@
 package com.raund.app.data.remote
 
+import retrofit2.Call
 import retrofit2.http.Body
 import retrofit2.http.POST
 
@@ -26,6 +27,9 @@ interface AuthService {
 
     @POST("auth/refresh")
     suspend fun refresh(@Body body: RefreshRequest): RefreshResponse
+
+    @POST("auth/refresh")
+    fun refreshCall(@Body body: RefreshRequest): Call<RefreshResponse>
 
     @POST("auth/logout")
     suspend fun logout(@Body body: LogoutRequest)

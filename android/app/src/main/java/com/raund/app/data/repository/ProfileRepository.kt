@@ -6,10 +6,13 @@ import com.raund.app.data.dao.RoundStats
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.entity.Round
 import com.raund.app.data.local.TokenStore
+import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.remote.ApiService
 import com.raund.app.data.remote.AuthService
 import com.raund.app.data.remote.CreateProfileRequest
 import com.raund.app.data.remote.CreateRoundRequest
+import com.raund.app.data.remote.PutRoundItem
+import com.raund.app.data.remote.PutRoundsRequest
 import com.raund.app.data.remote.UpdateProfileRequest
 import com.raund.app.timer.TimerProfile
 import com.raund.app.timer.TimerRound
@@ -24,7 +27,8 @@ class ProfileRepository(
     private val roundDao: RoundDao,
     private val api: ApiService?,
     private val tokenStore: TokenStore,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val syncPrefs: SyncPrefs
 ) {
 
     val profiles: Flow<List<Profile>> = profileDao.getAll()
@@ -65,6 +69,7 @@ class ProfileRepository(
             UUID.randomUUID().toString()
         }
         profileDao.insert(Profile(id = id, name = safeName, emoji = safeEmoji, updatedAt = now))
+        requestSync()
         id
     }
 
@@ -79,6 +84,7 @@ class ProfileRepository(
         } catch (_: Exception) {
             // Offline or server unknown profile; local update already done
         }
+        requestSync()
     }
 
     suspend fun deleteProfile(id: String) = withContext(Dispatchers.IO) {
@@ -90,16 +96,17 @@ class ProfileRepository(
         } catch (_: Exception) {
             // Offline or server unknown profile; local delete already done
         }
+        requestSync()
     }
 
     suspend fun saveRounds(profileId: String, rounds: List<Triple<String, Int, Boolean>>) = withContext(Dispatchers.IO) {
         ensureToken()
         val sanitizedRounds = rounds.mapNotNull { (name, durationSeconds, warn10sec) ->
-            val safeName = name.trim().take(30)
+            val safeName = name.trim().take(20)
             if (safeName.isBlank()) {
                 null
             } else {
-                Triple(safeName, durationSeconds.coerceAtLeast(1), warn10sec)
+                Triple(safeName, durationSeconds.coerceAtLeast(5), warn10sec)
             }
         }
         roundDao.deleteByProfileId(profileId)
@@ -115,36 +122,52 @@ class ProfileRepository(
         }
         roundDao.insertAll(entities)
         try {
-            api?.let { api ->
-                val existing = api.getRounds(profileId)
-                existing.forEach { api.deleteRound(it.id) }
-                sanitizedRounds.forEachIndexed { index, (name, durationSeconds, warn10sec) ->
-                    api.createRound(profileId, CreateRoundRequest(name, durationSeconds, warn10sec, index))
-                }
-            }
+            api?.putRounds(
+                profileId,
+                PutRoundsRequest(
+                    sanitizedRounds.mapIndexed { index, (name, durationSeconds, warn10sec) ->
+                        PutRoundItem(name, durationSeconds, warn10sec, index)
+                    }
+                )
+            )
         } catch (_: Exception) {
             // Offline or server error; local state is already saved
         }
+        requestSync()
+    }
+
+    /** Runs sync only if last sync was at least SYNC_THROTTLE_MS ago. Call from save completion or connectivity callback. */
+    suspend fun requestSync() = withContext(Dispatchers.IO) {
+        val last = syncPrefs.getLastSyncedAtMillis()
+        if (last != null && (System.currentTimeMillis() - last) < SyncPrefs.SYNC_THROTTLE_MS) {
+            return@withContext
+        }
+        syncFromApi()
     }
 
     suspend fun syncFromApi() = withContext(Dispatchers.IO) {
         ensureToken()
         try {
             val api = this@ProfileRepository.api ?: return@withContext
+            val updatedSince = syncPrefs.getLastSyncedAtForApi()
             var cursor: String? = null
             do {
-                val page = api.getProfilesPage(limit = 100, cursor = cursor)
+                val page = api.getProfilesWithRoundsPage(
+                    limit = 100,
+                    cursor = cursor,
+                    updatedSince = updatedSince
+                )
                 page.data.forEach { dto ->
                     val profile = Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis())
                     profileDao.insert(profile)
-                    val withRounds = api.getProfileWithRounds(dto.id)
                     roundDao.deleteByProfileId(dto.id)
-                    roundDao.insertAll(withRounds.rounds.mapIndexed { i, r ->
-                        Round(r.id, r.profile_id, r.name, r.duration_seconds.coerceAtLeast(1), r.warn10sec, i)
+                    roundDao.insertAll(dto.rounds.mapIndexed { i, r ->
+                        Round(r.id, r.profile_id, r.name, r.duration_seconds.coerceAtLeast(5), r.warn10sec, i)
                     })
                 }
                 cursor = page.next_cursor
             } while (cursor != null)
+            syncPrefs.setLastSyncedAtNow()
         } catch (_: Exception) {
             // Offline or server error; keep existing local data
         }

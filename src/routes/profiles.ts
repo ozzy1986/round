@@ -23,7 +23,19 @@ const profileIdParamSchema = {
 export async function profilesRoutes(app: FastifyInstance): Promise<void> {
   const pool = getPool();
 
-  app.get<{ Querystring: { limit?: string; cursor?: string } }>(
+  const roundItemSchema = {
+    type: 'object',
+    properties: {
+      id: { type: 'string' },
+      profile_id: { type: 'string' },
+      name: { type: 'string' },
+      duration_seconds: { type: 'integer' },
+      warn10sec: { type: 'boolean' },
+      position: { type: 'integer' },
+    },
+  };
+
+  app.get<{ Querystring: { limit?: string; cursor?: string; include?: string; updated_since?: string } }>(
     '/profiles',
     {
       schema: {
@@ -32,6 +44,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             limit: { type: 'string', pattern: '^[0-9]+$' },
             cursor: { type: 'string' },
+            include: { type: 'string', enum: ['rounds'] },
+            updated_since: { type: 'string' },
           },
         },
         response: {
@@ -50,6 +64,10 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
                     user_id: { type: ['string', 'null'] },
                     created_at: { type: 'string', format: 'date-time' },
                     updated_at: { type: 'string', format: 'date-time' },
+                    rounds: {
+                      type: 'array',
+                      items: roundItemSchema,
+                    },
                   },
                 },
               },
@@ -59,10 +77,40 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Querystring: { limit?: string; cursor?: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+    async (req: FastifyRequest<{ Querystring: { limit?: string; cursor?: string; include?: string; updated_since?: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
       const userId = getUserId(req);
       const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 20;
       const cursor = req.query.cursor ?? null;
+      const includeRounds = req.query.include === 'rounds';
+      const updatedSince = req.query.updated_since ?? null;
+
+      if (includeRounds) {
+        const { profiles, nextCursor } = await profilesDb.listProfilesWithRounds(
+          pool,
+          userId,
+          Number.isNaN(limit) ? 20 : limit,
+          cursor || undefined,
+          updatedSince || undefined
+        );
+        const data = profiles.map((p) => ({
+          id: p.id,
+          name: p.name,
+          emoji: p.emoji,
+          user_id: p.user_id,
+          created_at: (p.created_at as Date).toISOString(),
+          updated_at: (p.updated_at as Date).toISOString(),
+          rounds: p.rounds.map((r) => ({
+            id: r.id,
+            profile_id: r.profile_id,
+            name: r.name,
+            duration_seconds: r.duration_seconds,
+            warn10sec: r.warn10sec,
+            position: r.position,
+          })),
+        }));
+        return reply.send({ data, next_cursor: nextCursor });
+      }
+
       const { profiles, nextCursor } = await profilesDb.listProfiles(
         pool,
         userId,

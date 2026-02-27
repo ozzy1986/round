@@ -23,6 +23,11 @@ export interface ListProfilesResult {
   nextCursor: string | null;
 }
 
+export interface ListProfilesWithRoundsResult {
+  profiles: ProfileWithRounds[];
+  nextCursor: string | null;
+}
+
 export async function listProfiles(
   pool: Pool,
   userId: string,
@@ -53,6 +58,50 @@ export async function listProfiles(
   const rows = result.rows;
   const hasMore = rows.length > safeLimit;
   const profiles = (hasMore ? rows.slice(0, safeLimit) : rows).map((row) => profileFromRow(row));
+  const nextCursor =
+    profiles.length > 0 && hasMore
+      ? (profiles[profiles.length - 1].updated_at as Date).toISOString()
+      : null;
+  return { profiles, nextCursor };
+}
+
+export async function listProfilesWithRounds(
+  pool: Pool,
+  userId: string,
+  limit: number = 20,
+  cursor?: string | null,
+  updatedSince?: string | null
+): Promise<ListProfilesWithRoundsResult> {
+  const safeLimit = Math.min(Math.max(1, limit), 100);
+  const params: unknown[] = [userId];
+  let place = 2;
+  const cursorCond = cursor ? `AND p.updated_at < $${place++}` : '';
+  const sinceCond = updatedSince ? `AND p.updated_at >= $${place++}` : '';
+  if (cursor) params.push(cursor);
+  if (updatedSince) params.push(updatedSince);
+  params.push(safeLimit + 1);
+  const limitParam = place;
+
+  const result = await pool.query(
+    `SELECT p.id, p.name, p.emoji, p.user_id, p.created_at, p.updated_at,
+            COALESCE(
+              (SELECT json_agg(r ORDER BY r.position) FROM rounds r WHERE r.profile_id = p.id),
+              '[]'::json
+            ) AS rounds_json
+     FROM profiles p
+     WHERE p.user_id = $1 ${cursorCond} ${sinceCond}
+     ORDER BY p.updated_at DESC
+     LIMIT $${limitParam}`,
+    params
+  );
+  const rows = result.rows;
+  const hasMore = rows.length > safeLimit;
+  const slice = hasMore ? rows.slice(0, safeLimit) : rows;
+  const profiles: ProfileWithRounds[] = slice.map((row) => {
+    const profile = profileFromRow(row);
+    const rounds = (row.rounds_json as Array<Record<string, unknown>>).map((r) => roundFromRow(r));
+    return { ...profile, rounds };
+  });
   const nextCursor =
     profiles.length > 0 && hasMore
       ? (profiles[profiles.length - 1].updated_at as Date).toISOString()
