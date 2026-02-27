@@ -63,7 +63,7 @@ fun ProfileEditorScreen(
     var name by remember { mutableStateOf("") }
     var emoji by remember { mutableStateOf("⏱") }
     var showNameError by remember { mutableStateOf(false) }
-    val rounds = remember { mutableStateListOf<Triple<String, Int, Boolean>>() }
+    val rounds = remember { mutableStateListOf<Triple<String, String, Boolean>>() }
     val isNew = profileId == null || profileId == "new"
     val isNameValid = name.trim().isNotEmpty()
 
@@ -74,7 +74,7 @@ fun ProfileEditorScreen(
             emoji = profile?.emoji ?: "⏱"
             rounds.clear()
             profile?.rounds?.forEach { r ->
-                rounds.add(Triple(r.name, r.durationSeconds, r.warn10sec))
+                rounds.add(Triple(r.name, r.durationSeconds.toString(), r.warn10sec))
             }
         }
     }
@@ -184,11 +184,10 @@ fun ProfileEditorScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedTextField(
-                                value = dur.toString(),
+                                value = dur,
                                 onValueChange = {
                                     val digitsOnly = it.filter { char -> char.isDigit() }
-                                    val parsedValue = digitsOnly.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                                    rounds[index] = Triple(rName, parsedValue, warn)
+                                    rounds[index] = Triple(rName, digitsOnly, warn)
                                 },
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
@@ -220,7 +219,7 @@ fun ProfileEditorScreen(
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
-                onClick = { rounds.add(Triple("", 60, false)) },
+                onClick = { rounds.add(Triple("", "60", false)) },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -240,7 +239,11 @@ fun ProfileEditorScreen(
                     scope.launch {
                         val id = if (isNew) repository.insertProfile(safeName, safeEmoji) else profileId!!
                         if (!isNew) repository.updateProfile(profileId!!, safeName, safeEmoji)
-                        repository.saveRounds(id, rounds.toList())
+                        val roundsToSave = rounds.map { (name, durString, warn) ->
+                            val durInt = durString.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                            Triple(name, durInt, warn)
+                        }
+                        repository.saveRounds(id, roundsToSave)
                         onBack()
                     }
                 },

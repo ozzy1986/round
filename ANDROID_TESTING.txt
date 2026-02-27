@@ -160,7 +160,7 @@ C. PROFILE EDITOR UX + VALIDATION
 14) Emoji blank fallback is handled as stopwatch emoji after save.
 15) Add round works.
 16) Delete round works.
-17) Round duration input accepts digits and persists as >= 1 second.
+17) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
 18) Save persists profile and returns to list.
 19) Delete profile removes it and returns to list.
 20) Back navigation from editor returns to list without crash.
@@ -168,12 +168,13 @@ C. PROFILE EDITOR UX + VALIDATION
 D. TIMER UX / STATE MACHINE
 21) Pre-start timer shows current round name, step indicator, and countdown.
 22) Start begins countdown and transitions between rounds correctly.
-23) Warn-10 behavior: TTS warning + per-second beeps in last 10 seconds when enabled.
+23) Warn-10 behavior: TTS warning + per-second ticks (using STREAM_MUSIC to avoid conflicts) in last 10 seconds when enabled.
 24) Manual Stop shows "Training stopped/Тренировка остановлена".
 25) Natural completion shows "Training finished/Тренировка завершена".
 26) Restart button returns to initial timer state.
 27) Back from timer returns to profile list and stops active speech playback.
 28) Profiles without rounds: timer start remains disabled and helper text is shown.
+29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
 
 E. ACCESSIBILITY / I18N
 29) contentDescription labels are localized (check via UI dump XML).

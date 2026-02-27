@@ -1,8 +1,10 @@
 package com.raund.app.ui
 
+import android.app.Activity
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
+import android.view.WindowManager
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -105,7 +107,7 @@ fun TimerScreen(
     var tickTone by remember { mutableStateOf<ToneGenerator?>(null) }
     DisposableEffect(context) {
         val tg = try {
-            ToneGenerator(AudioManager.STREAM_ALARM, 100)
+            ToneGenerator(AudioManager.STREAM_MUSIC, 100)
         } catch (e: Exception) {
             null
         }
@@ -123,6 +125,18 @@ fun TimerScreen(
             roundTotal = p.rounds[0].durationSeconds
             currentRound = p.rounds[0].name
             roundInfo = "1 / ${p.rounds.size}"
+        }
+    }
+
+    DisposableEffect(running) {
+        val activity = context as? Activity
+        if (running) {
+            activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
