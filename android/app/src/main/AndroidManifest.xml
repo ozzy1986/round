@@ -4,7 +4,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:name=".RaundApplication"
-        android:usesCleartextTraffic="true"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:icon="@android:drawable/ic_lock_idle_alarm"
