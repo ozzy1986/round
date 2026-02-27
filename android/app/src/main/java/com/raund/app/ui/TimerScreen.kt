@@ -116,7 +116,7 @@ fun TimerScreen(
         }
     }
 
-    // Piercing high-pitched alarm: short ticks, long round-end/training-end beeps — audible across the hall
+    // Piercing alarm: short ticks for last 10 sec; one continuous long tone for round/training start and end
     var alarmTone by remember { mutableStateOf<ToneGenerator?>(null) }
     val piercingTone = ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD
     val tickTone = ToneGenerator.TONE_CDMA_PIP
@@ -139,8 +139,7 @@ fun TimerScreen(
     }
 
     val tickMs = 150
-    val longBeepMs = 450
-    val longBeepGapMs = 400L
+    val prolongedToneMs = 1200
 
     LaunchedEffect(profile) {
         val p = profile ?: return@LaunchedEffect
@@ -335,13 +334,8 @@ fun TimerScreen(
                                             roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
                                             val roundName = event.round.name
                                             scope.launch {
-                                                val tone = alarmTone
-                                                if (tone != null) {
-                                                    tone.startTone(piercingTone, longBeepMs)
-                                                    delay(longBeepGapMs)
-                                                    tone.startTone(piercingTone, longBeepMs)
-                                                    delay(longBeepGapMs)
-                                                }
+                                                alarmTone?.startTone(piercingTone, prolongedToneMs)
+                                                delay(prolongedToneMs.toLong())
                                                 tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
                                         }
@@ -355,23 +349,16 @@ fun TimerScreen(
                                             // Voice warning removed per user request
                                         }
                                         is TimerEvent.RoundEnd -> {
-                                            scope.launch {
-                                                alarmTone?.startTone(piercingTone, 1000)
-                                            }
+                                            alarmTone?.startTone(piercingTone, prolongedToneMs)
                                         }
                                         is TimerEvent.TrainingEnd -> {
                                             running = false
                                             finished = true
                                             stoppedByUser = false
-                                            tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
                                             scope.launch {
-                                                val tone = alarmTone
-                                                if (tone != null) {
-                                                    for (i in 1..3) {
-                                                        tone.startTone(piercingTone, longBeepMs)
-                                                        delay(longBeepGapMs)
-                                                    }
-                                                }
+                                                alarmTone?.startTone(piercingTone, prolongedToneMs)
+                                                delay(prolongedToneMs.toLong())
+                                                tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
                                         }
                                     }

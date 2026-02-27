@@ -177,12 +177,12 @@ D. TIMER UX / STATE MACHINE
 29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
 
 E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with device volume up)
-30) Start of training / start of round: two long beeps (450 ms each), then TTS speaks round name in Russian (e.g. "Работа", "Отдых") when profile uses Russian names.
+30) Start of training / start of round: one continuous prolonged tone (1200 ms), then TTS speaks round name in Russian (e.g. "Работа", "Отдых") when profile uses Russian names.
 31) Last 10 seconds: one short tick (150 ms, TONE_CDMA_PIP) per second only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining (TTS uses USAGE_ALARM stream to prevent ducking).
-32) End of round: two long beeps (450 ms each) when round ends.
-33) End of training: three long beeps (450 ms each), then TTS "Тренировка завершена".
+32) End of round: one continuous prolonged tone (1200 ms) when round ends.
+33) End of training: one continuous prolonged tone (1200 ms), then TTS "Тренировка завершена".
 34) No ticks for rounds with duration < 10 sec even if "Предупредить за 10 сек" is ON.
-    Test profile "Тест зал" (Russian rounds): run "node create_test.js" to create on VPS — Работа 15s (warn10), Отдых 5s (no warn), Работа 12s (warn10), Отдых 5s (no warn).
+    Test profile with 6 Russian rounds (varied duration and warn10): run "node scripts/create-training-ru.cjs" to create on VPS — Разминка 30s (warn10), Спринт 10s (no warn), Отдых 15s (warn10), Силовая 45s (warn10), Ходьба 20s (no warn), Заминка 25s (warn10).
 
 F. ACCESSIBILITY / I18N (Russian as primary check)
 35) When device locale is RU: all UI and TTS use Russian (Профили, Старт, Стоп, Тренировка завершена, Повторить, "X через 10 секунд"). Round names spoken by TTS use device locale (use Russian names in profile for full RU experience).
@@ -229,17 +229,17 @@ Run in order. After any code change, re-run from scenario 1.
 
  7. TIMER — SHORT ROUNDS (no ticks)
     7.1 Profile: one round 5 sec, "Предупредить за 10 сек" ON. Start timer.
-    7.2 Expect: two beeps (start), TTS round name, countdown 5→0, NO per-second ticks (round < 10 sec).
-    7.3 Two beeps (end of round), then if no more rounds: three beeps + TTS "Тренировка завершена".
+    7.2 Expect: one prolonged tone (start), TTS round name, countdown 5→0, NO per-second ticks (round < 10 sec).
+    7.3 One prolonged tone (end of round), then if no more rounds: one prolonged tone + TTS "Тренировка завершена".
 
  8. TIMER — LONG ROUND WITH WARN10
     8.1 Profile: one round 15 sec, "Предупредить за 10 сек" ON. Start timer.
-    8.2 Expect: two beeps, TTS round name. Countdown 15→11 no ticks. At 10 sec: TTS "X через 10 секунд", then one beep per second for 10,9,8,7,6,5,4,3,2,1.
-    8.3 At 0: two beeps (end of round). Then three beeps + "Тренировка завершена".
+    8.2 Expect: one prolonged tone, TTS round name. Countdown 15→11 no ticks. At 10 sec: TTS "X через 10 секунд", then one beep per second for 10,9,8,7,6,5,4,3,2,1.
+    8.3 At 0: one prolonged tone (end of round). Then one prolonged tone + "Тренировка завершена".
 
  9. TIMER — MULTIPLE ROUNDS
     9.1 Profile: e.g. Работа 15 sec (warn10), Отдых 5 sec (no warn). Start.
-    9.2 Round 1: two beeps, TTS "Работа", ticks last 10 sec, two beeps. Round 2: two beeps, TTS "Отдых", no ticks, two beeps. Three beeps + "Тренировка завершена".
+    9.2 Round 1: one prolonged tone, TTS "Работа", ticks last 10 sec, one prolonged tone. Round 2: one prolonged tone, TTS "Отдых", no ticks, one prolonged tone. One prolonged tone + "Тренировка завершена".
 
 10. TIMER — STOP AND RESTART
     10.1 Start timer, then tap Stop. "Тренировка остановлена". Tap "Повторить" → timer reset, can Start again.
