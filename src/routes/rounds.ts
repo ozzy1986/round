@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { getUserId, type AuthenticatedRequest } from '../auth/middleware.js';
 import { getPool } from '../db/pool.js';
 import * as profilesDb from '../db/profiles.js';
 import * as roundsDb from '../db/rounds.js';
@@ -55,8 +56,8 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+    async (req: FastifyRequest<{ Params: { id: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+      const userId = getUserId(req);
       const profile = await profilesDb.getProfileById(pool, req.params.id, userId);
       if (!profile) return reply.status(404).send({ message: 'Profile not found' });
       const rounds = await roundsDb.getRoundsByProfileId(pool, req.params.id);
@@ -83,10 +84,10 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       req: FastifyRequest<{
         Params: { id: string };
         Body: { name: string; duration_seconds: number; warn10sec?: boolean; position: number };
-      }>,
+      }> & AuthenticatedRequest,
       reply: FastifyReply
     ) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const userId = getUserId(req);
       const profile = await profilesDb.getProfileById(pool, req.params.id, userId);
       if (!profile) return reply.status(404).send({ message: 'Profile not found' });
       const round = await roundsDb.createRound(pool, req.params.id, {
@@ -126,10 +127,10 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       req: FastifyRequest<{
         Params: { roundId: string };
         Body: { name?: string; duration_seconds?: number; warn10sec?: boolean; position?: number };
-      }>,
+      }> & AuthenticatedRequest,
       reply: FastifyReply
     ) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const userId = getUserId(req);
       const round = await roundsDb.getRoundById(pool, req.params.roundId);
       if (!round) return reply.status(404).send({ message: 'Round not found' });
       const profile = await profilesDb.getProfileById(pool, round.profile_id, userId);
@@ -150,8 +151,8 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Params: { roundId: string } }>, reply: FastifyReply) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+    async (req: FastifyRequest<{ Params: { roundId: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+      const userId = getUserId(req);
       const round = await roundsDb.getRoundById(pool, req.params.roundId);
       if (!round) return reply.status(404).send({ message: 'Round not found' });
       const profile = await profilesDb.getProfileById(pool, round.profile_id, userId);

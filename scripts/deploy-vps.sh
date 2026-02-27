@@ -2,6 +2,7 @@
 # Run on VPS from app dir: /var/www/round.ozzy1986.com (must be a git clone)
 # Usage: bash scripts/deploy-vps.sh
 # Requires .env with JWT_SECRET (min 32 chars). Optional: BOT_SECRET for Telegram bot /auth/telegram.
+# SSL: ensure certbot renew runs (e.g. cron: 0 0 * * * certbot renew --quiet --deploy-hook "systemctl reload nginx").
 set -e
 APP_DIR="${APP_DIR:-/var/www/round.ozzy1986.com}"
 cd "$APP_DIR"

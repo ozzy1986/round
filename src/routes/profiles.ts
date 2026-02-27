@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { getUserId, type AuthenticatedRequest } from '../auth/middleware.js';
 import { getPool } from '../db/pool.js';
 import * as profilesDb from '../db/profiles.js';
 
@@ -58,8 +59,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Querystring: { limit?: string; cursor?: string } }>, reply: FastifyReply) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+    async (req: FastifyRequest<{ Querystring: { limit?: string; cursor?: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+      const userId = getUserId(req);
       const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 20;
       const cursor = req.query.cursor ?? null;
       const { profiles, nextCursor } = await profilesDb.listProfiles(
@@ -107,8 +108,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+    async (req: FastifyRequest<{ Params: { id: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+      const userId = getUserId(req);
       const profile = await profilesDb.getProfileWithRoundsById(pool, req.params.id, userId);
       if (!profile) return reply.status(404).send({ message: 'Profile not found' });
       return reply.send(profile);
@@ -136,8 +137,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Body: { name: string; emoji: string } }>, reply: FastifyReply) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+    async (req: FastifyRequest<{ Body: { name: string; emoji: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+      const userId = getUserId(req);
       const created = await profilesDb.createProfile(pool, { ...req.body, user_id: userId });
       return reply.status(201).send(created);
     }
@@ -178,10 +179,10 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
       req: FastifyRequest<{
         Params: { id: string };
         Body: { name?: string; emoji?: string };
-      }>,
+      }> & AuthenticatedRequest,
       reply: FastifyReply
     ) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+      const userId = getUserId(req);
       const updated = await profilesDb.updateProfile(pool, req.params.id, userId, req.body);
       if (!updated) return reply.status(404).send({ message: 'Profile not found' });
       return reply.send(updated);
@@ -199,8 +200,8 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const userId = (req as FastifyRequest & { user: { id: string } }).user.id;
+    async (req: FastifyRequest<{ Params: { id: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+      const userId = getUserId(req);
       const deleted = await profilesDb.deleteProfile(pool, req.params.id, userId);
       if (!deleted) return reply.status(404).send({ message: 'Profile not found' });
       return reply.status(204).send();
