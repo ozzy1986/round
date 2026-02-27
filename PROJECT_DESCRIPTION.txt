@@ -104,7 +104,10 @@ rounds:
   id (uuid, PK), profile_id (uuid, FK -> profiles, CASCADE), name (text), duration_seconds (int), warn10sec (boolean), position (int)
   Index on profile_id; unique (profile_id, position).
 
-Auth: not implemented yet (user_id nullable; API is anonymous).
+users:
+  id (uuid, PK), is_anonymous (boolean), telegram_id (bigint, unique, nullable), created_at (timestamptz)
+
+Auth: JWT-based. Anonymous registration (POST /auth/register) and Telegram auth (POST /auth/telegram with X-Bot-Secret). Tokens: 365d expiration. User isolation: all profile/round queries filter by user_id.
 
 
 7. API ENDPOINTS
@@ -207,7 +210,7 @@ Git remotes (4-way sync):
 VPS (production server):
   - Domain: round.ozzy1986.com (A record to VPS IP). Apache on 80; Nginx on 8080.
   - App dir: /var/www/round.ozzy1986.com (git clone from GitHub). .env in app root (PG_USER=round, PG_DATABASE=round, PORT=3001, HOST=127.0.0.1, TELEGRAM_BOT_TOKEN); .env persists across deploys.
-  - Nginx: config in deploy/nginx-round.ozzy1986.com.conf (listen 8080, server_name round.ozzy1986.com, proxy_pass to 127.0.0.1:3001). On server, use /etc/nginx/sites-available/ copy or symlink; only one server block per server_name on 8080.
+  - Nginx: config in deploy/nginx-round.ozzy1986.com.conf (HTTP 8080 redirects to HTTPS 443; upstream block with keepalive; HSTS, security headers, gzip). On server, use /etc/nginx/sites-available/ copy or symlink.
   - Deploy: on VPS run "cd /var/www/round.ozzy1986.com && bash scripts/deploy-vps.sh" (git pull, npm ci, migrate:up, build, pm2 restart round-api and round-bot). From local PC: scripts/deploy.ps1 (push both remotes then SSH and run deploy-vps.sh); requires SSH key from PC to VPS (ssh-copy-id root@VPS_IP).
   - PM2: round-api (HTTP server), round-bot (Telegram bot). PostgreSQL user and database: round.
   - For step-by-step sync procedure (for AI/next session), see SYNC.txt.
@@ -229,6 +232,12 @@ VPS (production server):
 -----------------------
 Aligned with CORE PRINCIPLES above: security, speed, stability, scalability; DRY, KISS, SOLID; TDD with full test coverage.
 - Validate all input (Fastify schemas), parameterized queries only, no secrets in logs, .env not committed.
+- CORS: configurable via CORS_ORIGINS env var (comma-separated origins; empty = allow all).
+- BOT_SECRET comparison uses crypto.timingSafeEqual (SHA-256 digest) to prevent timing attacks.
+- Nginx: HTTP 8080 redirects to HTTPS 443. HSTS, X-Content-Type-Options, X-Frame-Options headers. TLS 1.2+. Upstream keepalive and gzip compression for JSON.
+- Graceful shutdown: SIGTERM/SIGINT handlers drain in-flight requests and close DB pool before exit.
+- N+1 queries eliminated: getProfileWithRoundsById uses single query with json_agg; round update/delete use JOINed ownership checks (1 query instead of 2-3).
+- Bot token cache: capped at 5000 entries with 24h TTL (prevents unbounded memory growth).
 - Shared timer core; Vitest with coverage (timer-engine 100%, others high).
 - Offline-first and data validation. UI: minimal, big countdown, clear typography.
 - Android QA gate: `assembleDebug` + on-device ADB regression + `:app:lintDebug` (current lint: 0 errors; warnings are dependency update suggestions only).

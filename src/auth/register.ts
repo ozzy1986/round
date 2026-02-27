@@ -1,8 +1,16 @@
+import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getPool } from '../db/pool.js';
 import { createAnonymousUser, findOrCreateUserByTelegramId } from '../db/users.js';
 
 const BOT_SECRET = process.env.BOT_SECRET;
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const bufA = crypto.createHash('sha256').update(a, 'utf8').digest();
+  const bufB = crypto.createHash('sha256').update(b, 'utf8').digest();
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const pool = getPool();
@@ -32,7 +40,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req: FastifyRequest<{ Body: { telegram_id: number } }>, reply: FastifyReply) => {
       const secret = (req.headers['x-bot-secret'] as string) || '';
-      if (!BOT_SECRET || secret !== BOT_SECRET) {
+      if (!BOT_SECRET || !timingSafeEqual(secret, BOT_SECRET)) {
         return reply.status(401).send({ message: 'Unauthorized' });
       }
       const user = await findOrCreateUserByTelegramId(pool, req.body.telegram_id);

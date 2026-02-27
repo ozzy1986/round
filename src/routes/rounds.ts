@@ -58,9 +58,12 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req: FastifyRequest<{ Params: { id: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
       const userId = getUserId(req);
-      const profile = await profilesDb.getProfileById(pool, req.params.id, userId);
-      if (!profile) return reply.status(404).send({ message: 'Profile not found' });
-      const rounds = await roundsDb.getRoundsByProfileId(pool, req.params.id);
+      const { profileFound, rounds } = await roundsDb.getRoundsForProfileOwner(
+        pool,
+        req.params.id,
+        userId
+      );
+      if (!profileFound) return reply.status(404).send({ message: 'Profile not found' });
       return reply.send(rounds);
     }
   );
@@ -131,12 +134,14 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply
     ) => {
       const userId = getUserId(req);
-      const round = await roundsDb.getRoundById(pool, req.params.roundId);
-      if (!round) return reply.status(404).send({ message: 'Round not found' });
-      const profile = await profilesDb.getProfileById(pool, round.profile_id, userId);
-      if (!profile) return reply.status(404).send({ message: 'Round not found' });
-      const updated = await roundsDb.updateRound(pool, req.params.roundId, req.body);
-      return reply.send(updated!);
+      const updated = await roundsDb.updateRoundForOwner(
+        pool,
+        req.params.roundId,
+        userId,
+        req.body
+      );
+      if (!updated) return reply.status(404).send({ message: 'Round not found' });
+      return reply.send(updated);
     }
   );
 
@@ -153,11 +158,8 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req: FastifyRequest<{ Params: { roundId: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
       const userId = getUserId(req);
-      const round = await roundsDb.getRoundById(pool, req.params.roundId);
-      if (!round) return reply.status(404).send({ message: 'Round not found' });
-      const profile = await profilesDb.getProfileById(pool, round.profile_id, userId);
-      if (!profile) return reply.status(404).send({ message: 'Round not found' });
-      await roundsDb.deleteRound(pool, req.params.roundId);
+      const deleted = await roundsDb.deleteRoundForOwner(pool, req.params.roundId, userId);
+      if (!deleted) return reply.status(404).send({ message: 'Round not found' });
       return reply.status(204).send();
     }
   );

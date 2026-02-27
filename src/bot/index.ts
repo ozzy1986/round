@@ -30,7 +30,10 @@ interface RunningTimer {
 }
 
 const runningTimers = new Map<number, RunningTimer>();
-const telegramTokenCache = new Map<number, string>();
+const TOKEN_CACHE_MAX = 5000;
+const TOKEN_CACHE_TTL_MS = 86400000; // 24h
+const tokenCache = new Map<number, { token: string; expiresAt: number }>();
+const tokenCacheKeys: number[] = [];
 const FILE_ID_CACHE_MAX = 1000;
 const fileIdCache = new Map<string, string>();
 const fileIdCacheKeys: string[] = [];
@@ -39,6 +42,12 @@ function evictFileIdOne(): void {
   if (fileIdCacheKeys.length === 0) return;
   const k = fileIdCacheKeys.shift();
   if (k) fileIdCache.delete(k);
+}
+
+function evictTokenOne(): void {
+  if (tokenCacheKeys.length === 0) return;
+  const k = tokenCacheKeys.shift();
+  if (k !== undefined) tokenCache.delete(k);
 }
 
 async function fetchWithTimeout(
@@ -57,8 +66,9 @@ async function fetchWithTimeout(
 }
 
 async function getTokenForTelegramUser(telegramId: number): Promise<string | null> {
-  const cached = telegramTokenCache.get(telegramId);
-  if (cached) return cached;
+  const entry = tokenCache.get(telegramId);
+  if (entry && entry.expiresAt > Date.now()) return entry.token;
+  if (entry) tokenCache.delete(telegramId);
   if (!BOT_SECRET) return null;
   try {
     const res = await fetchWithTimeout(`${API_BASE}/auth/telegram`, {
@@ -71,7 +81,9 @@ async function getTokenForTelegramUser(telegramId: number): Promise<string | nul
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { token: string };
-    telegramTokenCache.set(telegramId, data.token);
+    if (tokenCache.size >= TOKEN_CACHE_MAX) evictTokenOne();
+    tokenCache.set(telegramId, { token: data.token, expiresAt: Date.now() + TOKEN_CACHE_TTL_MS });
+    tokenCacheKeys.push(telegramId);
     return data.token;
   } catch {
     return null;

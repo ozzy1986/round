@@ -3,6 +3,45 @@ import { buildApp } from '../../src/server.js';
 import type { FastifyInstance } from 'fastify';
 import { closePool } from '../../src/db/pool.js';
 
+describe('POST /auth/telegram', () => {
+  let app: FastifyInstance;
+  const savedBotSecret = process.env.BOT_SECRET;
+
+  beforeAll(async () => {
+    process.env.BOT_SECRET = 'test-bot-secret-for-telegram-auth';
+    app = await buildApp();
+  });
+
+  afterAll(async () => {
+    process.env.BOT_SECRET = savedBotSecret;
+    await app.close();
+    await closePool();
+  });
+
+  it('returns 401 when X-Bot-Secret is missing', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/telegram',
+      headers: { 'Content-Type': 'application/json' },
+      payload: { telegram_id: 12345 },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('returns 401 when X-Bot-Secret is wrong (timing-safe)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/telegram',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bot-Secret': 'wrong-secret',
+      },
+      payload: { telegram_id: 12345 },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+});
+
 describe('POST /auth/register', () => {
   let app: FastifyInstance;
 

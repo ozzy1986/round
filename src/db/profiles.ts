@@ -5,7 +5,7 @@ import type {
   CreateProfileInput,
   UpdateProfileInput,
 } from './types.js';
-import { getRoundsByProfileId } from './rounds.js';
+import { roundFromRow } from './rounds.js';
 
 function profileFromRow(row: Record<string, unknown>): Profile {
   return {
@@ -79,10 +79,23 @@ export async function getProfileWithRoundsById(
   id: string,
   userId: string
 ): Promise<ProfileWithRounds | null> {
-  const profile = await getProfileById(pool, id, userId);
-  if (!profile) return null;
-  const rounds = await getRoundsByProfileId(pool, id);
-  return { ...profile, rounds };
+  const result = await pool.query(
+    `SELECT p.id, p.name, p.emoji, p.user_id, p.created_at, p.updated_at,
+            COALESCE(
+              (SELECT json_agg(r ORDER BY r.position) FROM rounds r WHERE r.profile_id = p.id),
+              '[]'::json
+            ) AS rounds_json
+     FROM profiles p
+     WHERE p.id = $1 AND p.user_id = $2`,
+    [id, userId]
+  );
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  const rounds = (row.rounds_json as Array<Record<string, unknown>>).map((r) => roundFromRow(r));
+  return {
+    ...profileFromRow(row),
+    rounds,
+  };
 }
 
 export async function createProfile(

@@ -21,10 +21,16 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET must be set and at least 32 characters');
 }
 
+function getCorsOrigin(): boolean | string | string[] {
+  const raw = process.env.CORS_ORIGINS;
+  if (!raw || raw.trim() === '') return true;
+  return raw.split(',').map((o) => o.trim()).filter(Boolean);
+}
+
 export async function buildApp() {
   const app = Fastify({ logger: true, trustProxy: true });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, { origin: getCorsOrigin() });
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(rateLimit, {
     max: 100,
@@ -70,6 +76,20 @@ export async function buildApp() {
 
 export async function start() {
   const app = await buildApp();
+  const { closePool } = await import('./db/pool.js');
+  const shutdown = async (signal: string) => {
+    app.log.info({ signal }, 'shutting down');
+    try {
+      await app.close();
+      await closePool();
+      process.exit(0);
+    } catch (err) {
+      app.log.error(err);
+      process.exit(1);
+    }
+  };
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
   try {
     await app.listen({ port: PORT, host: HOST });
   } catch (err) {
