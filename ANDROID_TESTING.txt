@@ -176,12 +176,13 @@ D. TIMER UX / STATE MACHINE
 28) Profiles without rounds: timer start remains disabled and helper text is shown.
 29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
 
-E. SOUND SIGNALS (verify with device volume up; all beeps STREAM_ALARM, loud and clear)
-30) Start of training / start of round: two loud beeps (250 ms each), then TTS speaks round name (e.g. "Работа", "Отдых" if names are in Russian).
-31) Last 10 seconds: one loud beep per second (ticks) only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining.
-32) End of round: two loud beeps when round ends (before next round or before "Тренировка завершена").
-33) End of training: three loud beeps, then TTS "Тренировка завершена".
+E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with device volume up)
+30) Start of training / start of round: two long beeps (450 ms each), then TTS speaks round name in Russian (e.g. "Работа", "Отдых") when profile uses Russian names.
+31) Last 10 seconds: one short tick (100 ms) per second only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining.
+32) End of round: two long beeps (450 ms each) when round ends.
+33) End of training: three long beeps (450 ms each), then TTS "Тренировка завершена".
 34) No ticks for rounds with duration < 10 sec even if "Предупредить за 10 сек" is ON.
+    Test profile "Тест зал" (Russian rounds): run "node create_test.js" to create on VPS — Работа 15s (warn10), Отдых 5s (no warn), Работа 12s (warn10), Отдых 5s (no warn).
 
 F. ACCESSIBILITY / I18N (Russian as primary check)
 35) When device locale is RU: all UI and TTS use Russian (Профили, Старт, Стоп, Тренировка завершена, Повторить, "X через 10 секунд"). Round names spoken by TTS use device locale (use Russian names in profile for full RU experience).

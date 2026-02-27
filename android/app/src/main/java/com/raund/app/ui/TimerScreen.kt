@@ -1,6 +1,7 @@
 package com.raund.app.ui
 
 import android.app.Activity
+import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
@@ -105,9 +106,15 @@ fun TimerScreen(
         }
     }
 
-    // Loud alarm beeps for start, ticks (last 10 sec), end of round, end of training — same as boxing gym
+    // Piercing high-pitched alarm: short ticks, long round-end/training-end beeps — audible across the hall
     var alarmTone by remember { mutableStateOf<ToneGenerator?>(null) }
+    val piercingTone = ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD
     DisposableEffect(context) {
+        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        if (am != null) {
+            val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            am.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+        }
         val tg = try {
             ToneGenerator(AudioManager.STREAM_ALARM, 100)
         } catch (e: Exception) {
@@ -120,8 +127,9 @@ fun TimerScreen(
         }
     }
 
-    val beepMs = 250
-    val beepGapMs = 400L
+    val tickMs = 100
+    val longBeepMs = 450
+    val longBeepGapMs = 400L
 
     LaunchedEffect(profile) {
         val p = profile ?: return@LaunchedEffect
@@ -299,10 +307,10 @@ fun TimerScreen(
                                             scope.launch {
                                                 val tone = alarmTone
                                                 if (tone != null) {
-                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
-                                                    delay(beepGapMs)
-                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
-                                                    delay(beepGapMs)
+                                                    tone.startTone(piercingTone, longBeepMs)
+                                                    delay(longBeepGapMs)
+                                                    tone.startTone(piercingTone, longBeepMs)
+                                                    delay(longBeepGapMs)
                                                 }
                                                 tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
@@ -310,7 +318,7 @@ fun TimerScreen(
                                         is TimerEvent.Tick -> {
                                             remaining = event.remainingSeconds
                                             if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
-                                                alarmTone?.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
+                                                alarmTone?.startTone(piercingTone, tickMs)
                                             }
                                         }
                                         is TimerEvent.Warn10 -> {
@@ -321,9 +329,9 @@ fun TimerScreen(
                                             scope.launch {
                                                 val tone = alarmTone
                                                 if (tone != null) {
-                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
-                                                    delay(beepGapMs)
-                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
+                                                    tone.startTone(piercingTone, longBeepMs)
+                                                    delay(longBeepGapMs)
+                                                    tone.startTone(piercingTone, longBeepMs)
                                                 }
                                             }
                                         }
@@ -336,8 +344,8 @@ fun TimerScreen(
                                                 val tone = alarmTone
                                                 if (tone != null) {
                                                     for (i in 1..3) {
-                                                        tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
-                                                        delay(beepGapMs)
+                                                        tone.startTone(piercingTone, longBeepMs)
+                                                        delay(longBeepGapMs)
                                                     }
                                                 }
                                             }
