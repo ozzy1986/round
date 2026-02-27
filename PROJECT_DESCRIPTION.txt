@@ -157,7 +157,7 @@ Env: TELEGRAM_BOT_TOKEN required. On VPS, API_URL is set so the bot talks to the
 ---------------
 Location: android/ (Gradle, Kotlin, Compose).
 
-Screens: profile list, profile/round editor (name, emoji, rounds with name/duration/warn10), timer (big countdown, current round name and emoji, TTS). One-tap start. Data in Room; sync with backend on VPS when online (Retrofit). Timer: same event contract; TTS for round name and "X in 10 seconds". i18n: values/strings.xml (EN), values-ru/strings.xml (RU).
+Screens: profile list, profile/round editor (name, emoji, rounds with name/duration/warn10 and label), timer (big countdown, current round name and emoji, TTS). One-tap start. Data in Room; sync with backend on VPS when online (Retrofit): sync from API when profile list is shown; profile and rounds create/update/delete push to API when online. Timer: same event contract; TTS for round name and "X in 10 seconds"; if profile has no rounds, message is shown and Start is disabled. i18n: values/strings.xml (EN), values-ru/strings.xml (RU).
 
 Package: com.raund.app. API base URL in RaundApplication points to the VPS: http://round.ozzy1986.com:8080/ (for real device / phone). For Android emulator only use http://10.0.2.2:3001/.
 
