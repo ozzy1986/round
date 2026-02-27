@@ -174,6 +174,11 @@ fun TimerScreen(
                         if (p.rounds.isEmpty()) return@Button
                         running = true
                         scope.launch {
+                            var waited = 0
+                            while (tts == null && waited < 1500 && running) {
+                                delay(100)
+                                waited += 100
+                            }
                             val engine = TimerEngine(p) { event ->
                                 when (event) {
                                     is TimerEvent.RoundStart -> {
@@ -196,7 +201,7 @@ fun TimerScreen(
                                     is TimerEvent.TrainingEnd -> {
                                         running = false
                                         finished = true
-                                        tts?.speak(timerFinishedText, TextToSpeech.QUEUE_ADD, null, null)
+                                        tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
                                     }
                                 }
                             }
