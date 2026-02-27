@@ -168,18 +168,91 @@ C. PROFILE EDITOR UX + VALIDATION
 D. TIMER UX / STATE MACHINE
 21) Pre-start timer shows current round name, step indicator, and countdown.
 22) Start begins countdown and transitions between rounds correctly.
-23) Warn-10 behavior: TTS warning + per-second ticks (using STREAM_MUSIC to avoid conflicts) in last 10 seconds when enabled.
-24) Manual Stop shows "Training stopped/Тренировка остановлена".
-25) Natural completion shows "Training finished/Тренировка завершена".
+23) Warn-10: ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No ticks for short rounds (e.g. 5 sec). TTS says "%s через 10 секунд" when remainingSeconds hits 10 (for rounds >= 10 sec with warn enabled).
+24) Manual Stop shows "Тренировка остановлена" (or EN equivalent).
+25) Natural completion shows "Тренировка завершена" (or EN equivalent).
 26) Restart button returns to initial timer state.
 27) Back from timer returns to profile list and stops active speech playback.
 28) Profiles without rounds: timer start remains disabled and helper text is shown.
 29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
 
-E. ACCESSIBILITY / I18N
-29) contentDescription labels are localized (check via UI dump XML).
-30) Russian strings are used when device locale is RU.
-31) English strings are used when device locale is EN (spot-check when possible).
+E. SOUND SIGNALS (verify with device volume up; all beeps STREAM_ALARM, loud and clear)
+30) Start of training / start of round: two loud beeps (250 ms each), then TTS speaks round name (e.g. "Работа", "Отдых" if names are in Russian).
+31) Last 10 seconds: one loud beep per second (ticks) only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining.
+32) End of round: two loud beeps when round ends (before next round or before "Тренировка завершена").
+33) End of training: three loud beeps, then TTS "Тренировка завершена".
+34) No ticks for rounds with duration < 10 sec even if "Предупредить за 10 сек" is ON.
+
+F. ACCESSIBILITY / I18N (Russian as primary check)
+35) When device locale is RU: all UI and TTS use Russian (Профили, Старт, Стоп, Тренировка завершена, Повторить, "X через 10 секунд"). Round names spoken by TTS use device locale (use Russian names in profile for full RU experience).
+36) contentDescription labels are localized (check via UI dump XML).
+37) English strings used when device locale is EN.
+
+G. STABILITY / LOGS / QUALITY
+38) `adb logcat --pid=<appPid> -d` contains no app crash stack traces.
+39) No repeated app-specific error loops after 1-2 minute idle.
+40) `cd android && .\gradlew.bat :app:lintDebug` passes (0 errors).
+41) Build + install + launch cycle repeats cleanly.
+
+FULL LIST OF TEST SCENARIOS (go through all; restart from top if any fix is made)
+===============================================================================
+Run in order. After any code change, re-run from scenario 1.
+
+ 1. COLD START
+    1.1 Force-stop app, launch via ADB. App shows profile list (or empty state).
+    1.2 Screenshot, confirm no crash in logcat.
+
+ 2. API / SYNC
+    2.1 With network on, open app; profiles from VPS appear (or empty).
+    2.2 Create/edit profile on phone, save; sync may push to VPS (if implemented).
+
+ 3. EMPTY STATE
+    3.1 If no profiles: message "Нет профилей..." and button "Создать первый профиль".
+    3.2 Tap button → New profile editor opens.
+
+ 4. CREATE PROFILE
+    4.1 FAB or "Создать первый профиль" → editor with empty name, emoji, no rounds.
+    4.2 Save disabled while name blank. Enter name → Save enabled.
+    4.3 Add round: name "Работа", duration 15, tick "Предупредить за 10 сек". Add second round: "Отдых", 10, no tick.
+    4.4 Save → back to list, profile appears with "Раундов: 2 • 00:25" (or similar).
+    4.5 Tap profile card → editor opens with same data.
+
+ 5. EDIT PROFILE
+    5.1 Open profile, change name/emoji, add/remove round, change duration. Save → list updated.
+    5.2 Delete round, save. Delete profile → confirm, back to list, profile gone.
+
+ 6. PROFILE WITHOUT ROUNDS
+    6.1 Create profile with name only, no rounds. Save. In list, Start (play) is disabled; subtitle "Без раундов".
+    6.2 Open timer from such profile (if possible): "Добавьте хотя бы один раунд", Start disabled.
+
+ 7. TIMER — SHORT ROUNDS (no ticks)
+    7.1 Profile: one round 5 sec, "Предупредить за 10 сек" ON. Start timer.
+    7.2 Expect: two beeps (start), TTS round name, countdown 5→0, NO per-second ticks (round < 10 sec).
+    7.3 Two beeps (end of round), then if no more rounds: three beeps + TTS "Тренировка завершена".
+
+ 8. TIMER — LONG ROUND WITH WARN10
+    8.1 Profile: one round 15 sec, "Предупредить за 10 сек" ON. Start timer.
+    8.2 Expect: two beeps, TTS round name. Countdown 15→11 no ticks. At 10 sec: TTS "X через 10 секунд", then one beep per second for 10,9,8,7,6,5,4,3,2,1.
+    8.3 At 0: two beeps (end of round). Then three beeps + "Тренировка завершена".
+
+ 9. TIMER — MULTIPLE ROUNDS
+    9.1 Profile: e.g. Работа 15 sec (warn10), Отдых 5 sec (no warn). Start.
+    9.2 Round 1: two beeps, TTS "Работа", ticks last 10 sec, two beeps. Round 2: two beeps, TTS "Отдых", no ticks, two beeps. Three beeps + "Тренировка завершена".
+
+10. TIMER — STOP AND RESTART
+    10.1 Start timer, then tap Stop. "Тренировка остановлена". Tap "Повторить" → timer reset, can Start again.
+    10.2 Start, let it finish. "Тренировка завершена". Tap "Повторить" → reset, Start again.
+
+11. TIMER — BACK
+    11.1 Start timer, tap Back. Return to profile list, TTS/beeps stop.
+
+12. RUSSIAN LOCALE
+    12.1 Device language RU. All labels: Профили, Старт, Стоп, Повторить, Тренировка завершена/остановлена, "X через 10 секунд", Предупредить за 10 сек, etc.
+    12.2 TTS uses Russian for system phrases; round names from profile (use Russian names to hear full RU).
+
+13. LINT AND BUILD
+    13.1 :app:lintDebug 0 errors.
+    13.2 assembleDebug, install, launch — no crash.
 
 F. STABILITY / LOGS / QUALITY
 32) `adb logcat --pid=<appPid> -d` contains no app crash stack traces.

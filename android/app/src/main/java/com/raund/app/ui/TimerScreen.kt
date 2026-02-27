@@ -94,7 +94,8 @@ fun TimerScreen(
         ttsEngine = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts = ttsEngine
-                ttsEngine.setLanguage(Locale.getDefault())
+                val locale = if (Locale.getDefault().language == "ru") Locale.forLanguageTag("ru") else Locale.getDefault()
+                ttsEngine.setLanguage(locale)
             }
         }
         onDispose {
@@ -104,19 +105,23 @@ fun TimerScreen(
         }
     }
 
-    var tickTone by remember { mutableStateOf<ToneGenerator?>(null) }
+    // Loud alarm beeps for start, ticks (last 10 sec), end of round, end of training — same as boxing gym
+    var alarmTone by remember { mutableStateOf<ToneGenerator?>(null) }
     DisposableEffect(context) {
         val tg = try {
-            ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+            ToneGenerator(AudioManager.STREAM_ALARM, 100)
         } catch (e: Exception) {
             null
         }
-        tickTone = tg
+        alarmTone = tg
         onDispose {
             tg?.release()
-            tickTone = null
+            alarmTone = null
         }
     }
+
+    val beepMs = 250
+    val beepGapMs = 400L
 
     LaunchedEffect(profile) {
         val p = profile ?: return@LaunchedEffect
@@ -290,30 +295,49 @@ fun TimerScreen(
                                             remaining = event.round.durationSeconds
                                             roundTotal = event.round.durationSeconds
                                             roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
-                                            tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, null, null)
+                                            val roundName = event.round.name
+                                            scope.launch {
+                                                val tone = alarmTone
+                                                if (tone != null) {
+                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
+                                                    delay(beepGapMs)
+                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
+                                                    delay(beepGapMs)
+                                                }
+                                                tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, null, null)
+                                            }
                                         }
                                         is TimerEvent.Tick -> {
                                             remaining = event.remainingSeconds
-                                            if (event.round.warn10sec && event.remainingSeconds in 1..10) {
-                                                tickTone?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+                                            if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
+                                                alarmTone?.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
                                             }
                                         }
                                         is TimerEvent.Warn10 -> {
                                             val msg = warn10Template.format(event.round.name)
                                             tts?.speak(msg, TextToSpeech.QUEUE_ADD, null, null)
                                         }
-                                        is TimerEvent.RoundEnd -> {}
+                                        is TimerEvent.RoundEnd -> {
+                                            scope.launch {
+                                                val tone = alarmTone
+                                                if (tone != null) {
+                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
+                                                    delay(beepGapMs)
+                                                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
+                                                }
+                                            }
+                                        }
                                         is TimerEvent.TrainingEnd -> {
                                             running = false
                                             finished = true
                                             stoppedByUser = false
                                             tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
                                             scope.launch {
-                                                val tone = tickTone
+                                                val tone = alarmTone
                                                 if (tone != null) {
                                                     for (i in 1..3) {
-                                                        tone.startTone(ToneGenerator.TONE_PROP_BEEP, 250)
-                                                        delay(400L)
+                                                        tone.startTone(ToneGenerator.TONE_PROP_BEEP, beepMs)
+                                                        delay(beepGapMs)
                                                     }
                                                 }
                                             }
