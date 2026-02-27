@@ -2,7 +2,9 @@ package com.raund.app.ui
 
 import android.app.Activity
 import android.content.Context
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioTrack
 import android.media.ToneGenerator
 import android.speech.tts.TextToSpeech
 import android.view.WindowManager
@@ -65,10 +67,51 @@ import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
 import com.raund.app.timer.TimerProfile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.sin
+
+private suspend fun playProlongedAlarmTone(durationMs: Int) = withContext(Dispatchers.IO) {
+    val sampleRate = 44100
+    val numSamples = sampleRate * durationMs / 1000
+    val buffer = ShortArray(numSamples)
+    val freq = 880.0
+    for (i in 0 until numSamples) {
+        buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * 0.85).toInt().toShort()
+    }
+    val minBufSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+    val bufSizeBytes = (numSamples * 2).coerceAtLeast(minBufSize)
+    val track = AudioTrack.Builder()
+        .setAudioAttributes(
+            android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        )
+        .setAudioFormat(
+            android.media.AudioFormat.Builder()
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setSampleRate(sampleRate)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .build()
+        )
+        .setBufferSizeInBytes(bufSizeBytes)
+        .setTransferMode(AudioTrack.MODE_STATIC)
+        .build()
+    try {
+        track.setVolume(1f)
+        track.write(buffer, 0, buffer.size)
+        track.play()
+        delay(durationMs.toLong())
+    } finally {
+        track.release()
+    }
+}
 
 @Composable
 fun TimerScreen(
@@ -116,9 +159,8 @@ fun TimerScreen(
         }
     }
 
-    // Piercing alarm: short ticks for last 10 sec; one continuous long tone for round/training start and end
+    // Short ticks for last 10 sec (ToneGenerator); prolonged start/end tone via AudioTrack
     var alarmTone by remember { mutableStateOf<ToneGenerator?>(null) }
-    val piercingTone = ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD
     val tickTone = ToneGenerator.TONE_CDMA_PIP
     DisposableEffect(context) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -334,8 +376,7 @@ fun TimerScreen(
                                             roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
                                             val roundName = event.round.name
                                             scope.launch {
-                                                alarmTone?.startTone(piercingTone, prolongedToneMs)
-                                                delay(prolongedToneMs.toLong())
+                                                playProlongedAlarmTone(prolongedToneMs)
                                                 tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
                                         }
@@ -349,15 +390,14 @@ fun TimerScreen(
                                             // Voice warning removed per user request
                                         }
                                         is TimerEvent.RoundEnd -> {
-                                            alarmTone?.startTone(piercingTone, prolongedToneMs)
+                                            scope.launch { playProlongedAlarmTone(prolongedToneMs) }
                                         }
                                         is TimerEvent.TrainingEnd -> {
                                             running = false
                                             finished = true
                                             stoppedByUser = false
                                             scope.launch {
-                                                alarmTone?.startTone(piercingTone, prolongedToneMs)
-                                                delay(prolongedToneMs.toLong())
+                                                playProlongedAlarmTone(prolongedToneMs)
                                                 tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
                                         }

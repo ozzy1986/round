@@ -1,6 +1,7 @@
 /**
- * Creates one training (profile) on VPS with 6 rounds: Russian names,
- * varied duration and warn10. Run: node scripts/create-training-ru.cjs
+ * Creates one NEW training (profile) on VPS with 6 rounds: Russian names,
+ * varied duration and warn10. Does not remove or replace existing trainings.
+ * Run: node scripts/create-training-ru.cjs
  */
 const http = require('http');
 
@@ -8,7 +9,7 @@ const HOST = 'round.ozzy1986.com';
 const PORT = 8080;
 
 const profileBody = JSON.stringify({
-  name: 'Разнообразная тренировка',
+  name: 'Тест AI: 6 раундов',
   emoji: '🏋️'
 });
 
@@ -63,7 +64,7 @@ function request(options, body) {
       );
       console.log('  Round:', r.name, r.duration_seconds + 's', r.warn10sec ? 'warn10' : '');
     }
-    console.log('Done. Sync in app to see the training.');
+    console.log('Done. Sync in app to see the new training (your existing ones are unchanged).');
   } catch (e) {
     console.error(e.message || e);
     process.exit(1);

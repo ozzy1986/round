@@ -182,7 +182,7 @@ E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with d
 32) End of round: one continuous prolonged tone (1200 ms) when round ends.
 33) End of training: one continuous prolonged tone (1200 ms), then TTS "Тренировка завершена".
 34) No ticks for rounds with duration < 10 sec even if "Предупредить за 10 сек" is ON.
-    Test profile with 6 Russian rounds (varied duration and warn10): run "node scripts/create-training-ru.cjs" to create on VPS — Разминка 30s (warn10), Спринт 10s (no warn), Отдых 15s (warn10), Силовая 45s (warn10), Ходьба 20s (no warn), Заминка 25s (warn10).
+    Test profile with 6 Russian rounds (varied duration and warn10): run "node scripts/create-training-ru.cjs" to create on VPS a NEW training "Тест AI: 6 раундов" (does not remove existing) — Разминка 30s (warn10), Спринт 10s (no warn), Отдых 15s (warn10), Силовая 45s (warn10), Ходьба 20s (no warn), Заминка 25s (warn10).
 
 F. ACCESSIBILITY / I18N (Russian as primary check)
 35) When device locale is RU: all UI and TTS use Russian (Профили, Старт, Стоп, Тренировка завершена, Повторить, "X через 10 секунд"). Round names spoken by TTS use device locale (use Russian names in profile for full RU experience).
