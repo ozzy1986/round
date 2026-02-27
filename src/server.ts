@@ -1,11 +1,13 @@
 import './auth/types.js';
 import 'dotenv/config';
+import { initSentry } from './sentry.js';
 import Fastify from 'fastify';
 import fjwt from '@fastify/jwt';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { getPool } from './db/pool.js';
+import { getRedis } from './redis.js';
 import { authRoutes } from './auth/register.js';
 import { authVerify } from './auth/middleware.js';
 import { profilesRoutes } from './routes/profiles.js';
@@ -32,14 +34,17 @@ export async function buildApp() {
 
   await app.register(cors, { origin: getCorsOrigin() });
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(rateLimit, {
+  const rateLimitOpts: { max: number; timeWindow: string; redis?: unknown } = {
     max: 100,
     timeWindow: '1 minute',
-  });
+  };
+  const redis = getRedis();
+  if (redis) rateLimitOpts.redis = redis;
+  await app.register(rateLimit, rateLimitOpts);
 
   await app.register(fjwt, {
     secret: JWT_SECRET,
-    sign: { expiresIn: '365d' },
+    sign: { expiresIn: '15m' },
     formatUser: (payload: { sub: string }) => ({ id: payload.sub }),
   });
 
@@ -65,6 +70,9 @@ export async function buildApp() {
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error(error);
+    if (process.env.SENTRY_DSN && (error as { statusCode?: number }).statusCode >= 500) {
+      import('@sentry/node').then((S) => S.captureException(error)).catch(() => {});
+    }
     const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
     void reply.status(statusCode).send({
       message: statusCode >= 500 ? 'Internal server error' : (error as Error).message,
@@ -75,13 +83,16 @@ export async function buildApp() {
 }
 
 export async function start() {
+  await initSentry();
   const app = await buildApp();
   const { closePool } = await import('./db/pool.js');
+  const { closeRedis } = await import('./redis.js');
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');
     try {
       await app.close();
       await closePool();
+      await closeRedis();
       process.exit(0);
     } catch (err) {
       app.log.error(err);

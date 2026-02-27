@@ -48,7 +48,7 @@ class ProfileRepository(
         if (tokenStore.getToken() != null) return
         try {
             val r = authService.register()
-            tokenStore.setToken(r.token)
+            tokenStore.setTokens(r.token, r.refresh_token)
         } catch (_: Exception) {
             // Offline or server error
         }

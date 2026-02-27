@@ -25,7 +25,7 @@ class RaundApplication : Application() {
 
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
-            .addInterceptor(AuthInterceptor(tokenStore))
+            .addInterceptor(AuthInterceptor(tokenStore, authService))
             .build()
     }
     val api by lazy {

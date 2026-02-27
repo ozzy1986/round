@@ -1,14 +1,5 @@
 import textToSpeech from '@google-cloud/text-to-speech';
-
-const MAX_CACHE_SIZE = 1000;
-const bufferCache = new Map<string, Buffer>();
-const cacheKeys: string[] = [];
-
-function evictOne(): void {
-  if (cacheKeys.length === 0) return;
-  const key = cacheKeys.shift();
-  if (key) bufferCache.delete(key);
-}
+import { cacheGet, cacheSet, CacheKeys, CacheTTL } from '../cache.js';
 
 let client: textToSpeech.TextToSpeechClient | null = null;
 
@@ -24,12 +15,12 @@ function getTTSClient(): textToSpeech.TextToSpeechClient | null {
 
 /**
  * Synthesizes speech for the given text. Returns buffer (OGG) or null if TTS unavailable.
- * Results are cached by text:languageCode (LRU, max 1000 entries).
+ * Results are cached by text:languageCode (Redis when REDIS_URL set, else in-memory).
  */
 export async function synthesize(text: string, languageCode: string = 'en-US'): Promise<Buffer | null> {
-  const key = `${text}:${languageCode}`;
-  const cached = bufferCache.get(key);
-  if (cached) return cached;
+  const key = CacheKeys.tts(text, languageCode);
+  const cached = await cacheGet(key);
+  if (cached) return Buffer.from(cached, 'base64');
 
   const c = getTTSClient();
   if (!c) return null;
@@ -48,9 +39,7 @@ export async function synthesize(text: string, languageCode: string = 'en-US'): 
     if (response.audioContent && typeof response.audioContent === 'object') {
       const content = response.audioContent as Uint8Array | Buffer;
       const buf = Buffer.isBuffer(content) ? content : Buffer.from(content);
-      if (bufferCache.size >= MAX_CACHE_SIZE) evictOne();
-      bufferCache.set(key, buf);
-      cacheKeys.push(key);
+      await cacheSet(key, buf.toString('base64'), CacheTTL.TTS_TTL_SEC);
       return buf;
     }
     return null;

@@ -21,7 +21,7 @@ npm run build
 if pm2 describe round-api >/dev/null 2>&1; then
   pm2 restart round-api --update-env
 else
-  pm2 start dist/src/server.js --name round-api -i 2
+  pm2 start dist/src/server.js --name round-api -i max
 fi
 if pm2 describe round-bot >/dev/null 2>&1; then
   pm2 restart round-bot --update-env
