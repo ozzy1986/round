@@ -29,8 +29,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -127,12 +127,14 @@ fun TimerScreen(
     var roundInfo by remember { mutableStateOf("") }
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
-    var stoppedByUser by remember { mutableStateOf(false) }
+    var paused by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     val timerFinishedText = stringResource(R.string.timer_finished)
-    val timerStoppedText = stringResource(R.string.timer_stopped)
     val restartTimerText = stringResource(R.string.restart_timer)
+    val pauseTimerText = stringResource(R.string.pause_timer)
+    val resumeTimerText = stringResource(R.string.resume_timer)
+    val timerPausedText = stringResource(R.string.timer_paused)
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
@@ -278,7 +280,7 @@ fun TimerScreen(
             ) {
                 if (finished) {
                     Text(
-                        if (stoppedByUser) timerStoppedText else timerFinishedText,
+                        timerFinishedText,
                         style = MaterialTheme.typography.displaySmall,
                         color = primaryColor,
                         textAlign = TextAlign.Center
@@ -294,16 +296,36 @@ fun TimerScreen(
                     )
                     if (roundInfo.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = surfaceVarColor
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                roundInfo,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = onSurfaceVarColor,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = surfaceVarColor
+                            ) {
+                                Text(
+                                    roundInfo,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = onSurfaceVarColor,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                            if (paused) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = surfaceVarColor
+                                ) {
+                                    Text(
+                                        timerPausedText,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = onSurfaceVarColor,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                     
@@ -361,7 +383,7 @@ fun TimerScreen(
                             val p = profile ?: return@Button
                             if (p.rounds.isEmpty()) return@Button
                             running = true
-                            stoppedByUser = false
+                            paused = false
                             scope.launch {
                                 var waited = 0
                                 while (tts == null && waited < 1500 && running) {
@@ -399,7 +421,7 @@ fun TimerScreen(
                                         is TimerEvent.TrainingEnd -> {
                                             running = false
                                             finished = true
-                                            stoppedByUser = false
+                                            paused = false
                                             val trainingName = p.name
                                             scope.launch {
                                                 val phrase = "Тренировка $trainingName завершена"
@@ -410,8 +432,12 @@ fun TimerScreen(
                                 }
                                 engine.advance()
                                 while (scope.isActive && running) {
-                                    delay(1000L)
-                                    if (!engine.advance()) break
+                                    if (paused) {
+                                        delay(500L)
+                                    } else {
+                                        delay(1000L)
+                                        if (!engine.advance()) break
+                                    }
                                 }
                             }
                         },
@@ -435,12 +461,10 @@ fun TimerScreen(
                     }
                 }
                 
-                if (running) {
+                if (running && !paused) {
                     Button(
                         onClick = {
-                            running = false
-                            finished = true
-                            stoppedByUser = true
+                            paused = true
                             tts?.stop()
                         },
                         modifier = Modifier
@@ -448,14 +472,35 @@ fun TimerScreen(
                             .height(64.dp),
                         shape = RoundedCornerShape(32.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     ) {
-                        Icon(Icons.Filled.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(32.dp))
+                        Icon(Icons.Filled.Pause, contentDescription = pauseTimerText, modifier = Modifier.size(32.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            stringResource(R.string.stop_timer),
+                            pauseTimerText,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                if (running && paused) {
+                    Button(
+                        onClick = { paused = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        shape = RoundedCornerShape(32.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = resumeTimerText, modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            resumeTimerText,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -466,7 +511,7 @@ fun TimerScreen(
                     Button(
                         onClick = {
                             finished = false
-                            stoppedByUser = false
+                            paused = false
                             val p = profile
                             if (p != null && p.rounds.isNotEmpty()) {
                                 remaining = p.rounds[0].durationSeconds

@@ -13,6 +13,9 @@
     <string name="warn_10_sec">Предупредить за 10 сек</string>
     <string name="start_timer">Старт</string>
     <string name="stop_timer">Стоп</string>
+    <string name="pause_timer">Пауза</string>
+    <string name="resume_timer">Продолжить</string>
+    <string name="timer_paused">Пауза</string>
     <string name="timer_finished">Тренировка завершена</string>
     <string name="timer_stopped">Тренировка остановлена</string>
     <string name="timer_warn10">%s через 10 секунд</string>

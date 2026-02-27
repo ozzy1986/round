@@ -173,9 +173,9 @@ D. TIMER UX / STATE MACHINE
 23) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.
 24) Start begins countdown and transitions between rounds correctly.
 25) Warn-10: ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No ticks for short rounds (e.g. 5 sec). TTS says "%s через 10 секунд" when remainingSeconds hits 10 (for rounds >= 10 sec with warn enabled).
-24) Manual Stop shows "Тренировка остановлена" (or EN equivalent).
+24) Pause button freezes the countdown; Resume continues from the same round/seconds. "Пауза" / "Продолжить" (or EN Pause/Resume). Paused state shows "Пауза" chip next to step indicator.
 25) Natural completion shows "Тренировка завершена" (or EN equivalent).
-26) Restart button returns to initial timer state.
+26) Restart button returns to initial timer state (shown only after training finishes).
 27) Back from timer returns to profile list and stops active speech playback.
 28) Profiles without rounds: timer start remains disabled and helper text is shown.
 29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
@@ -190,7 +190,7 @@ E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with d
 
 F. ACCESSIBILITY / I18N (Russian as primary check)
 35) When device locale is RU: all UI and TTS use Russian (Профили, Старт, Стоп, Тренировка завершена, Повторить, "X через 10 секунд"). Round names spoken by TTS use device locale (use Russian names in profile for full RU experience).
-36) contentDescription labels are localized (check via UI dump XML); all icon buttons have contentDescription (Add, Delete, Start, Stop, Back).
+36) contentDescription labels are localized (check via UI dump XML); all icon buttons have contentDescription (Add, Delete, Start, Pause, Resume, Back).
 37) English strings used when device locale is EN.
 38) "Add round" button shows icon + "Add round" / "Добавить раунд" (no duplicate plus in label).
 
@@ -250,15 +250,15 @@ Run in order. After any code change, re-run from scenario 1.
     9.1 Profile: e.g. Работа 15 sec (warn10), Отдых 5 sec (no warn). Start.
     9.2 Round 1: one prolonged tone, TTS "Работа", ticks last 10 sec, one prolonged tone. Round 2: one prolonged tone, TTS "Отдых", no ticks, one prolonged tone. One prolonged tone + "Тренировка завершена".
 
-10. TIMER — STOP AND RESTART
-    10.1 Start timer, then tap Stop. "Тренировка остановлена". Tap "Повторить" → timer reset, can Start again.
+10. TIMER — PAUSE, RESUME AND RESTART
+    10.1 Start timer, then tap Pause. Countdown freezes, "Пауза" chip appears, button becomes "Продолжить". Tap "Продолжить" → countdown continues from same time.
     10.2 Start, let it finish. "Тренировка завершена". Tap "Повторить" → reset, Start again.
 
 11. TIMER — BACK
     11.1 Start timer, tap Back. Return to profile list, TTS/beeps stop.
 
 12. RUSSIAN LOCALE
-    12.1 Device language RU. All labels: Профили, Старт, Стоп, Повторить, Тренировка завершена/остановлена, "X через 10 секунд", Предупредить за 10 сек, etc.
+    12.1 Device language RU. All labels: Профили, Старт, Пауза, Продолжить, Повторить, Тренировка завершена, "X через 10 секунд", Предупредить за 10 сек, etc.
     12.2 TTS uses Russian for system phrases; round names from profile (use Russian names to hear full RU).
 
 13. LINT AND BUILD
