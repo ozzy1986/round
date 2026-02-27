@@ -10,3 +10,5 @@ android/local.properties
 android/app/build/
 android/.gradle/
 *.hprof
+android/ui*.xml
+create_test.js
