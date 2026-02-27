@@ -11,4 +11,5 @@ android/app/build/
 android/.gradle/
 *.hprof
 android/ui*.xml
+android/screenshot.png
 create_test.js
