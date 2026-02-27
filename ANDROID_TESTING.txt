@@ -250,15 +250,18 @@ Run in order. After any code change, re-run from scenario 1.
     9.1 Profile: e.g. Работа 15 sec (warn10), Отдых 5 sec (no warn). Start.
     9.2 Round 1: one prolonged tone, TTS "Работа", ticks last 10 sec, one prolonged tone. Round 2: one prolonged tone, TTS "Отдых", no ticks, one prolonged tone. One prolonged tone + "Тренировка завершена".
 
-10. TIMER — PAUSE, RESUME AND RESTART
-    10.1 Start timer, then tap Pause. Countdown freezes, "Пауза" chip appears, button becomes "Продолжить". Tap "Продолжить" → countdown continues from same time.
-    10.2 Start, let it finish. "Тренировка завершена". Tap "Повторить" → reset, Start again.
+10. TIMER — PAUSE, RESUME, STOP AND RESTART
+    10.1 Start timer, then tap Pause. Countdown freezes, "Пауза" chip appears, two buttons shown: "Продолжить" (Resume) and "Стоп" (Stop).
+    10.2 Tap "Продолжить" → countdown continues from same time.
+    10.3 Tap "Стоп" while paused → "Тренировка завершена", "Повторить" (Restart) shown.
+    10.4 Start, let it finish naturally. "Тренировка завершена". Tap "Повторить" → reset, Start again.
 
 11. TIMER — BACK
     11.1 Start timer, tap Back. Return to profile list, TTS/beeps stop.
 
 12. RUSSIAN LOCALE
-    12.1 Device language RU. All labels: Профили, Старт, Пауза, Продолжить, Повторить, Тренировка завершена, "X через 10 секунд", Предупредить за 10 сек, etc.
+    12.1 Device language RU. All labels: Профили, Старт, Пауза, Продолжить, Стоп, Повторить, Тренировка завершена, "X через 10 секунд", Предупредить за 10 сек, etc.
+    12.2 Language selector: in profile list top bar, chip shows current language (RU/EN). Tap to toggle. App recreates with new locale; all labels update. Preference persists across restarts.
     12.2 TTS uses Russian for system phrases; round names from profile (use Russian names to hear full RU).
 
 13. LINT AND BUILD

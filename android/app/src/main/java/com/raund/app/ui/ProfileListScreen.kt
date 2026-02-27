@@ -32,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -39,16 +40,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import android.app.Activity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
@@ -64,6 +71,8 @@ fun ProfileListScreen(
     val scope = rememberCoroutineScope()
     val profiles by repository.profiles.collectAsState(initial = emptyList())
     val roundStats by repository.roundStats.collectAsState(initial = emptyMap())
+    val context = LocalContext.current
+    var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
 
     LaunchedEffect(Unit) {
         repository.syncFromApi()
@@ -74,6 +83,24 @@ fun ProfileListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.profiles), fontWeight = FontWeight.Bold) },
                 actions = {
+                    Surface(
+                        onClick = {
+                            val newLang = if (currentLang == "ru") "en" else "ru"
+                            currentLang = newLang
+                            LocaleManager.setLanguage(context, newLang)
+                            (context as? Activity)?.recreate()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    ) {
+                        Text(
+                            currentLang.uppercase(),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     IconButton(
                         onClick = { scope.launch { repository.syncFromApi() } }
                     ) {
