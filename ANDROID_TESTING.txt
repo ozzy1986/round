@@ -177,10 +177,10 @@ D. TIMER UX / STATE MACHINE
 29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
 
 E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with device volume up)
-30) Start of training / start of round: one continuous prolonged tone (1200 ms), then TTS speaks round name in Russian (e.g. "Работа", "Отдых") when profile uses Russian names.
+30) Start of training (first round only): one continuous prolonged tone (1200 ms), then TTS speaks round name. Subsequent round starts: TTS only (no tone).
 31) Last 10 seconds: one short tick (150 ms, TONE_CDMA_PIP) per second only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining (TTS uses USAGE_ALARM stream to prevent ducking).
 32) End of round: one continuous prolonged tone (1200 ms) when round ends.
-33) End of training: one continuous prolonged tone (1200 ms), then TTS "Тренировка завершена".
+33) End of training: TTS "Тренировка [название] завершена" (no tone). Round names longer than 10 chars are truncated to 10 + "…" on the timer display (TTS still speaks full name).
 34) No ticks for rounds with duration < 10 sec even if "Предупредить за 10 сек" is ON.
     Test profile with 6 Russian rounds (varied duration and warn10): run "node scripts/create-training-ru.cjs" to create on VPS a NEW training "Тест AI: 6 раундов" (does not remove existing) — Разминка 30s (warn10), Спринт 10s (no warn), Отдых 15s (warn10), Силовая 45s (warn10), Ходьба 20s (no warn), Заминка 25s (warn10).
 

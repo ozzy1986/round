@@ -284,8 +284,9 @@ fun TimerScreen(
                         textAlign = TextAlign.Center
                     )
                 } else {
+                    val displayRoundName = if (currentRound.length > 10) currentRound.take(10) + "…" else currentRound
                     Text(
-                        currentRound,
+                        displayRoundName,
                         style = MaterialTheme.typography.displaySmall,
                         color = primaryColor,
                         textAlign = TextAlign.Center,
@@ -375,8 +376,11 @@ fun TimerScreen(
                                             roundTotal = event.round.durationSeconds
                                             roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
                                             val roundName = event.round.name
+                                            val isFirstRound = event.roundIndex == 0
                                             scope.launch {
-                                                playProlongedAlarmTone(prolongedToneMs)
+                                                if (isFirstRound) {
+                                                    playProlongedAlarmTone(prolongedToneMs)
+                                                }
                                                 tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
                                         }
@@ -396,9 +400,10 @@ fun TimerScreen(
                                             running = false
                                             finished = true
                                             stoppedByUser = false
+                                            val trainingName = p.name
                                             scope.launch {
-                                                playProlongedAlarmTone(prolongedToneMs)
-                                                tts?.speak(timerFinishedText, TextToSpeech.QUEUE_FLUSH, null, null)
+                                                val phrase = "Тренировка $trainingName завершена"
+                                                tts?.speak(phrase, TextToSpeech.QUEUE_FLUSH, null, null)
                                             }
                                         }
                                     }
