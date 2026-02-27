@@ -233,6 +233,14 @@ fun TimerScreen(
         }
     }
 
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        activity?.volumeControlStream = AudioManager.STREAM_ALARM
+        onDispose {
+            activity?.volumeControlStream = AudioManager.USE_DEFAULT_STREAM_TYPE
+        }
+    }
+
     DisposableEffect(running) {
         val activity = context as? Activity
         if (running) {
@@ -445,8 +453,9 @@ fun TimerScreen(
                                     @Suppress("DEPRECATION")
                                     am?.requestAudioFocus({}, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
                                 }
-                                try {
                                 var pendingToneJob: Job? = null
+                                var finalTtsJob: Job? = null
+                                try {
                                 val engine = TimerEngine(p) { event ->
                                     when (event) {
                                         is TimerEvent.RoundStart -> {
@@ -483,14 +492,14 @@ fun TimerScreen(
                                             running = false
                                             finished = true
                                             paused = false
-                                            scope.launch(Dispatchers.Main) {
+                                            finalTtsJob = scope.launch(Dispatchers.Main) {
+                                                pendingToneJob?.join()
                                                 val nameHasCyrillic = p.name.any { it.isCyrillic() }
                                                 if (nameHasCyrillic && defaultLocale != null) {
                                                     ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
                                                     TrainingEndPending.finishedText = finishedText
                                                     TrainingEndPending.defaultLocale = defaultLocale
                                                 }
-                                                delay((prolongedToneMs - 350).coerceAtLeast(0).toLong())
                                                 val nameId = "training_end_name_${System.currentTimeMillis()}"
                                                 if (nameHasCyrillic && defaultLocale != null) {
                                                     ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
@@ -498,6 +507,7 @@ fun TimerScreen(
                                                     ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, nameId)
                                                     ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, null, "training_end_done_${System.currentTimeMillis()}")
                                                 }
+                                                delay(5000)
                                             }
                                         }
                                     }
@@ -512,6 +522,7 @@ fun TimerScreen(
                                     }
                                 }
                                 } finally {
+                                    finalTtsJob?.join()
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
                                         am?.abandonAudioFocusRequest(focusRequest)
                                     } else {
