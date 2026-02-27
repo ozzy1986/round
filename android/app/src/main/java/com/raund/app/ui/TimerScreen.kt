@@ -137,7 +137,6 @@ fun TimerScreen(
     val pauseTimerText = stringResource(R.string.pause_timer)
     val resumeTimerText = stringResource(R.string.resume_timer)
     val timerPausedText = stringResource(R.string.timer_paused)
-    val timerFinishedNameFmt = stringResource(R.string.timer_finished_name)
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
@@ -431,23 +430,15 @@ fun TimerScreen(
                                             }
                                         }
                                         is TimerEvent.TrainingEnd -> {
-                                            val phrase = String.format(timerFinishedNameFmt, p.name)
                                             val ttsRef = tts
+                                            val finishedText = timerFinishedText
                                             running = false
                                             finished = true
                                             paused = false
-                                            scope.launch(Dispatchers.Main) speakJob@{
+                                            scope.launch(Dispatchers.Main) {
                                                 delay(400)
-                                                repeat(3) {
-                                                    val ok = ttsRef?.speak(
-                                                        phrase,
-                                                        TextToSpeech.QUEUE_FLUSH,
-                                                        null,
-                                                        "training_end"
-                                                    ) == TextToSpeech.SUCCESS
-                                                    if (ok) return@speakJob
-                                                    delay(600)
-                                                }
+                                                ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, null, "training_end_name_${System.currentTimeMillis()}")
+                                                ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, null, "training_end_done_${System.currentTimeMillis()}")
                                             }
                                         }
                                     }
