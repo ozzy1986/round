@@ -1,7 +1,14 @@
 package com.raund.app.ui
 
 import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.UtteranceProgressListener
@@ -57,7 +64,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,14 +83,9 @@ import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
-import com.raund.app.timer.TimerEngine
-import com.raund.app.timer.TimerEvent
 import com.raund.app.timer.TimerProfile
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.PI
@@ -149,7 +150,6 @@ fun TimerScreen(
     profileId: String,
     onBack: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<TimerProfile?>(null) }
     var currentRound by remember { mutableStateOf("") }
     var remaining by remember { mutableIntStateOf(0) }
@@ -266,6 +266,33 @@ fun TimerScreen(
         }
         onDispose {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) {
+                if (i == null) return
+                remaining = i.getIntExtra(TimerService.EXTRA_REMAINING, remaining)
+                currentRound = i.getStringExtra(TimerService.EXTRA_ROUND_NAME) ?: currentRound
+                roundTotal = i.getIntExtra(TimerService.EXTRA_ROUND_TOTAL, roundTotal)
+                val idx = i.getIntExtra(TimerService.EXTRA_ROUND_INDEX, 0)
+                val total = i.getIntExtra(TimerService.EXTRA_TOTAL_ROUNDS, 1)
+                roundInfo = "$idx / $total"
+                if (!i.getBooleanExtra(TimerService.EXTRA_IS_RUNNING, true)) {
+                    running = false
+                    finished = true
+                }
+            }
+        }
+        val filter = IntentFilter(TimerService.ACTION_TIMER_STATE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
         }
     }
 
@@ -468,98 +495,24 @@ fun TimerScreen(
                             if (p.rounds.isEmpty()) return@Button
                             running = true
                             paused = false
-                            TimerService.start(context)
-                            scope.launch {
-                                var waited = 0
-                                while (tts == null && waited < 1500 && running) {
-                                    delay(100)
-                                    waited += 100
-                                }
-                                var pendingToneJob: Job? = null
-                                var finalTtsJob: Job? = null
-                                try {
-                                val engine = TimerEngine(p) { event ->
-                                    when (event) {
-                                        is TimerEvent.RoundStart -> {
-                                            Log.w(TIMER_DEBUG_TAG, "event=RoundStart roundIndex=${event.roundIndex} round=${event.round.name}")
-                                            currentRound = event.round.name
-                                            remaining = event.round.durationSeconds
-                                            roundTotal = event.round.durationSeconds
-                                            roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
-                                            val roundName = event.round.name
-                                            val isFirstRound = event.roundIndex == 0
-                                            scope.launch {
-                                                try {
-                                                    pendingToneJob?.join()
-                                                    if (isFirstRound) {
-                                                        playProlongedAlarmTone(prolongedToneMs)
-                                                    }
-                                                    tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, null)
-                                                } catch (_: Exception) {}
-                                            }
+                            finished = false
+                            remaining = p.rounds[0].durationSeconds
+                            roundTotal = p.rounds[0].durationSeconds
+                            currentRound = p.rounds[0].name
+                            roundInfo = "1 / ${p.rounds.size}"
+                            (context as? Activity)?.let { activity ->
+                                val pm = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                                if (pm != null && !pm.isIgnoringBatteryOptimizations(activity.packageName)) {
+                                    try {
+                                        val intent = Intent().apply {
+                                            action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                                            data = Uri.parse("package:${activity.packageName}")
                                         }
-                                        is TimerEvent.Tick -> {
-                                            if (event.remainingSeconds <= 3) Log.w(TIMER_DEBUG_TAG, "event=Tick remaining=${event.remainingSeconds}")
-                                            remaining = event.remainingSeconds
-                                            if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
-                                                try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
-                                            }
-                                        }
-                                        is TimerEvent.Warn10 -> {
-                                            // Voice warning removed per user request
-                                        }
-                                        is TimerEvent.RoundEnd -> {
-                                            Log.w(TIMER_DEBUG_TAG, "event=RoundEnd roundIndex=${event.roundIndex}")
-                                            pendingToneJob = scope.launch {
-                                                try { playProlongedAlarmTone(prolongedToneMs) } catch (_: Exception) {}
-                                            }
-                                        }
-                                        is TimerEvent.TrainingEnd -> {
-                                            Log.w(TIMER_DEBUG_TAG, "event=TrainingEnd")
-                                            val ttsRef = tts
-                                            val finishedText = timerFinishedText
-                                            val defaultLocale = defaultTtsLocale
-                                            running = false
-                                            finished = true
-                                            paused = false
-                                            finalTtsJob = scope.launch(Dispatchers.Main) {
-                                                try {
-                                                    val nameHasCyrillic = p.name.any { it.isCyrillic() }
-                                                    if (nameHasCyrillic && defaultLocale != null) {
-                                                        ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
-                                                        TrainingEndPending.finishedText = finishedText
-                                                        TrainingEndPending.defaultLocale = defaultLocale
-                                                    }
-                                                    delay((prolongedToneMs - 400).coerceAtLeast(0).toLong())
-                                                    val nameId = "training_end_name_${System.currentTimeMillis()}"
-                                                    if (nameHasCyrillic && defaultLocale != null) {
-                                                        ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
-                                                    } else {
-                                                        ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
-                                                        ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
-                                                    }
-                                                    delay(5000)
-                                                } catch (_: Exception) {}
-                                            }
-                                        }
-                                    }
-                                }
-                                engine.advance()
-                                while (scope.isActive && running) {
-                                    if (paused) {
-                                        delay(500L)
-                                    } else {
-                                        if (remaining <= 2) Log.w(TIMER_DEBUG_TAG, "before delay(1000) remaining=$remaining")
-                                        delay(1000L)
-                                        if (remaining <= 2) Log.w(TIMER_DEBUG_TAG, "after delay calling advance()")
-                                        if (!engine.advance()) break
-                                    }
-                                }
-                                } finally {
-                                    finalTtsJob?.join()
-                                    TimerService.stop(context)
+                                        activity.startActivity(intent)
+                                    } catch (_: Exception) {}
                                 }
                             }
+                            TimerService.start(context, p, LocaleManager.currentLanguageTag(context))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -586,6 +539,7 @@ fun TimerScreen(
                         onClick = {
                             paused = true
                             tts?.stop()
+                            TimerService.pause(context)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -607,7 +561,10 @@ fun TimerScreen(
                 }
                 if (running && paused) {
                     Button(
-                        onClick = { paused = false },
+                        onClick = {
+                            paused = false
+                            TimerService.resume(context)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp),
@@ -632,6 +589,7 @@ fun TimerScreen(
                             finished = true
                             paused = false
                             tts?.stop()
+                            TimerService.stop(context)
                         },
                         modifier = Modifier
                             .fillMaxWidth()

@@ -1,10 +1,14 @@
 package com.raund.app.timer
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
 data class TimerRound(
     val name: String,
     val durationSeconds: Int,
     val warn10sec: Boolean
-)
+) : Parcelable
 
 sealed class TimerEvent {
     data class RoundStart(val roundIndex: Int, val round: TimerRound, val totalRounds: Int) : TimerEvent()

@@ -1,5 +1,8 @@
 package com.raund.app.timer
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
 /**
  * Same event contract as backend timer engine: round_start, tick, warn10, round_end, training_end.
  */
@@ -53,8 +56,9 @@ class TimerEngine(
     }
 }
 
+@Parcelize
 data class TimerProfile(
     val name: String,
     val emoji: String,
     val rounds: List<TimerRound>
-)
+) : Parcelable

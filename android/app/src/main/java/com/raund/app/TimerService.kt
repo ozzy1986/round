@@ -7,13 +7,43 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
+import android.media.ToneGenerator
 import android.os.Build
+import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
+import android.speech.tts.TextToSpeech
+import android.util.Log
+import com.raund.app.timer.TimerEngine
+import com.raund.app.timer.TimerEvent
+import com.raund.app.timer.TimerProfile
+import kotlin.math.PI
+import kotlin.math.sin
+import java.util.Locale
 
 class TimerService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var silentTrack: AudioTrack? = null
+    private var timerThread: Thread? = null
+
+    @Volatile
+    private var paused = false
+
+    @Volatile
+    private var ttsRef: TextToSpeech? = null
+
+    @Volatile
+    private var ttsReady = false
+
+    @Volatile
+    private var running = true
 
     override fun onCreate() {
         super.onCreate()
@@ -24,7 +54,7 @@ class TimerService : Service() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.app_name),
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         )
         channel.setSound(null, null)
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
@@ -32,25 +62,234 @@ class TimerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_PAUSE -> {
+                paused = true
+                return START_NOT_STICKY
+            }
+            ACTION_RESUME -> {
+                paused = false
+                return START_NOT_STICKY
+            }
+        }
+
         if (!(wakeLock?.isHeld == true)) {
             wakeLock?.acquire()
         }
+        startSilentAudio()
+
+        @Suppress("DEPRECATION")
+        val profile = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(EXTRA_PROFILE, TimerProfile::class.java)
+        } else {
+            intent?.getParcelableExtra(EXTRA_PROFILE)
+        } ?: run {
+            val n = Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(getString(R.string.timer_running))
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setOngoing(true)
+                .build()
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIFICATION_ID, n)
+            }
+            return START_NOT_STICKY
+        }
+
+        val langTag = intent.getStringExtra(EXTRA_LANG) ?: "en"
+        running = true
+        paused = false
+
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(R.string.timer_running))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .build()
-
         if (Build.VERSION.SDK_INT >= 29) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+
+        ttsRef = null
+        ttsReady = false
+        val ttsHolder = TextToSpeech(applicationContext) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val ttsLocale = when (langTag) {
+                    "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
+                    "az", "uz" -> Locale.forLanguageTag("tr")
+                    "zh" -> Locale.CHINESE
+                    else -> Locale.forLanguageTag(langTag)
+                }
+                ttsHolder.setLanguage(ttsLocale)
+                ttsHolder.setSpeechRate(1f)
+                ttsHolder.setPitch(1f)
+                val attrs = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                ttsHolder.setAudioAttributes(attrs)
+                ttsRef = ttsHolder
+                ttsReady = true
+            }
+        }
+
+        timerThread = Thread {
+            runTimer(profile)
+        }.apply { start() }
+
         return START_NOT_STICKY
     }
 
+    private fun runTimer(profile: TimerProfile) {
+        var waited = 0
+        while (!ttsReady && waited < 3000 && running) {
+            Thread.sleep(100)
+            waited += 100
+        }
+        val tts = ttsRef ?: run {
+            stopSelf()
+            return
+        }
+        val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
+        val finishedText = getString(R.string.timer_finished)
+        var alarmTone: ToneGenerator? = null
+        try {
+            alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+        } catch (_: Exception) {}
+        val tickTone = ToneGenerator.TONE_CDMA_PIP
+        val tickMs = 200
+        val prolongedMs = 1200
+
+        val engine = TimerEngine(profile) { event ->
+            when (event) {
+                is TimerEvent.RoundStart -> {
+                    broadcastState(event.round.name, event.round.durationSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
+                    if (event.roundIndex == 0) {
+                        Thread { playProlongedTone(prolongedMs) }.start()
+                    }
+                    tts.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                }
+                is TimerEvent.Tick -> {
+                    broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
+                    if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
+                        try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
+                    }
+                }
+                is TimerEvent.RoundEnd -> {
+                    Thread { playProlongedTone(prolongedMs) }.start()
+                }
+                is TimerEvent.TrainingEnd -> {
+                    running = false
+                    tts.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                    tts.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
+                    broadcastState("", 0, 0, 0, 0, isRunning = false)
+                    Handler(Looper.getMainLooper()).postDelayed({ stopSelf() }, 6000)
+                }
+                else -> {}
+            }
+        }
+
+        engine.advance()
+        while (running) {
+            if (paused) {
+                Thread.sleep(500)
+            } else {
+                Thread.sleep(1000)
+                if (!engine.advance()) break
+            }
+        }
+
+        try { alarmTone?.release() } catch (_: Exception) {}
+    }
+
+    private fun playProlongedTone(durationMs: Int) {
+        try {
+            val sampleRate = 44100
+            val numSamples = sampleRate * durationMs / 1000
+            val buffer = ShortArray(numSamples)
+            val freq = 880.0
+            val vol = 0.55f
+            for (i in 0 until numSamples) {
+                buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * vol).toInt().toShort()
+            }
+            val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                .setBufferSizeInBytes((numSamples * 2).coerceAtLeast(minBuf))
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+            track.setVolume(vol)
+            track.write(buffer, 0, buffer.size)
+            track.play()
+            Thread.sleep(durationMs.toLong())
+            track.release()
+        } catch (_: Exception) {}
+    }
+
+    private fun broadcastState(roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
+        val i = Intent(ACTION_TIMER_STATE).apply {
+            setPackage(packageName)
+            putExtra(EXTRA_REMAINING, remaining)
+            putExtra(EXTRA_ROUND_NAME, roundName)
+            putExtra(EXTRA_ROUND_TOTAL, roundTotal)
+            putExtra(EXTRA_ROUND_INDEX, roundIndex)
+            putExtra(EXTRA_TOTAL_ROUNDS, totalRounds)
+            putExtra(EXTRA_IS_RUNNING, isRunning)
+        }
+        sendBroadcast(i)
+        val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
+        showNotification(text)
+    }
+
+    private fun showNotification(text: String) {
+        val notification = Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setOngoing(true)
+            .build()
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun startSilentAudio() {
+        if (silentTrack != null) return
+        try {
+            val sampleRate = 8000
+            val bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                .setBufferSizeInBytes(bufferSize)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+            val silence = ShortArray(sampleRate)
+            track.write(silence, 0, silence.size)
+            track.setLoopPoints(0, sampleRate, -1)
+            track.setVolume(0f)
+            track.play()
+            silentTrack = track
+        } catch (_: Exception) {}
+    }
+
+    private fun stopSilentAudio() {
+        try {
+            silentTrack?.stop()
+            silentTrack?.release()
+        } catch (_: Exception) {}
+        silentTrack = null
+    }
+
     override fun onDestroy() {
+        running = false
+        timerThread?.join(2000)
+        try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
+        ttsRef = null
+        stopSilentAudio()
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
         }
@@ -63,9 +302,33 @@ class TimerService : Service() {
     companion object {
         private const val CHANNEL_ID = "raund_timer"
         private const val NOTIFICATION_ID = 1
+        const val ACTION_START = "com.raund.app.TimerService.START"
+        const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"
+        const val ACTION_RESUME = "com.raund.app.TimerService.RESUME"
+        const val ACTION_TIMER_STATE = "com.raund.app.TIMER_STATE"
+        const val EXTRA_PROFILE = "profile"
+        const val EXTRA_LANG = "lang"
+        const val EXTRA_REMAINING = "remaining"
+        const val EXTRA_ROUND_NAME = "roundName"
+        const val EXTRA_ROUND_TOTAL = "roundTotal"
+        const val EXTRA_ROUND_INDEX = "roundIndex"
+        const val EXTRA_TOTAL_ROUNDS = "totalRounds"
+        const val EXTRA_IS_RUNNING = "isRunning"
 
-        fun start(context: Context) {
-            context.startForegroundService(Intent(context, TimerService::class.java))
+        fun start(context: Context, profile: TimerProfile, languageTag: String) {
+            context.startForegroundService(Intent(context, TimerService::class.java).apply {
+                action = ACTION_START
+                putExtra(EXTRA_PROFILE, profile)
+                putExtra(EXTRA_LANG, languageTag)
+            })
+        }
+
+        fun pause(context: Context) {
+            context.startService(Intent(context, TimerService::class.java).apply { action = ACTION_PAUSE })
+        }
+
+        fun resume(context: Context) {
+            context.startService(Intent(context, TimerService::class.java).apply { action = ACTION_RESUME })
         }
 
         fun stop(context: Context) {
