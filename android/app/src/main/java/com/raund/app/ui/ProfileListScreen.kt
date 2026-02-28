@@ -87,7 +87,7 @@ fun ProfileListScreen(
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
     var showSettings by remember { mutableStateOf(false) }
-    var screenOffPause by remember { mutableStateOf(SettingsManager.isScreenOffPause(context)) }
+
 
     Scaffold(
         topBar = {
@@ -309,40 +309,7 @@ fun ProfileListScreen(
                     fontWeight = FontWeight.Bold
                 )
             },
-            text = {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.screen_off_behavior),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                stringResource(
-                                    if (screenOffPause) R.string.screen_off_pause
-                                    else R.string.screen_off_continue
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Switch(
-                            checked = screenOffPause,
-                            onCheckedChange = {
-                                screenOffPause = it
-                                SettingsManager.setScreenOffPause(context, it)
-                            }
-                        )
-                    }
-                }
-            },
+            text = { },
             confirmButton = {
                 TextButton(onClick = { showSettings = false }) {
                     Text(stringResource(R.string.cancel))

@@ -1,20 +1,13 @@
 package com.raund.app.ui
 
 import android.app.Activity
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.speech.tts.UtteranceProgressListener
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
-import android.os.Build
 import android.media.ToneGenerator
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
@@ -81,8 +74,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
-import com.raund.app.SettingsManager
-import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
@@ -261,8 +252,6 @@ fun TimerScreen(
         }
     }
 
-    val screenOffPause = remember { SettingsManager.isScreenOffPause(context) }
-
     DisposableEffect(running) {
         val activity = context as? Activity
         if (running) {
@@ -272,40 +261,6 @@ fun TimerScreen(
         }
         onDispose {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-    }
-
-    DisposableEffect(running, screenOffPause) {
-        var wakeLock: PowerManager.WakeLock? = null
-        var receiver: BroadcastReceiver? = null
-        var serviceStarted = false
-
-        if (running && screenOffPause) {
-            receiver = object : BroadcastReceiver() {
-                override fun onReceive(ctx: Context?, intent: Intent?) {
-                    if (intent?.action == Intent.ACTION_SCREEN_OFF) {
-                        paused = true
-                    }
-                }
-            }
-            context.registerReceiver(receiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
-        } else if (running && !screenOffPause) {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer")
-            wakeLock?.acquire(60 * 60 * 1000L)
-            try { TimerService.start(context); serviceStarted = true } catch (_: Exception) {}
-        }
-
-        onDispose {
-            receiver?.let {
-                try { context.unregisterReceiver(it) } catch (_: Exception) {}
-            }
-            wakeLock?.let {
-                if (it.isHeld) it.release()
-            }
-            if (serviceStarted) {
-                try { TimerService.stop(context) } catch (_: Exception) {}
-            }
         }
     }
 
@@ -513,23 +468,6 @@ fun TimerScreen(
                                     delay(100)
                                     waited += 100
                                 }
-                                val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                val focusRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                                        .setAudioAttributes(
-                                            AudioAttributes.Builder()
-                                                .setUsage(AudioAttributes.USAGE_ALARM)
-                                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                                .build()
-                                        )
-                                        .build()
-                                } else null
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
-                                    am?.requestAudioFocus(focusRequest)
-                                } else {
-                                    @Suppress("DEPRECATION")
-                                    am?.requestAudioFocus({}, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
-                                }
                                 var pendingToneJob: Job? = null
                                 var finalTtsJob: Job? = null
                                 try {
@@ -606,12 +544,6 @@ fun TimerScreen(
                                 }
                                 } finally {
                                     finalTtsJob?.join()
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
-                                        am?.abandonAudioFocusRequest(focusRequest)
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        am?.abandonAudioFocus {}
-                                    }
                                 }
                             }
                         },
