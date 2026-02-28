@@ -55,9 +55,12 @@ class TimerService : Service() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.app_name),
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         )
+        channel.description = getString(R.string.timer_running)
         channel.setSound(null, null)
+        channel.setShowBadge(true)
+        channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
             .createNotificationChannel(channel)
     }
@@ -275,10 +278,18 @@ class TimerService : Service() {
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
+            .setStyle(Notification.BigTextStyle().bigText(text))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setCategory(Notification.CATEGORY_PROGRESS)
             .build()
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun startSilentAudio() {
@@ -331,7 +342,7 @@ class TimerService : Service() {
 
     companion object {
         private const val TAG = "RaundTimer"
-        private const val CHANNEL_ID = "raund_timer"
+        private const val CHANNEL_ID = "raund_timer_visible"
         private const val NOTIFICATION_ID = 1
         const val ACTION_START = "com.raund.app.TimerService.START"
         const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"
