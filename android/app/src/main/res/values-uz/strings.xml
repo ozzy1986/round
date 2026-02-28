@@ -43,4 +43,8 @@
     <string name="move_round_up">Yuqoriga</string>
     <string name="move_round_down">Pastga</string>
     <string name="reorder_round">Tartibni o\'zgartirish uchun bosib turing</string>
+    <string name="settings">Sozlamalar</string>
+    <string name="screen_off_behavior">Ekran oʻchganda pauza</string>
+    <string name="screen_off_pause">Ekranni qulflasangiz mashq toʻxtaydi</string>
+    <string name="screen_off_continue">Mashq fonda davom etadi</string>
 </resources>

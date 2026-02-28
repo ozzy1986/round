@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,7 +36,9 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -42,9 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
+import com.raund.app.SettingsManager
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 
@@ -79,17 +82,21 @@ fun ProfileListScreen(
     onAddProfile: () -> Unit,
     onStartTimer: (String) -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     val profiles by repository.profiles.collectAsState(initial = emptyList())
     val roundStats by repository.roundStats.collectAsState(initial = emptyMap())
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
+    var showSettings by remember { mutableStateOf(false) }
+    var screenOffPause by remember { mutableStateOf(SettingsManager.isScreenOffPause(context)) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.profiles), fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
+                    }
                     Box {
                         var langMenuExpanded by remember { mutableStateOf(false) }
                         val currentFlag = supportedLanguages.find { it.first == currentLang }?.third ?: "🌐"
@@ -218,8 +225,8 @@ fun ProfileListScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onProfileClick(profile.id) },
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
                         colors = CardDefaults.elevatedCardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -240,7 +247,7 @@ fun ProfileListScreen(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.background),
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
@@ -252,22 +259,22 @@ fun ProfileListScreen(
                                     Text(
                                         profileName,
                                         style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.SemiBold,
+                                        fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         profileSummary,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                         maxLines = 1,
                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             IconButton(
                                 onClick = { onStartTimer(profile.id) },
                                 modifier = Modifier.size(56.dp),
@@ -291,6 +298,57 @@ fun ProfileListScreen(
                 item { Spacer(modifier = Modifier.height(80.dp)) }
             }
         }
+    }
+
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            title = {
+                Text(
+                    stringResource(R.string.settings),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.screen_off_behavior),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                stringResource(
+                                    if (screenOffPause) R.string.screen_off_pause
+                                    else R.string.screen_off_continue
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Switch(
+                            checked = screenOffPause,
+                            onCheckedChange = {
+                                screenOffPause = it
+                                SettingsManager.setScreenOffPause(context, it)
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettings = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 }
 

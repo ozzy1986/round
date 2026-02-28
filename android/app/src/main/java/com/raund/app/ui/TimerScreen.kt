@@ -1,9 +1,13 @@
 package com.raund.app.ui
 
 import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.speech.tts.UtteranceProgressListener
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -16,7 +20,11 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.view.WindowManager
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.background
@@ -62,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -72,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
+import com.raund.app.SettingsManager
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
@@ -218,7 +228,7 @@ fun TimerScreen(
     val tickTone = ToneGenerator.TONE_CDMA_PIP
     DisposableEffect(context) {
         val tg = try {
-            ToneGenerator(AudioManager.STREAM_ALARM, 55)
+            ToneGenerator(AudioManager.STREAM_ALARM, 100)
         } catch (e: Exception) {
             null
         }
@@ -229,7 +239,7 @@ fun TimerScreen(
         }
     }
 
-    val tickMs = 150
+    val tickMs = 200
     val prolongedToneMs = 1200
 
     LaunchedEffect(profile) {
@@ -250,6 +260,8 @@ fun TimerScreen(
         }
     }
 
+    val screenOffPause = remember { SettingsManager.isScreenOffPause(context) }
+
     DisposableEffect(running) {
         val activity = context as? Activity
         if (running) {
@@ -259,6 +271,35 @@ fun TimerScreen(
         }
         onDispose {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    DisposableEffect(running, screenOffPause) {
+        var wakeLock: PowerManager.WakeLock? = null
+        var receiver: BroadcastReceiver? = null
+
+        if (running && screenOffPause) {
+            receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                        paused = true
+                    }
+                }
+            }
+            context.registerReceiver(receiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+        } else if (running && !screenOffPause) {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer")
+            wakeLock?.acquire(60 * 60 * 1000L)
+        }
+
+        onDispose {
+            receiver?.let {
+                try { context.unregisterReceiver(it) } catch (_: Exception) {}
+            }
+            wakeLock?.let {
+                if (it.isHeld) it.release()
+            }
         }
     }
 
@@ -386,26 +427,47 @@ fun TimerScreen(
                     
                     Spacer(modifier = Modifier.height(48.dp))
 
+                    val inWarningZone = running && !finished && remaining in 1..10
+                    val pulseTransition = rememberInfiniteTransition(label = "pulse")
+                    val pulseScale by pulseTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.06f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(500, easing = LinearEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseScale"
+                    )
+                    val ringScale = if (inWarningZone) pulseScale else 1f
+
                     Box(contentAlignment = Alignment.Center) {
                         val progressRatio = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
                         val animatedProgress by animateFloatAsState(
                             targetValue = progressRatio,
                             label = "progress"
                         )
-                        
+
+                        val warningColor = MaterialTheme.colorScheme.tertiary
+                        val ringColor = if (inWarningZone) warningColor else primaryColor
+
                         CircularProgressIndicator(
                             progress = { animatedProgress },
-                            modifier = Modifier.size(minOf(this@BoxWithConstraints.maxWidth, 320.dp)),
+                            modifier = Modifier
+                                .size(minOf(this@BoxWithConstraints.maxWidth, 320.dp))
+                                .graphicsLayer {
+                                    scaleX = ringScale
+                                    scaleY = ringScale
+                                },
                             strokeWidth = 36.dp,
                             trackColor = surfaceVarColor,
-                            color = primaryColor,
+                            color = ringColor,
                             strokeCap = StrokeCap.Round
                         )
                         
                         Text(
                             "%02d:%02d".format(remaining / 60, remaining % 60),
                             fontSize = timerFontSize,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Black,
                             color = onBgColor,
                             textAlign = TextAlign.Center,
                             maxLines = 1,

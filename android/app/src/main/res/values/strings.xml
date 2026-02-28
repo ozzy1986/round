@@ -43,4 +43,8 @@
     <string name="move_round_up">Move up</string>
     <string name="move_round_down">Move down</string>
     <string name="reorder_round">Hold and drag to reorder</string>
+    <string name="settings">Settings</string>
+    <string name="screen_off_behavior">Pause when screen turns off</string>
+    <string name="screen_off_pause">Training pauses when you lock the screen</string>
+    <string name="screen_off_continue">Training keeps running in the background</string>
 </resources>
