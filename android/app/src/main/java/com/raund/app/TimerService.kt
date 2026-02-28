@@ -83,6 +83,21 @@ class TimerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "onStartCommand action=${intent?.action}")
         when (intent?.action) {
+            ACTION_WARMUP -> {
+                Log.d(TAG, "warmup: process ready")
+                val n = Notification.Builder(this, CHANNEL_ID)
+                    .setContentTitle(getString(R.string.app_name))
+                    .setContentText(getString(R.string.timer_running))
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                    .setOngoing(true)
+                    .build()
+                if (Build.VERSION.SDK_INT >= 29) {
+                    startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                } else {
+                    startForeground(NOTIFICATION_ID, n)
+                }
+                return START_NOT_STICKY
+            }
             ACTION_PAUSE -> {
                 paused = true
                 Log.d(TAG, "paused")
@@ -126,7 +141,10 @@ class TimerService : Service() {
         val langTag = intent?.getStringExtra(EXTRA_LANG) ?: "en"
         val finishedText = intent?.getStringExtra(EXTRA_FINISHED_TEXT) ?: getString(R.string.timer_finished)
         val phrases = TtsCache.buildPhraseList(profile, finishedText)
+        Log.d(TAG, "cacheDir=${TtsCache.cacheDir(applicationContext).absolutePath} phrases count=${phrases.size} langTag=$langTag finishedText='${finishedText.take(30)}'")
+        phrases.forEachIndexed { i, s -> Log.d(TAG, "  phrase[$i] exists=${TtsCache.exists(applicationContext, langTag, s)} '${s.take(25)}'") }
         val useCacheOnly = TtsCache.allExist(applicationContext, langTag, phrases)
+        Log.d(TAG, "useCacheOnly=$useCacheOnly (allExist=$useCacheOnly)")
         if (useCacheOnly) Log.d(TAG, "All phrases in cache, starting without TTS")
 
         running = true
@@ -181,6 +199,7 @@ class TimerService : Service() {
     }
 
     private fun runTimer(profile: TimerProfile, useCacheOnly: Boolean, langTag: String, finishedText: String) {
+        Log.d(TAG, "runTimer useCacheOnly=$useCacheOnly")
         if (!useCacheOnly) {
             var waited = 0
             while (!ttsReady && waited < 5000 && running) {
@@ -190,6 +209,8 @@ class TimerService : Service() {
             val tts = ttsRef
             if (tts == null) Log.w(TAG, "TTS not ready after ${waited}ms, continuing without TTS")
             else Log.d(TAG, "TTS ready after ${waited}ms")
+        } else {
+            Log.d(TAG, "runTimer using cache only, no TTS wait")
         }
 
         val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
@@ -268,7 +289,7 @@ class TimerService : Service() {
                     Handler(Looper.getMainLooper()).post { onDone?.invoke() }
                     return@Thread
                 }
-                val mp = MediaPlayer().apply {
+                MediaPlayer().apply {
                     setAudioAttributes(AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -276,7 +297,7 @@ class TimerService : Service() {
                     setDataSource(file.absolutePath)
                     prepare()
                     setOnCompletionListener {
-                        mp.release()
+                        release()
                         Handler(Looper.getMainLooper()).post { onDone?.invoke() }
                     }
                     start()
@@ -397,6 +418,7 @@ class TimerService : Service() {
         private const val TAG = "RaundTimer"
         private const val CHANNEL_ID = "raund_timer_visible"
         private const val NOTIFICATION_ID = 1
+        const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"
         const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"
         const val ACTION_RESUME = "com.raund.app.TimerService.RESUME"
@@ -410,6 +432,12 @@ class TimerService : Service() {
         const val EXTRA_ROUND_INDEX = "roundIndex"
         const val EXTRA_TOTAL_ROUNDS = "totalRounds"
         const val EXTRA_IS_RUNNING = "isRunning"
+
+        fun warmup(context: Context) {
+            context.startForegroundService(Intent(context, TimerService::class.java).apply {
+                action = ACTION_WARMUP
+            })
+        }
 
         fun start(context: Context, profile: TimerProfile, languageTag: String, finishedText: String) {
             context.startForegroundService(Intent(context, TimerService::class.java).apply {

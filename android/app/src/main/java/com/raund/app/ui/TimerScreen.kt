@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -95,6 +96,7 @@ fun TimerScreen(
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
+    var cacheReady by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val timerFinishedText = stringResource(R.string.timer_finished)
     val restartTimerText = stringResource(R.string.restart_timer)
@@ -104,6 +106,7 @@ fun TimerScreen(
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
+        TimerService.warmup(context)
     }
 
     LaunchedEffect(profile) {
@@ -112,8 +115,17 @@ fun TimerScreen(
         val locale = LocaleManager.currentLanguageTag(context)
         val finishedText = context.getString(R.string.timer_finished)
         val phrases = TtsCache.buildPhraseList(p, finishedText)
-        if (TtsCache.allExist(context, locale, phrases)) return@LaunchedEffect
+        Log.d("TimerScreen", "cache check profile=${p.name} locale=$locale phrases=${phrases.size}")
+        val allExist = TtsCache.allExist(context, locale, phrases)
+        if (allExist) {
+            Log.d("TimerScreen", "cache full, skip ensureCache")
+            cacheReady = true
+            return@LaunchedEffect
+        }
+        Log.d("TimerScreen", "cache missing, calling ensureCache")
         TtsCache.ensureCache(context, locale, phrases)
+        Log.d("TimerScreen", "ensureCache returned")
+        cacheReady = true
     }
 
     LaunchedEffect(profile) {
@@ -400,7 +412,7 @@ fun TimerScreen(
                             .fillMaxWidth()
                             .height(64.dp),
                         shape = RoundedCornerShape(32.dp),
-                        enabled = hasRounds,
+                        enabled = hasRounds && cacheReady,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
