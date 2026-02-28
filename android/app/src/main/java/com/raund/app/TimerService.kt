@@ -98,7 +98,7 @@ class TimerService : Service() {
             return START_NOT_STICKY
         }
 
-        val langTag = intent.getStringExtra(EXTRA_LANG) ?: "en"
+        val langTag = intent?.getStringExtra(EXTRA_LANG) ?: "en"
         running = true
         paused = false
 
@@ -116,7 +116,8 @@ class TimerService : Service() {
 
         ttsRef = null
         ttsReady = false
-        val ttsHolder = TextToSpeech(applicationContext) { status ->
+        var ttsHolder: TextToSpeech? = null
+        ttsHolder = TextToSpeech(applicationContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val ttsLocale = when (langTag) {
                     "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
@@ -124,14 +125,14 @@ class TimerService : Service() {
                     "zh" -> Locale.CHINESE
                     else -> Locale.forLanguageTag(langTag)
                 }
-                ttsHolder.setLanguage(ttsLocale)
-                ttsHolder.setSpeechRate(1f)
-                ttsHolder.setPitch(1f)
+                ttsHolder?.setLanguage(ttsLocale)
+                ttsHolder?.setSpeechRate(1f)
+                ttsHolder?.setPitch(1f)
                 val attrs = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
-                ttsHolder.setAudioAttributes(attrs)
+                ttsHolder?.setAudioAttributes(attrs)
                 ttsRef = ttsHolder
                 ttsReady = true
             }
