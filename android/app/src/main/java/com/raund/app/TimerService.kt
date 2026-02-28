@@ -11,6 +11,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
@@ -23,8 +24,10 @@ import android.util.Log
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
 import com.raund.app.timer.TimerProfile
+import com.raund.app.tts.TtsCache
 import kotlin.math.PI
 import kotlin.math.sin
+import java.io.File
 import java.util.Locale
 
 class TimerService : Service() {
@@ -121,6 +124,11 @@ class TimerService : Service() {
         }
 
         val langTag = intent?.getStringExtra(EXTRA_LANG) ?: "en"
+        val finishedText = intent?.getStringExtra(EXTRA_FINISHED_TEXT) ?: getString(R.string.timer_finished)
+        val phrases = TtsCache.buildPhraseList(profile, finishedText)
+        val useCacheOnly = TtsCache.allExist(applicationContext, langTag, phrases)
+        if (useCacheOnly) Log.d(TAG, "All phrases in cache, starting without TTS")
+
         running = true
         paused = false
 
@@ -138,48 +146,54 @@ class TimerService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        var ttsHolder: TextToSpeech? = null
-        ttsHolder = TextToSpeech(applicationContext) { status ->
-            Log.d(TAG, "TTS init status=$status")
-            if (status == TextToSpeech.SUCCESS) {
-                val ttsLocale = when (langTag) {
-                    "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
-                    "az", "uz" -> Locale.forLanguageTag("tr")
-                    "zh" -> Locale.CHINESE
-                    else -> Locale.forLanguageTag(langTag)
+        if (!useCacheOnly) {
+            var ttsHolder: TextToSpeech? = null
+            ttsHolder = TextToSpeech(applicationContext) { status ->
+                Log.d(TAG, "TTS init status=$status")
+                if (status == TextToSpeech.SUCCESS) {
+                    val ttsLocale = when (langTag) {
+                        "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
+                        "az", "uz" -> Locale.forLanguageTag("tr")
+                        "zh" -> Locale.CHINESE
+                        else -> Locale.forLanguageTag(langTag)
+                    }
+                    ttsHolder?.setLanguage(ttsLocale)
+                    ttsHolder?.setSpeechRate(1f)
+                    ttsHolder?.setPitch(1f)
+                    val attrs = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                    ttsHolder?.setAudioAttributes(attrs)
+                    ttsRef = ttsHolder
+                    ttsReady = true
                 }
-                ttsHolder?.setLanguage(ttsLocale)
-                ttsHolder?.setSpeechRate(1f)
-                ttsHolder?.setPitch(1f)
-                val attrs = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
-                ttsHolder?.setAudioAttributes(attrs)
-                ttsRef = ttsHolder
-                ttsReady = true
             }
+        } else {
+            ttsReady = true
         }
 
         timerThread = Thread {
-            runTimer(profile)
+            runTimer(profile, useCacheOnly, langTag, finishedText)
         }.apply { start() }
 
         return START_NOT_STICKY
     }
 
-    private fun runTimer(profile: TimerProfile) {
-        var waited = 0
-        while (!ttsReady && waited < 5000 && running) {
-            Thread.sleep(100)
-            waited += 100
+    private fun runTimer(profile: TimerProfile, useCacheOnly: Boolean, langTag: String, finishedText: String) {
+        if (!useCacheOnly) {
+            var waited = 0
+            while (!ttsReady && waited < 5000 && running) {
+                Thread.sleep(100)
+                waited += 100
+            }
+            val tts = ttsRef
+            if (tts == null) Log.w(TAG, "TTS not ready after ${waited}ms, continuing without TTS")
+            else Log.d(TAG, "TTS ready after ${waited}ms")
         }
-        val tts = ttsRef
-        if (tts == null) Log.w(TAG, "TTS not ready after ${waited}ms, continuing without TTS")
-        else Log.d(TAG, "TTS ready after ${waited}ms")
 
         val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
-        val finishedText = getString(R.string.timer_finished)
+        val tts = ttsRef
         var alarmTone: ToneGenerator? = null
         try {
             alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100)
@@ -196,7 +210,11 @@ class TimerService : Service() {
                     if (event.roundIndex == 0) {
                         Thread { playProlongedTone(prolongedMs) }.start()
                     }
-                    tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                    if (useCacheOnly) {
+                        playCacheFile(event.round.name, langTag, null)
+                    } else {
+                        tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                    }
                 }
                 is TimerEvent.Tick -> {
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
@@ -210,11 +228,19 @@ class TimerService : Service() {
                 }
                 is TimerEvent.TrainingEnd -> {
                     Log.d(TAG, "TrainingEnd")
-                    tts?.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
-                    tts?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
                     running = false
-                    Handler(Looper.getMainLooper()).postDelayed({ stopSelf() }, 6000)
+                    if (useCacheOnly) {
+                        playCacheFile(profile.name, langTag) {
+                            playCacheFile(finishedText, langTag) {
+                                Handler(Looper.getMainLooper()).postDelayed({ stopSelf() }, 6000)
+                            }
+                        }
+                    } else {
+                        tts?.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                        tts?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
+                        Handler(Looper.getMainLooper()).postDelayed({ stopSelf() }, 6000)
+                    }
                 }
                 else -> {}
             }
@@ -232,6 +258,33 @@ class TimerService : Service() {
         Log.d(TAG, "Timer loop ended, running=$running")
 
         try { alarmTone?.release() } catch (_: Exception) {}
+    }
+
+    private fun playCacheFile(text: String, langTag: String, onDone: (() -> Unit)? = null) {
+        Thread {
+            try {
+                val file = TtsCache.cacheFile(applicationContext, langTag, text)
+                if (!file.exists()) {
+                    Handler(Looper.getMainLooper()).post { onDone?.invoke() }
+                    return@Thread
+                }
+                val mp = MediaPlayer().apply {
+                    setAudioAttributes(AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build())
+                    setDataSource(file.absolutePath)
+                    prepare()
+                    setOnCompletionListener {
+                        mp.release()
+                        Handler(Looper.getMainLooper()).post { onDone?.invoke() }
+                    }
+                    start()
+                }
+            } catch (_: Exception) {
+                Handler(Looper.getMainLooper()).post { onDone?.invoke() }
+            }
+        }.start()
     }
 
     private fun playProlongedTone(durationMs: Int) {
@@ -350,6 +403,7 @@ class TimerService : Service() {
         const val ACTION_TIMER_STATE = "com.raund.app.TIMER_STATE"
         const val EXTRA_PROFILE = "profile"
         const val EXTRA_LANG = "lang"
+        const val EXTRA_FINISHED_TEXT = "finishedText"
         const val EXTRA_REMAINING = "remaining"
         const val EXTRA_ROUND_NAME = "roundName"
         const val EXTRA_ROUND_TOTAL = "roundTotal"
@@ -357,11 +411,12 @@ class TimerService : Service() {
         const val EXTRA_TOTAL_ROUNDS = "totalRounds"
         const val EXTRA_IS_RUNNING = "isRunning"
 
-        fun start(context: Context, profile: TimerProfile, languageTag: String) {
+        fun start(context: Context, profile: TimerProfile, languageTag: String, finishedText: String) {
             context.startForegroundService(Intent(context, TimerService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_PROFILE, profile)
                 putExtra(EXTRA_LANG, languageTag)
+                putExtra(EXTRA_FINISHED_TEXT, finishedText)
             })
         }
 

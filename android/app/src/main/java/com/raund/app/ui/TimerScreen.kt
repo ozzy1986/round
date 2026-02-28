@@ -79,6 +79,7 @@ import com.raund.app.R
 import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerProfile
+import com.raund.app.tts.TtsCache
 
 @Composable
 fun TimerScreen(
@@ -103,6 +104,16 @@ fun TimerScreen(
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
+    }
+
+    LaunchedEffect(profile) {
+        val p = profile ?: return@LaunchedEffect
+        if (p.rounds.isEmpty()) return@LaunchedEffect
+        val locale = LocaleManager.currentLanguageTag(context)
+        val finishedText = context.getString(R.string.timer_finished)
+        val phrases = TtsCache.buildPhraseList(p, finishedText)
+        if (TtsCache.allExist(context, locale, phrases)) return@LaunchedEffect
+        TtsCache.ensureCache(context, locale, phrases)
     }
 
     LaunchedEffect(profile) {
@@ -383,7 +394,7 @@ fun TimerScreen(
                                     } catch (_: Exception) {}
                                 }
                             }
-                            TimerService.start(context, p, LocaleManager.currentLanguageTag(context))
+                            TimerService.start(context, p, LocaleManager.currentLanguageTag(context), timerFinishedText)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
