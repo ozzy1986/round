@@ -111,6 +111,7 @@ private const val TONE_VOLUME = 0.55f
 private val ttsVolumeParams: Bundle by lazy {
     Bundle().apply {
         putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f)
+        putFloat(TextToSpeech.Engine.KEY_PARAM_PAN, 0f)
     }
 }
 
@@ -205,6 +206,8 @@ fun TimerScreen(
                     else -> Locale.forLanguageTag(appLang)
                 }
                 ttsEngine.setLanguage(ttsLocale)
+                ttsEngine.setSpeechRate(1f)
+                ttsEngine.setPitch(1f)
                 defaultTtsLocale = ttsLocale
                 ttsEngine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
@@ -355,6 +358,7 @@ fun TimerScreen(
                         }
                     }
                     is TimerEvent.RoundEnd -> {
+                        android.util.Log.i("RaundTimer", "UI: received RoundEnd, launching tone")
                         pendingToneJob = scope.launch {
                             try { playProlongedAlarmTone(prolongedToneMs) } catch (_: Exception) {}
                         }

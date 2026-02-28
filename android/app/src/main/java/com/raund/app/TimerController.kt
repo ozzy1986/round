@@ -75,8 +75,10 @@ class TimerController(private val context: Context) {
         _state.update { it.copy(running = true, paused = false, finished = false) }
         scope.launch {
             val engine = TimerEngine(profile) { event ->
+                try {
                 when (event) {
                     is TimerEvent.RoundStart -> {
+                        Log.i(TAG, "event RoundStart round=${event.roundIndex + 1}/${event.totalRounds} ${event.round.name}")
                         _state.update {
                             it.copy(
                                 currentRound = event.round.name,
@@ -88,30 +90,45 @@ class TimerController(private val context: Context) {
                         _events.tryEmit(event)
                     }
                     is TimerEvent.Tick -> {
+                        if (event.remainingSeconds <= 3) Log.i(TAG, "event Tick remaining=${event.remainingSeconds} round=${event.roundIndex + 1}/${event.totalRounds}")
                         _state.update { it.copy(remaining = event.remainingSeconds) }
                         _events.tryEmit(event)
                     }
                     is TimerEvent.Warn10 -> { _events.tryEmit(event) }
-                    is TimerEvent.RoundEnd -> { _events.tryEmit(event) }
+                    is TimerEvent.RoundEnd -> {
+                        Log.i(TAG, "event RoundEnd round=${event.roundIndex + 1}/${event.totalRounds} (remaining was 0)")
+                        _events.tryEmit(event)
+                    }
                     is TimerEvent.TrainingEnd -> {
+                        Log.i(TAG, "event TrainingEnd")
                         _state.update {
                             it.copy(running = false, finished = true, paused = false)
                         }
                         _events.tryEmit(event)
                     }
                 }
+                } catch (e: Throwable) {
+                    Log.e(TAG, "event callback threw", e)
+                }
             }
             engine.advance()
+            var tickCount = 0
             while (scope.isActive && _state.value.running) {
                 if (_state.value.paused) {
                     delay(500L)
                 } else {
+                    val rem = _state.value.remaining
+                    if (rem <= 2) Log.i(TAG, "loop: remaining=$rem about to delay(1000)")
                     delay(1000L)
-                    if (!engine.advance()) break
+                    if (rem <= 2) Log.i(TAG, "loop: woke from delay, calling advance()")
+                    val cont = engine.advance()
+                    if (rem <= 2) Log.i(TAG, "loop: advance() returned $cont")
+                    if (!cont) break
                 }
+                tickCount++
             }
             unregisterScreenOffReceiver()
-            Log.d(TAG, "timer loop exited running=${_state.value.running} finished=${_state.value.finished}")
+            Log.i(TAG, "timer loop EXIT isActive=${scope.isActive} running=${_state.value.running} finished=${_state.value.finished} ticks=$tickCount")
         }
     }
 
