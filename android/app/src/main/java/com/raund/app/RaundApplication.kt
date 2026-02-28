@@ -50,4 +50,6 @@ class RaundApplication : Application() {
             syncPrefs = syncPrefs
         )
     }
+
+    val timerController by lazy { TimerController(this) }
 }

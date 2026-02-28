@@ -59,8 +59,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,18 +79,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.raund.app.LocaleManager
 import com.raund.app.R
+import com.raund.app.RaundApplication
 import com.raund.app.SettingsManager
 import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
-import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
 import com.raund.app.timer.TimerProfile
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -156,15 +158,10 @@ fun TimerScreen(
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var profile by remember { mutableStateOf<TimerProfile?>(null) }
-    var currentRound by remember { mutableStateOf("") }
-    var remaining by remember { mutableIntStateOf(0) }
-    var roundTotal by remember { mutableIntStateOf(1) }
-    var roundInfo by remember { mutableStateOf("") }
-    var running by remember { mutableStateOf(false) }
-    var finished by remember { mutableStateOf(false) }
-    var paused by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val controller = (context.applicationContext as RaundApplication).timerController
+    val state by controller.state.collectAsState()
+    var profile by remember { mutableStateOf<TimerProfile?>(null) }
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     var defaultTtsLocale by remember { mutableStateOf<Locale?>(null) }
     val timerFinishedText = stringResource(R.string.timer_finished)
@@ -172,6 +169,24 @@ fun TimerScreen(
     val pauseTimerText = stringResource(R.string.pause_timer)
     val resumeTimerText = stringResource(R.string.resume_timer)
     val timerPausedText = stringResource(R.string.timer_paused)
+
+    val displayCurrentRound = when {
+        state.running -> state.currentRound
+        state.finished -> ""
+        else -> profile?.rounds?.firstOrNull()?.name ?: ""
+    }
+    val displayRemaining = when {
+        state.running -> state.remaining
+        else -> profile?.rounds?.firstOrNull()?.durationSeconds ?: 0
+    }
+    val displayRoundTotal = when {
+        state.running -> state.roundTotal
+        else -> profile?.rounds?.firstOrNull()?.durationSeconds ?: 1
+    }
+    val displayRoundInfo = when {
+        state.running -> state.roundInfo
+        else -> "1 / ${profile?.rounds?.size ?: 0}"
+    }
 
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
@@ -243,16 +258,6 @@ fun TimerScreen(
     val tickMs = 200
     val prolongedToneMs = 1200
 
-    LaunchedEffect(profile) {
-        val p = profile ?: return@LaunchedEffect
-        if (!running && !finished && p.rounds.isNotEmpty()) {
-            remaining = p.rounds[0].durationSeconds
-            roundTotal = p.rounds[0].durationSeconds
-            currentRound = p.rounds[0].name
-            roundInfo = "1 / ${p.rounds.size}"
-        }
-    }
-
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.volumeControlStream = AudioManager.STREAM_ALARM
@@ -263,33 +268,52 @@ fun TimerScreen(
 
     val screenOffPause = remember { SettingsManager.isScreenOffPause(context) }
 
-    DisposableEffect(running) {
+    DisposableEffect(state.running) {
         val activity = context as? Activity
-        if (running) {
+        var focusRequest: AudioFocusRequest? = null
+        var requestedFocus = false
+        if (state.running) {
             activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .build()
+                am?.requestAudioFocus(req)
+                focusRequest = req
+                requestedFocus = true
+            } else {
+                @Suppress("DEPRECATION")
+                am?.requestAudioFocus({}, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
+                requestedFocus = true
+            }
         } else {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         onDispose {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (requestedFocus) {
+                val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
+                    am?.abandonAudioFocusRequest(focusRequest)
+                } else {
+                    @Suppress("DEPRECATION")
+                    am?.abandonAudioFocus { }
+                }
+            }
         }
     }
 
-    DisposableEffect(running, screenOffPause) {
+    DisposableEffect(state.running, screenOffPause) {
         var wakeLock: PowerManager.WakeLock? = null
-        var receiver: BroadcastReceiver? = null
         var serviceStarted = false
 
-        if (running && screenOffPause) {
-            receiver = object : BroadcastReceiver() {
-                override fun onReceive(ctx: Context?, intent: Intent?) {
-                    if (intent?.action == Intent.ACTION_SCREEN_OFF) {
-                        paused = true
-                    }
-                }
-            }
-            context.registerReceiver(receiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
-        } else if (running && !screenOffPause) {
+        if (state.running && !screenOffPause) {
             val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
             wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer")
             wakeLock?.acquire(60 * 60 * 1000L)
@@ -297,9 +321,6 @@ fun TimerScreen(
         }
 
         onDispose {
-            receiver?.let {
-                try { context.unregisterReceiver(it) } catch (_: Exception) {}
-            }
             wakeLock?.let {
                 if (it.isHeld) it.release()
             }
@@ -309,9 +330,69 @@ fun TimerScreen(
         }
     }
 
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var pendingToneJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            launch {
+                controller.events.collectLatest { event ->
+                val p = profile ?: return@collectLatest
+                when (event) {
+                    is TimerEvent.RoundStart -> {
+                        pendingToneJob?.join()
+                        val roundName = event.round.name
+                        val isFirstRound = event.roundIndex == 0
+                        pendingToneJob = scope.launch {
+                            try {
+                                if (isFirstRound) playProlongedAlarmTone(prolongedToneMs)
+                                tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, null)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    is TimerEvent.Tick -> {
+                        if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
+                            try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
+                        }
+                    }
+                    is TimerEvent.RoundEnd -> {
+                        pendingToneJob = scope.launch {
+                            try { playProlongedAlarmTone(prolongedToneMs) } catch (_: Exception) {}
+                        }
+                    }
+                    is TimerEvent.TrainingEnd -> {
+                        val ttsRef = tts
+                        val finishedText = timerFinishedText
+                        val defaultLocale = defaultTtsLocale
+                        scope.launch(Dispatchers.Main) {
+                            try {
+                                val nameHasCyrillic = p.name.any { it.isCyrillic() }
+                                if (nameHasCyrillic && defaultLocale != null) {
+                                    ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
+                                    TrainingEndPending.finishedText = finishedText
+                                    TrainingEndPending.defaultLocale = defaultLocale
+                                }
+                                delay((prolongedToneMs - 400).coerceAtLeast(0).toLong())
+                                val nameId = "training_end_name_${System.currentTimeMillis()}"
+                                if (nameHasCyrillic && defaultLocale != null) {
+                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
+                                } else {
+                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
+                                    ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
+                                }
+                                delay(5000)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+        }
+    }
+
     val defaultBgColor = MaterialTheme.colorScheme.background
-    val progressRatioForBg = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
-    val targetBgColor = if (running && !finished) {
+    val progressRatioForBg = if (displayRoundTotal > 0) displayRemaining.toFloat() / displayRoundTotal.toFloat() else 1f
+    val targetBgColor = if (state.running && !state.finished) {
         lerp(Color(0xFF8B0000), Color(0xFF006400), progressRatioForBg)
     } else {
         defaultBgColor
@@ -347,7 +428,7 @@ fun TimerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {
-                    running = false
+                    controller.stop()
                     tts?.stop()
                     onBack()
                 }) {
@@ -380,7 +461,7 @@ fun TimerScreen(
                     .weight(1f)
                     .padding(horizontal = 24.dp)
             ) {
-                if (finished) {
+                if (state.finished) {
                     Text(
                         timerFinishedText,
                         style = MaterialTheme.typography.displaySmall,
@@ -388,7 +469,7 @@ fun TimerScreen(
                         textAlign = TextAlign.Center
                     )
                 } else {
-                    val displayRoundName = if (currentRound.length > 10) currentRound.take(10) + "…" else currentRound
+                    val displayRoundName = if (displayCurrentRound.length > 10) displayCurrentRound.take(10) + "…" else displayCurrentRound
                     Text(
                         displayRoundName,
                         style = MaterialTheme.typography.displaySmall,
@@ -396,7 +477,7 @@ fun TimerScreen(
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.SemiBold
                     )
-                    if (roundInfo.isNotEmpty()) {
+                    if (displayRoundInfo.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             horizontalArrangement = Arrangement.Center,
@@ -408,13 +489,13 @@ fun TimerScreen(
                                 color = surfaceVarColor
                             ) {
                                 Text(
-                                    roundInfo,
+                                    displayRoundInfo,
                                     style = MaterialTheme.typography.titleMedium,
                                     color = onSurfaceVarColor,
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             }
-                            if (paused) {
+                            if (state.paused) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
@@ -433,7 +514,7 @@ fun TimerScreen(
                     
                     Spacer(modifier = Modifier.height(48.dp))
 
-                    val inWarningZone = running && !finished && remaining in 1..10
+                    val inWarningZone = state.running && !state.finished && displayRemaining in 1..10
                     val pulseTransition = rememberInfiniteTransition(label = "pulse")
                     val pulseScale by pulseTransition.animateFloat(
                         initialValue = 1f,
@@ -447,7 +528,7 @@ fun TimerScreen(
                     val ringScale = if (inWarningZone) pulseScale else 1f
 
                     Box(contentAlignment = Alignment.Center) {
-                        val progressRatio = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
+                        val progressRatio = if (displayRoundTotal > 0) displayRemaining.toFloat() / displayRoundTotal.toFloat() else 1f
                         val animatedProgress by animateFloatAsState(
                             targetValue = progressRatio,
                             label = "progress"
@@ -471,7 +552,7 @@ fun TimerScreen(
                         )
                         
                         Text(
-                            "%02d:%02d".format(remaining / 60, remaining % 60),
+                            "%02d:%02d".format(displayRemaining / 60, displayRemaining % 60),
                             fontSize = timerFontSize,
                             fontWeight = FontWeight.Black,
                             color = onBgColor,
@@ -488,7 +569,7 @@ fun TimerScreen(
                     .fillMaxWidth()
                     .padding(24.dp)
             ) {
-                if (!running && !finished) {
+                if (!state.running && !state.finished) {
                     val hasRounds = profile?.rounds?.isNotEmpty() == true
                     if (!hasRounds && profile != null) {
                         Text(
@@ -505,114 +586,13 @@ fun TimerScreen(
                         onClick = {
                             val p = profile ?: return@Button
                             if (p.rounds.isEmpty()) return@Button
-                            running = true
-                            paused = false
                             scope.launch {
                                 var waited = 0
-                                while (tts == null && waited < 1500 && running) {
+                                while (tts == null && waited < 1500) {
                                     delay(100)
                                     waited += 100
                                 }
-                                val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                val focusRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                                        .setAudioAttributes(
-                                            AudioAttributes.Builder()
-                                                .setUsage(AudioAttributes.USAGE_ALARM)
-                                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                                .build()
-                                        )
-                                        .build()
-                                } else null
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
-                                    am?.requestAudioFocus(focusRequest)
-                                } else {
-                                    @Suppress("DEPRECATION")
-                                    am?.requestAudioFocus({}, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN)
-                                }
-                                var pendingToneJob: Job? = null
-                                var finalTtsJob: Job? = null
-                                try {
-                                val engine = TimerEngine(p) { event ->
-                                    when (event) {
-                                        is TimerEvent.RoundStart -> {
-                                            currentRound = event.round.name
-                                            remaining = event.round.durationSeconds
-                                            roundTotal = event.round.durationSeconds
-                                            roundInfo = "${event.roundIndex + 1} / ${event.totalRounds}"
-                                            val roundName = event.round.name
-                                            val isFirstRound = event.roundIndex == 0
-                                            scope.launch {
-                                                try {
-                                                    pendingToneJob?.join()
-                                                    if (isFirstRound) {
-                                                        playProlongedAlarmTone(prolongedToneMs)
-                                                    }
-                                                    tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, null)
-                                                } catch (_: Exception) {}
-                                            }
-                                        }
-                                        is TimerEvent.Tick -> {
-                                            remaining = event.remainingSeconds
-                                            if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
-                                                try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
-                                            }
-                                        }
-                                        is TimerEvent.Warn10 -> {
-                                            // Voice warning removed per user request
-                                        }
-                                        is TimerEvent.RoundEnd -> {
-                                            pendingToneJob = scope.launch {
-                                                try { playProlongedAlarmTone(prolongedToneMs) } catch (_: Exception) {}
-                                            }
-                                        }
-                                        is TimerEvent.TrainingEnd -> {
-                                            val ttsRef = tts
-                                            val finishedText = timerFinishedText
-                                            val defaultLocale = defaultTtsLocale
-                                            running = false
-                                            finished = true
-                                            paused = false
-                                            finalTtsJob = scope.launch(Dispatchers.Main) {
-                                                try {
-                                                    val nameHasCyrillic = p.name.any { it.isCyrillic() }
-                                                    if (nameHasCyrillic && defaultLocale != null) {
-                                                        ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
-                                                        TrainingEndPending.finishedText = finishedText
-                                                        TrainingEndPending.defaultLocale = defaultLocale
-                                                    }
-                                                    delay((prolongedToneMs - 400).coerceAtLeast(0).toLong())
-                                                    val nameId = "training_end_name_${System.currentTimeMillis()}"
-                                                    if (nameHasCyrillic && defaultLocale != null) {
-                                                        ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
-                                                    } else {
-                                                        ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
-                                                        ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
-                                                    }
-                                                    delay(5000)
-                                                } catch (_: Exception) {}
-                                            }
-                                        }
-                                    }
-                                }
-                                engine.advance()
-                                while (scope.isActive && running) {
-                                    if (paused) {
-                                        delay(500L)
-                                    } else {
-                                        delay(1000L)
-                                        if (!engine.advance()) break
-                                    }
-                                }
-                                } finally {
-                                    finalTtsJob?.join()
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && focusRequest != null) {
-                                        am?.abandonAudioFocusRequest(focusRequest)
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        am?.abandonAudioFocus {}
-                                    }
-                                }
+                                controller.start(p, screenOffPause)
                             }
                         },
                         modifier = Modifier
@@ -635,10 +615,10 @@ fun TimerScreen(
                     }
                 }
                 
-                if (running && !paused) {
+                if (state.running && !state.paused) {
                     Button(
                         onClick = {
-                            paused = true
+                            controller.setPaused(true)
                             tts?.stop()
                         },
                         modifier = Modifier
@@ -659,9 +639,9 @@ fun TimerScreen(
                         )
                     }
                 }
-                if (running && paused) {
+                if (state.running && state.paused) {
                     Button(
-                        onClick = { paused = false },
+                        onClick = { controller.setPaused(false) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(64.dp),
@@ -682,9 +662,7 @@ fun TimerScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = {
-                            running = false
-                            finished = true
-                            paused = false
+                            controller.stop()
                             tts?.stop()
                         },
                         modifier = Modifier
@@ -708,18 +686,10 @@ fun TimerScreen(
                     }
                 }
 
-                if (finished) {
+                if (state.finished) {
                     Button(
                         onClick = {
-                            finished = false
-                            paused = false
-                            val p = profile
-                            if (p != null && p.rounds.isNotEmpty()) {
-                                remaining = p.rounds[0].durationSeconds
-                                roundTotal = p.rounds[0].durationSeconds
-                                currentRound = p.rounds[0].name
-                                roundInfo = "1 / ${p.rounds.size}"
-                            }
+                            controller.resetForRestart()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
