@@ -9,10 +9,18 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 
 class TimerService : Service() {
+
+    private var wakeLock: PowerManager.WakeLock? = null
+
     override fun onCreate() {
         super.onCreate()
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer").apply {
+            setReferenceCounted(false)
+        }
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.app_name),
@@ -24,6 +32,9 @@ class TimerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!(wakeLock?.isHeld == true)) {
+            wakeLock?.acquire()
+        }
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(R.string.timer_running))
@@ -37,6 +48,14 @@ class TimerService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
         return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        if (wakeLock?.isHeld == true) {
+            wakeLock?.release()
+        }
+        wakeLock = null
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

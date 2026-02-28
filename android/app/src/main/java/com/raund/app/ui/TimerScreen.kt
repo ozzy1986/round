@@ -11,6 +11,7 @@ import android.media.AudioTrack
 import android.media.ToneGenerator
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.view.WindowManager
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -74,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
+import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
@@ -96,6 +98,7 @@ private object TrainingEndPending {
 private fun Char.isCyrillic(): Boolean = this in '\u0400'..'\u04FF'
 
 private const val TONE_VOLUME = 0.55f
+private const val TIMER_DEBUG_TAG = "RaundTimer"
 
 private val ttsVolumeParams: Bundle by lazy {
     Bundle().apply {
@@ -306,6 +309,7 @@ fun TimerScreen(
                 IconButton(onClick = {
                     running = false
                     tts?.stop()
+                    TimerService.stop(context)
                     onBack()
                 }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -464,6 +468,7 @@ fun TimerScreen(
                             if (p.rounds.isEmpty()) return@Button
                             running = true
                             paused = false
+                            TimerService.start(context)
                             scope.launch {
                                 var waited = 0
                                 while (tts == null && waited < 1500 && running) {
@@ -476,6 +481,7 @@ fun TimerScreen(
                                 val engine = TimerEngine(p) { event ->
                                     when (event) {
                                         is TimerEvent.RoundStart -> {
+                                            Log.w(TIMER_DEBUG_TAG, "event=RoundStart roundIndex=${event.roundIndex} round=${event.round.name}")
                                             currentRound = event.round.name
                                             remaining = event.round.durationSeconds
                                             roundTotal = event.round.durationSeconds
@@ -493,6 +499,7 @@ fun TimerScreen(
                                             }
                                         }
                                         is TimerEvent.Tick -> {
+                                            if (event.remainingSeconds <= 3) Log.w(TIMER_DEBUG_TAG, "event=Tick remaining=${event.remainingSeconds}")
                                             remaining = event.remainingSeconds
                                             if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
                                                 try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
@@ -502,11 +509,13 @@ fun TimerScreen(
                                             // Voice warning removed per user request
                                         }
                                         is TimerEvent.RoundEnd -> {
+                                            Log.w(TIMER_DEBUG_TAG, "event=RoundEnd roundIndex=${event.roundIndex}")
                                             pendingToneJob = scope.launch {
                                                 try { playProlongedAlarmTone(prolongedToneMs) } catch (_: Exception) {}
                                             }
                                         }
                                         is TimerEvent.TrainingEnd -> {
+                                            Log.w(TIMER_DEBUG_TAG, "event=TrainingEnd")
                                             val ttsRef = tts
                                             val finishedText = timerFinishedText
                                             val defaultLocale = defaultTtsLocale
@@ -540,12 +549,15 @@ fun TimerScreen(
                                     if (paused) {
                                         delay(500L)
                                     } else {
+                                        if (remaining <= 2) Log.w(TIMER_DEBUG_TAG, "before delay(1000) remaining=$remaining")
                                         delay(1000L)
+                                        if (remaining <= 2) Log.w(TIMER_DEBUG_TAG, "after delay calling advance()")
                                         if (!engine.advance()) break
                                     }
                                 }
                                 } finally {
                                     finalTtsJob?.join()
+                                    TimerService.stop(context)
                                 }
                             }
                         },
