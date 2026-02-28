@@ -266,7 +266,7 @@ Aligned with CORE PRINCIPLES above: security, speed, stability, scalability; DRY
 - Shared timer core; Vitest with coverage (timer-engine 100%, auth, cache, others high).
 - Offline-first and data validation. UI: minimal, big countdown, clear typography.
 - Timer tick sounds: ToneGenerator at max volume (100), 200ms TONE_CDMA_PIP on STREAM_ALARM; TTS at volume 1.0f; prolonged alarm tone at 0.55f via AudioTrack.
-- Screen-off handling: user chooses "pause" (BroadcastReceiver) or "keep running" (PARTIAL_WAKE_LOCK, 1h max). Setting persisted in SharedPreferences. WAKE_LOCK permission in manifest.
+- Screen-off handling: user chooses "pause" (BroadcastReceiver) or "keep running" (foreground service + PARTIAL_WAKE_LOCK). "Keep running" starts TimerService (foreground notification) so Android doesn't kill the process, plus WakeLock for CPU. All audio ops (TTS, AudioTrack, ToneGenerator) are wrapped in try-catch so failures don't crash the timer coroutine. Permissions: WAKE_LOCK, FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE.
 - Theme: vibrant red primary (#E53935), teal secondary (#00897B), orange tertiary (#FF9800); bold typography; dynamic colors on Android 12+. Timer ring pulses (scale animation) in warning zone (last 10s). Profile cards use rounded corners (20dp), elevated cards with primaryContainer emoji circles.
 - Android QA gate: `assembleDebug` + on-device ADB regression + `:app:lintDebug` (current lint: 0 errors; warnings are dependency update suggestions only).
 

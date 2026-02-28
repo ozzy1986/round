@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.SettingsManager
+import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
@@ -277,6 +278,7 @@ fun TimerScreen(
     DisposableEffect(running, screenOffPause) {
         var wakeLock: PowerManager.WakeLock? = null
         var receiver: BroadcastReceiver? = null
+        var serviceStarted = false
 
         if (running && screenOffPause) {
             receiver = object : BroadcastReceiver() {
@@ -291,6 +293,7 @@ fun TimerScreen(
             val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
             wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer")
             wakeLock?.acquire(60 * 60 * 1000L)
+            try { TimerService.start(context); serviceStarted = true } catch (_: Exception) {}
         }
 
         onDispose {
@@ -299,6 +302,9 @@ fun TimerScreen(
             }
             wakeLock?.let {
                 if (it.isHeld) it.release()
+            }
+            if (serviceStarted) {
+                try { TimerService.stop(context) } catch (_: Exception) {}
             }
         }
     }
@@ -537,24 +543,28 @@ fun TimerScreen(
                                             val roundName = event.round.name
                                             val isFirstRound = event.roundIndex == 0
                                             scope.launch {
-                                                pendingToneJob?.join()
-                                                if (isFirstRound) {
-                                                    playProlongedAlarmTone(prolongedToneMs)
-                                                }
-                                                tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, null)
+                                                try {
+                                                    pendingToneJob?.join()
+                                                    if (isFirstRound) {
+                                                        playProlongedAlarmTone(prolongedToneMs)
+                                                    }
+                                                    tts?.speak(roundName, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, null)
+                                                } catch (_: Exception) {}
                                             }
                                         }
                                         is TimerEvent.Tick -> {
                                             remaining = event.remainingSeconds
                                             if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
-                                                alarmTone?.startTone(tickTone, tickMs)
+                                                try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
                                             }
                                         }
                                         is TimerEvent.Warn10 -> {
                                             // Voice warning removed per user request
                                         }
                                         is TimerEvent.RoundEnd -> {
-                                            pendingToneJob = scope.launch { playProlongedAlarmTone(prolongedToneMs) }
+                                            pendingToneJob = scope.launch {
+                                                try { playProlongedAlarmTone(prolongedToneMs) } catch (_: Exception) {}
+                                            }
                                         }
                                         is TimerEvent.TrainingEnd -> {
                                             val ttsRef = tts
@@ -564,21 +574,23 @@ fun TimerScreen(
                                             finished = true
                                             paused = false
                                             finalTtsJob = scope.launch(Dispatchers.Main) {
-                                                val nameHasCyrillic = p.name.any { it.isCyrillic() }
-                                                if (nameHasCyrillic && defaultLocale != null) {
-                                                    ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
-                                                    TrainingEndPending.finishedText = finishedText
-                                                    TrainingEndPending.defaultLocale = defaultLocale
-                                                }
-                                                delay((prolongedToneMs - 400).coerceAtLeast(0).toLong())
-                                                val nameId = "training_end_name_${System.currentTimeMillis()}"
-                                                if (nameHasCyrillic && defaultLocale != null) {
-                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
-                                                } else {
-                                                    ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
-                                                    ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
-                                                }
-                                                delay(5000)
+                                                try {
+                                                    val nameHasCyrillic = p.name.any { it.isCyrillic() }
+                                                    if (nameHasCyrillic && defaultLocale != null) {
+                                                        ttsRef?.setLanguage(Locale.forLanguageTag("ru"))
+                                                        TrainingEndPending.finishedText = finishedText
+                                                        TrainingEndPending.defaultLocale = defaultLocale
+                                                    }
+                                                    delay((prolongedToneMs - 400).coerceAtLeast(0).toLong())
+                                                    val nameId = "training_end_name_${System.currentTimeMillis()}"
+                                                    if (nameHasCyrillic && defaultLocale != null) {
+                                                        ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
+                                                    } else {
+                                                        ttsRef?.speak(p.name, TextToSpeech.QUEUE_FLUSH, ttsVolumeParams, nameId)
+                                                        ttsRef?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
+                                                    }
+                                                    delay(5000)
+                                                } catch (_: Exception) {}
                                             }
                                         }
                                     }
