@@ -45,7 +45,6 @@
     <string name="reorder_round">长按拖动以重新排序</string>
     <string name="settings">设置</string>
     <string name="screen_off_behavior">屏幕关闭时暂停</string>
-    <string name="screen_off_pause">锁屏时训练暂停</string>
     <string name="screen_off_continue">训练在后台继续运行</string>
     <string name="timer_running">计时器运行中</string>
 </resources>

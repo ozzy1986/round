@@ -45,7 +45,6 @@
     <string name="reorder_round">Удерживайте и перетаскивайте</string>
     <string name="settings">Настройки</string>
     <string name="screen_off_behavior">Пауза при выключении экрана</string>
-    <string name="screen_off_pause">Тренировка приостанавливается при блокировке экрана</string>
     <string name="screen_off_continue">Тренировка продолжается в фоновом режиме</string>
     <string name="timer_running">Таймер работает</string>
 </resources>

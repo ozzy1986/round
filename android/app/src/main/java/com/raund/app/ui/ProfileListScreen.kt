@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
-import com.raund.app.SettingsManager
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 

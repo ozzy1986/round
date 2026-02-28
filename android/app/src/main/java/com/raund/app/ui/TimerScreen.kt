@@ -181,6 +181,8 @@ fun TimerScreen(
                     else -> Locale.forLanguageTag(appLang)
                 }
                 ttsEngine.setLanguage(ttsLocale)
+                ttsEngine.setSpeechRate(1f)
+                ttsEngine.setPitch(1f)
                 defaultTtsLocale = ttsLocale
                 ttsEngine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
