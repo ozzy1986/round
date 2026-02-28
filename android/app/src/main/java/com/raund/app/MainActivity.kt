@@ -2,7 +2,6 @@ package com.raund.app
 
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -22,16 +21,6 @@ import com.raund.app.ui.theme.RaundTheme
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(LocaleManager.applyLocale(newBase))
-    }
-
-    override fun onStop() {
-        super.onStop()
-        Log.d("RaundTimer", "MainActivity onStop")
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        Log.d("RaundTimer", "MainActivity onDestroy")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

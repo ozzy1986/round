@@ -43,4 +43,9 @@
     <string name="move_round_up">Өскә</string>
     <string name="move_round_down">Аска</string>
     <string name="reorder_round">Тәртипкә китерү өчен басып тотыгыз</string>
+    <string name="settings">Көйләүләр</string>
+    <string name="screen_off_behavior">Экран сүнгәндә тукталыш</string>
+    <string name="screen_off_pause">Экранны кулыплаганда күнегү туктый</string>
+    <string name="screen_off_continue">Күнегү фонда дәвам итә</string>
+    <string name="timer_running">Таймер эшли</string>
 </resources>

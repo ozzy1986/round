@@ -1,9 +1,5 @@
 package com.raund.app.timer
 
-import android.util.Log
-
-private const val TAG = "RaundTimer"
-
 /**
  * Same event contract as backend timer engine: round_start, tick, warn10, round_end, training_end.
  */
@@ -42,7 +38,6 @@ class TimerEngine(
             onEvent(TimerEvent.Warn10(s.roundIndex, round, totalRounds))
         }
         if (s.remainingSeconds == 0) {
-            Log.i(TAG, "engine: firing RoundEnd roundIndex=${s.roundIndex} totalRounds=$totalRounds")
             onEvent(TimerEvent.RoundEnd(s.roundIndex, round, totalRounds))
             val nextIndex = s.roundIndex + 1
             if (nextIndex >= rounds.size) {

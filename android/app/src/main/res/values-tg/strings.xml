@@ -43,4 +43,9 @@
     <string name="move_round_up">Боло</string>
     <string name="move_round_down">Поён</string>
     <string name="reorder_round">Барои тартибдиҳӣ пахш карда нигоҳ доред</string>
+    <string name="settings">Танзимот</string>
+    <string name="screen_off_behavior">Ҳангоми хомӯш шудани экран таваққуф</string>
+    <string name="screen_off_pause">Ҳангоми қулф кардани экран машқ меистад</string>
+    <string name="screen_off_continue">Машқ дар замина идома меёбад</string>
+    <string name="timer_running">Таймер кор мекунад</string>
 </resources>
