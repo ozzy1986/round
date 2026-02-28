@@ -5,20 +5,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.os.Handler
-import android.os.Looper
-import android.speech.tts.UtteranceProgressListener
-import android.media.AudioFormat
-import android.media.AudioManager
-import android.media.AudioTrack
-import android.media.ToneGenerator
-import android.os.Bundle
-import android.speech.tts.TextToSpeech
-import android.util.Log
 import android.view.WindowManager
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -84,65 +75,6 @@ import com.raund.app.R
 import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerProfile
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import java.util.Locale
-import kotlin.math.PI
-import kotlin.math.sin
-
-private object TrainingEndPending {
-    var finishedText: String? = null
-    var defaultLocale: Locale? = null
-}
-
-private fun Char.isCyrillic(): Boolean = this in '\u0400'..'\u04FF'
-
-private const val TONE_VOLUME = 0.55f
-private const val TIMER_DEBUG_TAG = "RaundTimer"
-
-private val ttsVolumeParams: Bundle by lazy {
-    Bundle().apply {
-        putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f)
-    }
-}
-
-private suspend fun playProlongedAlarmTone(durationMs: Int) = withContext(Dispatchers.IO) {
-    val sampleRate = 44100
-    val numSamples = sampleRate * durationMs / 1000
-    val buffer = ShortArray(numSamples)
-    val freq = 880.0
-    for (i in 0 until numSamples) {
-        buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * TONE_VOLUME).toInt().toShort()
-    }
-    val minBufSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-    val bufSizeBytes = (numSamples * 2).coerceAtLeast(minBufSize)
-    val track = AudioTrack.Builder()
-        .setAudioAttributes(
-            android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-        )
-        .setAudioFormat(
-            android.media.AudioFormat.Builder()
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .setSampleRate(sampleRate)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                .build()
-        )
-        .setBufferSizeInBytes(bufSizeBytes)
-        .setTransferMode(AudioTrack.MODE_STATIC)
-        .build()
-    try {
-        track.setVolume(TONE_VOLUME)
-        track.write(buffer, 0, buffer.size)
-        track.play()
-        delay(durationMs.toLong())
-    } finally {
-        track.release()
-    }
-}
 
 @Composable
 fun TimerScreen(
@@ -159,8 +91,6 @@ fun TimerScreen(
     var finished by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
-    var defaultTtsLocale by remember { mutableStateOf<Locale?>(null) }
     val timerFinishedText = stringResource(R.string.timer_finished)
     val restartTimerText = stringResource(R.string.restart_timer)
     val pauseTimerText = stringResource(R.string.pause_timer)
@@ -170,74 +100,6 @@ fun TimerScreen(
     LaunchedEffect(profileId) {
         profile = repository.getProfileWithRounds(profileId)
     }
-
-    DisposableEffect(context) {
-        lateinit var ttsEngine: TextToSpeech
-        ttsEngine = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                tts = ttsEngine
-                val appLang = LocaleManager.currentLanguageTag(context)
-                val ttsLocale = when (appLang) {
-                    "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
-                    "az", "uz" -> Locale.forLanguageTag("tr")
-                    "zh" -> Locale.CHINESE
-                    else -> Locale.forLanguageTag(appLang)
-                }
-                ttsEngine.setLanguage(ttsLocale)
-                ttsEngine.setSpeechRate(1f)
-                ttsEngine.setPitch(1f)
-                defaultTtsLocale = ttsLocale
-                ttsEngine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {}
-                    override fun onDone(utteranceId: String?) {
-                        if (utteranceId != null && utteranceId.startsWith("training_end_name_")) {
-                            val text = TrainingEndPending.finishedText
-                            val locale = TrainingEndPending.defaultLocale
-                            TrainingEndPending.finishedText = null
-                            TrainingEndPending.defaultLocale = null
-                            if (text != null && locale != null) {
-                                Handler(Looper.getMainLooper()).post {
-                                    ttsEngine.setLanguage(locale)
-                                    ttsEngine.speak(text, TextToSpeech.QUEUE_ADD, ttsVolumeParams, "training_end_done_${System.currentTimeMillis()}")
-                                }
-                            }
-                        }
-                    }
-                    @Deprecated("Deprecated")
-                    override fun onError(utteranceId: String?) {}
-                    override fun onError(utteranceId: String?, errorCode: Int) {}
-                })
-                val audioAttributes = android.media.AudioAttributes.Builder()
-                    .setUsage(android.media.AudioAttributes.USAGE_ALARM)
-                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
-                ttsEngine.setAudioAttributes(audioAttributes)
-            }
-        }
-        onDispose {
-            tts = null
-            ttsEngine.stop()
-            ttsEngine.shutdown()
-        }
-    }
-
-    var alarmTone by remember { mutableStateOf<ToneGenerator?>(null) }
-    val tickTone = ToneGenerator.TONE_CDMA_PIP
-    DisposableEffect(context) {
-        val tg = try {
-            ToneGenerator(AudioManager.STREAM_ALARM, 100)
-        } catch (e: Exception) {
-            null
-        }
-        alarmTone = tg
-        onDispose {
-            tg?.release()
-            alarmTone = null
-        }
-    }
-
-    val tickMs = 200
-    val prolongedToneMs = 1200
 
     LaunchedEffect(profile) {
         val p = profile ?: return@LaunchedEffect
@@ -293,6 +155,7 @@ fun TimerScreen(
         }
         onDispose {
             try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+            if (running) TimerService.stop(context)
         }
     }
 
@@ -335,7 +198,6 @@ fun TimerScreen(
             ) {
                 IconButton(onClick = {
                     running = false
-                    tts?.stop()
                     TimerService.stop(context)
                     onBack()
                 }) {
@@ -538,7 +400,6 @@ fun TimerScreen(
                     Button(
                         onClick = {
                             paused = true
-                            tts?.stop()
                             TimerService.pause(context)
                         },
                         modifier = Modifier
@@ -588,7 +449,6 @@ fun TimerScreen(
                             running = false
                             finished = true
                             paused = false
-                            tts?.stop()
                             TimerService.stop(context)
                         },
                         modifier = Modifier

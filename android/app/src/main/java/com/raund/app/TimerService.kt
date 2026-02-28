@@ -43,10 +43,11 @@ class TimerService : Service() {
     private var ttsReady = false
 
     @Volatile
-    private var running = true
+    private var running = false
 
     override fun onCreate() {
         super.onCreate()
+        Log.d(TAG, "onCreate")
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer").apply {
             setReferenceCounted(false)
@@ -61,17 +62,34 @@ class TimerService : Service() {
             .createNotificationChannel(channel)
     }
 
+    private fun stopPreviousTimer() {
+        running = false
+        timerThread?.let { t ->
+            t.join(3000)
+            if (t.isAlive) t.interrupt()
+        }
+        timerThread = null
+        try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
+        ttsRef = null
+        ttsReady = false
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand action=${intent?.action}")
         when (intent?.action) {
             ACTION_PAUSE -> {
                 paused = true
+                Log.d(TAG, "paused")
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
                 paused = false
+                Log.d(TAG, "resumed")
                 return START_NOT_STICKY
             }
         }
+
+        stopPreviousTimer()
 
         if (!(wakeLock?.isHeld == true)) {
             wakeLock?.acquire()
@@ -84,6 +102,7 @@ class TimerService : Service() {
         } else {
             intent?.getParcelableExtra(EXTRA_PROFILE)
         } ?: run {
+            Log.w(TAG, "No profile in intent, showing foreground and exiting")
             val n = Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle(getString(R.string.app_name))
                 .setContentText(getString(R.string.timer_running))
@@ -102,6 +121,8 @@ class TimerService : Service() {
         running = true
         paused = false
 
+        Log.d(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, lang=$langTag")
+
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(R.string.timer_running))
@@ -114,10 +135,9 @@ class TimerService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        ttsRef = null
-        ttsReady = false
         var ttsHolder: TextToSpeech? = null
         ttsHolder = TextToSpeech(applicationContext) { status ->
+            Log.d(TAG, "TTS init status=$status")
             if (status == TextToSpeech.SUCCESS) {
                 val ttsLocale = when (langTag) {
                     "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
@@ -147,14 +167,14 @@ class TimerService : Service() {
 
     private fun runTimer(profile: TimerProfile) {
         var waited = 0
-        while (!ttsReady && waited < 3000 && running) {
+        while (!ttsReady && waited < 5000 && running) {
             Thread.sleep(100)
             waited += 100
         }
-        val tts = ttsRef ?: run {
-            stopSelf()
-            return
-        }
+        val tts = ttsRef
+        if (tts == null) Log.w(TAG, "TTS not ready after ${waited}ms, continuing without TTS")
+        else Log.d(TAG, "TTS ready after ${waited}ms")
+
         val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
         val finishedText = getString(R.string.timer_finished)
         var alarmTone: ToneGenerator? = null
@@ -168,11 +188,12 @@ class TimerService : Service() {
         val engine = TimerEngine(profile) { event ->
             when (event) {
                 is TimerEvent.RoundStart -> {
+                    Log.d(TAG, "RoundStart ${event.roundIndex+1}/${event.totalRounds} '${event.round.name}'")
                     broadcastState(event.round.name, event.round.durationSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
                     if (event.roundIndex == 0) {
                         Thread { playProlongedTone(prolongedMs) }.start()
                     }
-                    tts.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                    tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
                 }
                 is TimerEvent.Tick -> {
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
@@ -181,13 +202,15 @@ class TimerService : Service() {
                     }
                 }
                 is TimerEvent.RoundEnd -> {
+                    Log.d(TAG, "RoundEnd ${event.roundIndex+1}")
                     Thread { playProlongedTone(prolongedMs) }.start()
                 }
                 is TimerEvent.TrainingEnd -> {
-                    running = false
-                    tts.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
-                    tts.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
+                    Log.d(TAG, "TrainingEnd")
+                    tts?.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                    tts?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
+                    running = false
                     Handler(Looper.getMainLooper()).postDelayed({ stopSelf() }, 6000)
                 }
                 else -> {}
@@ -203,6 +226,7 @@ class TimerService : Service() {
                 if (!engine.advance()) break
             }
         }
+        Log.d(TAG, "Timer loop ended, running=$running")
 
         try { alarmTone?.release() } catch (_: Exception) {}
     }
@@ -286,8 +310,13 @@ class TimerService : Service() {
     }
 
     override fun onDestroy() {
+        Log.d(TAG, "onDestroy")
         running = false
-        timerThread?.join(2000)
+        timerThread?.let { t ->
+            t.join(3000)
+            if (t.isAlive) t.interrupt()
+        }
+        timerThread = null
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
         stopSilentAudio()
@@ -301,6 +330,7 @@ class TimerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        private const val TAG = "RaundTimer"
         private const val CHANNEL_ID = "raund_timer"
         private const val NOTIFICATION_ID = 1
         const val ACTION_START = "com.raund.app.TimerService.START"
