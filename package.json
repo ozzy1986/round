@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "migrate:up": "tsx scripts/run-migrate.ts up",
     "migrate:down": "tsx scripts/run-migrate.ts down",
-    "migrate:create": "node-pg-migrate create"
+    "migrate:create": "node-pg-migrate create",
+    "purge:tokens": "tsx scripts/purge-tokens.ts"
   },
   "keywords": [],
   "author": "",

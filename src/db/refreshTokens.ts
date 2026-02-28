@@ -65,3 +65,16 @@ export async function revokeRefreshTokenByHash(pool: Pool, tokenHash: string): P
   );
   return result.rowCount !== null && result.rowCount > 0;
 }
+
+/**
+ * Delete tokens that are expired or were revoked more than 7 days ago.
+ * Run periodically (e.g. daily cron) to keep the table lean.
+ */
+export async function purgeStaleTokens(pool: Pool): Promise<number> {
+  const result = await pool.query(
+    `DELETE FROM refresh_tokens
+     WHERE expires_at < current_timestamp
+        OR (revoked_at IS NOT NULL AND revoked_at < current_timestamp - interval '7 days')`
+  );
+  return result.rowCount ?? 0;
+}

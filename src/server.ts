@@ -34,13 +34,27 @@ export async function buildApp() {
 
   await app.register(cors, { origin: getCorsOrigin() });
   await app.register(helmet, { contentSecurityPolicy: false });
-  const rateLimitOpts: { max: number; timeWindow: string; redis?: unknown } = {
-    max: 100,
-    timeWindow: '1 minute',
-  };
   const redis = getRedis();
-  if (redis) rateLimitOpts.redis = redis;
-  await app.register(rateLimit, rateLimitOpts);
+  await app.register(rateLimit, {
+    max: Number(process.env.RATE_LIMIT_MAX) || 200,
+    timeWindow: process.env.RATE_LIMIT_WINDOW ?? '1 minute',
+    keyGenerator: (request: { ip: string; headers: { authorization?: string } }) => {
+      const auth = request.headers.authorization;
+      if (auth?.startsWith('Bearer ')) {
+        try {
+          const payload = auth.slice(7).split('.')[1];
+          if (payload) {
+            const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { sub?: string };
+            if (decoded?.sub) return `user:${decoded.sub}`;
+          }
+        } catch {
+          // fall back to IP
+        }
+      }
+      return request.ip;
+    },
+    ...(redis ? { redis } : {}),
+  });
 
   await app.register(fjwt, {
     secret: JWT_SECRET,
@@ -49,6 +63,9 @@ export async function buildApp() {
   });
 
   await app.register(authRoutes);
+
+  // Liveness: no DB. Use for load balancer / process manager.
+  app.get('/', async (_req, reply) => reply.send({ status: 'ok' }));
 
   app.get('/health', async (_req, reply) => {
     try {

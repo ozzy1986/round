@@ -10,5 +10,6 @@ listen_port = 6432
 auth_type = md5
 auth_file = /etc/pgbouncer/userlist.txt
 pool_mode = transaction
+# max_client_conn: allow enough for (API instances × PG_POOL_MAX). E.g. 50 instances × 30 = 1500.
 max_client_conn = 200
 default_pool_size = 30

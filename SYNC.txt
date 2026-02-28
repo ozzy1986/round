@@ -1,6 +1,6 @@
-4-WAY SYNC — FOR AI / NEXT SESSION
-==================================
-After any task that changes code or config, sync to: LOCAL, GITHUB, GITLAB, VPS.
+5-PLACE SYNC — FOR AI / NEXT SESSION
+=====================================
+After any task that changes code or config, sync to: THIS PC, GITHUB, GITLAB, VPS, PHONE.
 Read this file to perform the full sync.
 
 REPOSITORY
@@ -17,7 +17,7 @@ VPS
 
 EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
 --------------------------------------------------------------
-1. Local
+1. This PC (local)
    - Edit files, run tests (npm test), run migrations if needed (npm run migrate:up).
    - If android/ changed: run build and QA gate before commit:
      cd android
@@ -40,15 +40,21 @@ EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
 
    This does: git pull, npm ci, npm run migrate:up, npm run build, pm2 restart round-api, pm2 restart round-bot, pm2 save.
 
-5. Update text docs so they reflect the change:
+5. Phone (only if android/ changed)
+   - Copy APK to phone: android/Round-debug.apk (or from android/app/build/outputs/apk/debug/app-debug.apk).
+   - Transfer via USB, cloud, or email; install on device (enable "Install from unknown sources" if prompted).
+   - If android/ did not change, phone is already in sync (app talks to VPS API).
+
+6. Update text docs so they reflect the change:
    - PROJECT_DESCRIPTION.txt (always)
    - ANDROID_TESTING.txt (when test flow/checklist changed)
    - Any other operational .txt docs touched by this task
 
-DONE. All four (local, GitHub, GitLab, VPS) are in sync, and the project description is up to date.
+DONE. All five (this PC, GitHub, GitLab, VPS, phone) are in sync, and the project description is up to date.
 
 NOTES
 -----
-- Do not commit .env. It is in .gitignore.
+- Do not commit .env. It is in .gitignore. Use .env.example as template (no real credentials in repo).
 - To change secrets on VPS (e.g. TELEGRAM_BOT_TOKEN), edit /var/www/round.ozzy1986.com/.env on the server (e.g. via SSH), then restart: ssh root@162.246.19.78 "pm2 restart round-api round-bot".
+- Optional VPS cron for refresh token cleanup: 0 3 * * * cd /var/www/round.ozzy1986.com && node dist/scripts/purge-tokens.js
 - One-time VPS setup (clone, Nginx, PM2): see ENV_CHECK.txt section "VPS DEPLOY".

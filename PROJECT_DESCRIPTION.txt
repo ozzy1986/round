@@ -5,7 +5,7 @@ Product name shown to users: "Round". Internal/codebase name: "raund".
 
 *** UPDATE THIS FILE AFTER EVERY PROJECT CHANGE. Keep it in sync with the codebase, features, and deployment. ***
 
-AFTER EVERY CHANGE (for AI and humans): (1) Sync to all four places — local (commit), GitHub (push origin main), GitLab (push gitlab main), VPS (SSH and run deploy-vps.sh). Exact steps: SYNC.txt. (2) Then update this file (PROJECT_DESCRIPTION.txt) so it reflects the change.
+AFTER EVERY CHANGE (for AI and humans): (1) Sync to all five places — this PC (commit), GitHub (push origin main), GitLab (push gitlab main), VPS (SSH and run deploy-vps.sh), phone (if android/ changed: build APK and install on device). Exact steps: SYNC.txt. (2) Then update this file (PROJECT_DESCRIPTION.txt) so it reflects the change.
 
 FOR AI: WHEN ASKED TO "RUN AND TEST" THE APP
 ----------------------------------------------
@@ -65,9 +65,9 @@ Backend:
   - Runtime: Node.js (ESM)
   - Language: TypeScript
   - HTTP: Fastify
-  - DB: PostgreSQL, driver "pg"; optional PgBouncer (PG_PORT=6432); pool max via PG_POOL_MAX (default 10), pool error handler
-  - Redis: optional (REDIS_URL); when set: shared rate limit, bot caches (token, fileId, TTS) via src/cache.ts
-  - Migrations: node-pg-migrate (migrations in migrations/*.cjs, including refresh_tokens)
+  - DB: PostgreSQL, driver "pg"; optional PgBouncer (PG_PORT=6432); pool max via PG_POOL_MAX (default 10); optional PG_STMT_TIMEOUT_MS; pool error + exhaustion warning (log when queued or near capacity)
+  - Redis: optional (REDIS_URL); when set: shared rate limit, bot caches (token, fileId, TTS) via src/cache.ts. At scale Redis is required for rate limit across instances.
+  - Migrations: node-pg-migrate (migrations in migrations/*.cjs, including refresh_tokens, composite profile index)
   - Tests: Vitest, coverage with v8
   - Bot: Telegraf; TTS: @google-cloud/text-to-speech (free tier); caches use Redis or in-memory fallback
   - Monitoring: optional Sentry (SENTRY_DSN); health-check script for cron
@@ -83,18 +83,18 @@ Android:
 --------------------
 raund/
   src/
-    server.ts           - Fastify app, listens PORT (default 3001); Sentry init when SENTRY_DSN set; Redis rate limit when REDIS_URL set
+    server.ts           - Fastify app, listens PORT (default 3001); GET / liveness (no DB), GET /health readiness (DB check); rate limit by user when Bearer present else by IP (RATE_LIMIT_MAX, RATE_LIMIT_WINDOW); Sentry when SENTRY_DSN set; Redis rate limit when REDIS_URL set
     redis.ts            - getRedis() / closeRedis() (optional when REDIS_URL set)
     cache.ts            - cacheGet/cacheSet (Redis or in-memory); CacheKeys, CacheTTL for bot/TTS
     sentry.ts           - initSentry() for error tracking (optional)
     routes/             - profiles.ts, rounds.ts (CRUD)
-    db/                 - config, pool, types, profiles, rounds, users, refreshTokens
+    db/                 - config, pool (statement_timeout, exhaustion logging), types, profiles, rounds, users, refreshTokens (purgeStaleTokens for cron)
     timer-engine/       - types.ts, index.ts (getInitialState, advance, runToCompletion)
     bot/                - index.ts (Telegraf), parser.ts, tts.ts (caches via cache.ts), run.ts
     i18n/               - en.json, ru.json, ... (getString, localeFromTelegram)
-  migrations/           - node-pg-migrate .cjs (profiles, rounds, users, refresh_tokens, indexes)
+  migrations/           - node-pg-migrate .cjs (profiles, rounds, users, refresh_tokens, indexes, composite profiles index)
   tests/                - Vitest: db/, routes/, auth/, timer-engine/, bot/, i18n/, cache.test.ts
-  scripts/              - deploy-vps.sh (run on VPS; PM2 -i max for API), deploy.ps1, setup-vps-services.sh (one-time: Redis, PgBouncer), health-check.sh (cron), build-apk.ps1
+  scripts/              - deploy-vps.sh (run on VPS; PM2 -i max for API), deploy.ps1, setup-vps-services.sh (one-time: Redis, PgBouncer), health-check.sh (cron), purge-tokens.ts (cron: purge expired/revoked refresh tokens), build-apk.ps1
   deploy/               - nginx-round.ozzy1986.com.conf, pgbouncer.ini.sample
   android/              - Android app (TokenStore: token + refresh_token; AuthInterceptor: 401 -> refresh retry)
   package.json, tsconfig.json, vitest.config.ts, .env.example, .gitignore (.env, dist/, coverage/)
@@ -104,6 +104,7 @@ raund/
 --------------------------
 profiles:
   id (uuid, PK), name (text), emoji (text), user_id (text, nullable), created_at, updated_at (timestamptz)
+  Index: (user_id, updated_at DESC) for list/get by user and delta sync.
 
 rounds:
   id (uuid, PK), profile_id (uuid, FK -> profiles, CASCADE), name (text), duration_seconds (int), warn10sec (boolean), position (int)
@@ -136,6 +137,9 @@ Auth: JWT-based. Access token 15m; refresh token 30 days, rotated on use. Anonym
   POST   /auth/telegram        - (X-Bot-Secret) create/find user by telegram_id; returns token, refresh_token, user_id
   POST   /auth/refresh         - body: refresh_token; returns new token, refresh_token, user_id (rotation)
   POST   /auth/logout          - body: refresh_token; revokes token (204)
+
+  GET    /                     - liveness (no DB); returns { status: 'ok' }
+  GET    /health               - readiness (DB check); returns { status: 'ok' } or 503
 
 All request/response bodies validated via Fastify JSON schema. UUIDs in path.
 
@@ -216,10 +220,10 @@ Local machine (dev only — NOT required for running/testing the app):
   - npm run migrate:up, npm run dev (or npm run build && npm start).
   - Optional: Nginx or similar to proxy a hostname to 3001.
 
-Git remotes (4-way sync):
+Git remotes (5-place sync: this PC, GitHub, GitLab, VPS, phone):
   - origin  = GitHub  (https://github.com/ozzy1986/round.git)
   - gitlab  = GitLab  (https://gitlab.com/ozzy1986/round.git)
-  - Workflow: commit locally -> push origin main -> push gitlab main -> deploy on VPS (see below). .env is not in the repo and is not overwritten on deploy.
+  - Workflow: commit locally -> push origin main -> push gitlab main -> deploy on VPS (see below). If android/ changed, build APK and install on phone. .env is not in the repo and is not overwritten on deploy.
 
 VPS (production server):
   - Domain: round.ozzy1986.com (A record to VPS IP). Apache on 80; Nginx on 8080.
@@ -227,6 +231,7 @@ VPS (production server):
   - Nginx: config in deploy/nginx-round.ozzy1986.com.conf (HTTP 8080 redirects to HTTPS 443; upstream block with keepalive; HSTS, security headers, gzip). On server, use /etc/nginx/sites-available/ copy or symlink.
   - Deploy: on VPS run "cd /var/www/round.ozzy1986.com && bash scripts/deploy-vps.sh" (git pull, npm ci, migrate:up, build, pm2 restart round-api and round-bot). From local PC: scripts/deploy.ps1 (push both remotes then SSH and run deploy-vps.sh); requires SSH key from PC to VPS (ssh-copy-id root@VPS_IP).
   - PM2: round-api (HTTP server, -i max for cluster on start and restart), round-bot (Telegram bot). PostgreSQL user and database: round. Optional: Redis (scripts/setup-vps-services.sh), PgBouncer (deploy/pgbouncer.ini.sample; then PG_PORT=6432 in .env), REDIS_URL and SENTRY_DSN in .env. Health check cron: scripts/health-check.sh.
+  - Optional cron: scripts/purge-tokens (npm run purge:tokens or node dist/scripts/purge-tokens.js) to delete expired/old revoked refresh tokens (e.g. daily at 03:00).
   - For step-by-step sync procedure (for AI/next session), see SYNC.txt.
 
 
@@ -239,6 +244,7 @@ VPS (production server):
   test:coverage - vitest run --coverage
   migrate:up    - tsx scripts/run-migrate.ts up (uses PG_* or DATABASE_URL from .env)
   migrate:down  - tsx scripts/run-migrate.ts down
+  purge:tokens  - tsx scripts/purge-tokens.ts (purge expired/revoked refresh tokens; for cron)
   bot           - tsx src/bot/run.ts (Telegram bot)
 
 
@@ -252,8 +258,8 @@ Aligned with CORE PRINCIPLES above: security, speed, stability, scalability; DRY
 - Graceful shutdown: SIGTERM/SIGINT handlers drain in-flight requests and close DB pool before exit.
 - N+1 queries eliminated: getProfileWithRoundsById uses single query with json_agg; round update/delete use JOINed ownership checks (1 query instead of 2-3).
 - Refresh token rotation: short-lived access token (15m), refresh token (30d) stored hashed in DB; rotation on /auth/refresh; Android retries on 401 via refresh.
-- Redis (optional): when REDIS_URL set, rate limit is shared across PM2 workers; bot token/fileId/TTS caches use Redis with TTL (no in-process cap).
-- PgBouncer (optional): deploy/pgbouncer.ini.sample; PG_POOL_MAX per worker (default 10); pool.on('error') handler.
+- Redis (optional): when REDIS_URL set, rate limit is shared across PM2 workers; bot token/fileId/TTS caches use Redis with TTL. Required at scale (multi-instance). Rate limit key: user id when Bearer present, else IP; RATE_LIMIT_MAX (default 200), RATE_LIMIT_WINDOW (default 1 minute).
+- PgBouncer (optional): deploy/pgbouncer.ini.sample; PG_POOL_MAX per worker (default 10); pool.on('error') and exhaustion warning; optional PG_STMT_TIMEOUT_MS.
 - Sentry (optional): SENTRY_DSN for 5xx error reporting; health-check.sh for uptime cron.
 - Shared timer core; Vitest with coverage (timer-engine 100%, auth, cache, others high).
 - Offline-first and data validation. UI: minimal, big countdown, clear typography.
@@ -263,6 +269,6 @@ Aligned with CORE PRINCIPLES above: security, speed, stability, scalability; DRY
 15. SOURCE OF TRUTH
 -------------------
 This description is derived from the implementation plan and the current codebase.
-- After every change: sync to 4 places (local, GitHub, GitLab, VPS) then update this file. See "AFTER EVERY CHANGE" at top and SYNC.txt for exact sync commands.
+- After every change: sync to 5 places (this PC, GitHub, GitLab, VPS, phone if android changed) then update this file. See "AFTER EVERY CHANGE" at top and SYNC.txt for exact sync commands.
 - One-time VPS setup and SSH key: ENV_CHECK.txt (VPS DEPLOY section).
 - How to sync: SYNC.txt (exact commands for AI or human).

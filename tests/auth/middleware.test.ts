@@ -45,6 +45,12 @@ describe('auth middleware', () => {
     expect(Array.isArray(body.data)).toBe(true);
   });
 
+  it('GET / (liveness) returns 200 without auth and does not hit DB', async () => {
+    const res = await app.inject({ method: 'GET', url: '/' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ status: 'ok' });
+  });
+
   it('/health does not require auth', async () => {
     const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(200);
