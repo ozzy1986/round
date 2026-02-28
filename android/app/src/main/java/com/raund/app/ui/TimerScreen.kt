@@ -312,27 +312,6 @@ fun TimerScreen(
         }
     }
 
-    DisposableEffect(state.running, screenOffPause) {
-        var wakeLock: PowerManager.WakeLock? = null
-        var serviceStarted = false
-
-        if (state.running && !screenOffPause) {
-            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer")
-            wakeLock?.acquire(60 * 60 * 1000L)
-            try { TimerService.start(context); serviceStarted = true } catch (_: Exception) {}
-        }
-
-        onDispose {
-            wakeLock?.let {
-                if (it.isHeld) it.release()
-            }
-            if (serviceStarted) {
-                try { TimerService.stop(context) } catch (_: Exception) {}
-            }
-        }
-    }
-
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var pendingToneJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     LaunchedEffect(lifecycle) {

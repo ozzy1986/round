@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
@@ -42,7 +43,7 @@ data class TimerUiState(
  */
 class TimerController(private val context: Context) {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(TimerUiState())
     val state: StateFlow<TimerUiState> = _state.asStateFlow()
 
@@ -50,13 +51,19 @@ class TimerController(private val context: Context) {
     val events: SharedFlow<TimerEvent> = _events.asSharedFlow()
 
     private var screenOffReceiver: BroadcastReceiver? = null
-    private var screenOffPauseEnabled = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     fun start(profile: TimerProfile, screenOffPause: Boolean) {
         if (_state.value.running) return
         if (profile.rounds.isEmpty()) return
-        Log.d(TAG, "timer start profile=${profile.name} screenOffPause=$screenOffPause")
-        screenOffPauseEnabled = screenOffPause
+        Log.i(TAG, "timer start profile=${profile.name} screenOffPause=$screenOffPause")
+        if (!screenOffPause) {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer")
+            wakeLock?.acquire(60 * 60 * 1000L)
+            Log.i(TAG, "wake lock acquired")
+            try { TimerService.start(context) } catch (e: Exception) { Log.e(TAG, "service start failed", e) }
+        }
         if (screenOffPause) {
             screenOffReceiver = object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context?, intent: Intent?) {
@@ -127,15 +134,15 @@ class TimerController(private val context: Context) {
                 }
                 tickCount++
             }
-            unregisterScreenOffReceiver()
+            releaseResources()
             Log.i(TAG, "timer loop EXIT isActive=${scope.isActive} running=${_state.value.running} finished=${_state.value.finished} ticks=$tickCount")
         }
     }
 
     fun stop() {
-        Log.d(TAG, "timer stop")
+        Log.i(TAG, "timer stop")
         _state.update { it.copy(running = false, finished = true, paused = false) }
-        unregisterScreenOffReceiver()
+        releaseResources()
     }
 
     fun setPaused(paused: Boolean) {
@@ -146,6 +153,18 @@ class TimerController(private val context: Context) {
         _state.update {
             it.copy(finished = false, paused = false, currentRound = "", remaining = 0, roundTotal = 1, roundInfo = "")
         }
+    }
+
+    private fun releaseResources() {
+        unregisterScreenOffReceiver()
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.i(TAG, "wake lock released")
+            }
+        }
+        wakeLock = null
+        try { TimerService.stop(context) } catch (_: Exception) {}
     }
 
     private fun unregisterScreenOffReceiver() {
