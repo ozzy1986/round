@@ -44,7 +44,6 @@
     <string name="move_round_down">Аска</string>
     <string name="reorder_round">Тәртипкә китерү өчен басып тотыгыз</string>
     <string name="settings">Көйләүләр</string>
-    <string name="screen_off_behavior">Экран сүнгәндә тукталыш</string>
-    <string name="screen_off_continue">Күнегү фонда дәвам итә</string>
+    <string name="keep_running_when_screen_off">Экран сүнгәндә күнегүне дәвам итү</string>
     <string name="timer_running">Таймер эшли</string>
 </resources>

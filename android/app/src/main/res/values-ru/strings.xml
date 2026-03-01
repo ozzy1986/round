@@ -44,7 +44,6 @@
     <string name="move_round_down">Переместить вниз</string>
     <string name="reorder_round">Удерживайте и перетаскивайте</string>
     <string name="settings">Настройки</string>
-    <string name="screen_off_behavior">Пауза при выключении экрана</string>
-    <string name="screen_off_continue">Тренировка продолжается в фоновом режиме</string>
+    <string name="keep_running_when_screen_off">Продолжать тренировку при выключенном экране</string>
     <string name="timer_running">Таймер работает</string>
 </resources>

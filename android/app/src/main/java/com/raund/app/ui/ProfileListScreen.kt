@@ -302,7 +302,7 @@ fun ProfileListScreen(
 
     if (showSettings) {
         val appPrefs = (context.applicationContext as RaundApplication).appPrefs
-        var pauseOnScreenOff by remember { mutableStateOf(appPrefs.pauseOnScreenOff) }
+        var keepRunningWhenScreenOff by remember { mutableStateOf(appPrefs.keepRunningWhenScreenOff) }
         AlertDialog(
             onDismissRequest = { showSettings = false },
             title = {
@@ -312,32 +312,24 @@ fun ProfileListScreen(
                 )
             },
             text = {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.screen_off_behavior),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                stringResource(R.string.screen_off_continue),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stringResource(R.string.keep_running_when_screen_off),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = keepRunningWhenScreenOff,
+                        onCheckedChange = {
+                            keepRunningWhenScreenOff = it
+                            appPrefs.keepRunningWhenScreenOff = it
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Switch(
-                            checked = pauseOnScreenOff,
-                            onCheckedChange = {
-                                pauseOnScreenOff = it
-                                appPrefs.pauseOnScreenOff = it
-                            }
-                        )
-                    }
+                    )
                 }
             },
             confirmButton = {

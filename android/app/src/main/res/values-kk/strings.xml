@@ -44,7 +44,6 @@
     <string name="move_round_down">Төменге</string>
     <string name="reorder_round">Реттеу үшін ұстап сүйреңіз</string>
     <string name="settings">Баптаулар</string>
-    <string name="screen_off_behavior">Экран өшкенде кідірту</string>
-    <string name="screen_off_continue">Жаттығу фонда жалғасады</string>
+    <string name="keep_running_when_screen_off">Экран өшкенде жаттығуды жалғастыру</string>
     <string name="timer_running">Таймер жұмыс істеуде</string>
 </resources>

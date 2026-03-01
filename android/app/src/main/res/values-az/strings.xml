@@ -44,7 +44,6 @@
     <string name="move_round_down">Aşağı</string>
     <string name="reorder_round">Sıralamaq üçün basıb saxlayın</string>
     <string name="settings">Parametrlər</string>
-    <string name="screen_off_behavior">Ekran sönəndə fasilə</string>
-    <string name="screen_off_continue">Məşq arxa planda davam edir</string>
+    <string name="keep_running_when_screen_off">Ekran sönəndə məşqi davam etdirmək</string>
     <string name="timer_running">Taymer işləyir</string>
 </resources>

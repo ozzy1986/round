@@ -180,7 +180,7 @@ fun TimerScreen(
             }
             override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
-                if (appPrefs.pauseOnScreenOff && running && !paused) {
+                if (!appPrefs.keepRunningWhenScreenOff && running && !paused) {
                     pausedByScreenOff = true
                     paused = true
                     TimerService.pause(context)
