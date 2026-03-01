@@ -3,6 +3,7 @@ package com.raund.app
 import android.app.Application
 import android.util.Log
 import com.raund.app.data.db.AppDatabase
+import com.raund.app.data.local.AppPrefs
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.local.TokenStore
 import com.raund.app.data.remote.ApiService
@@ -29,6 +30,7 @@ class RaundApplication : Application() {
             Log.i("PerfFix", "Background init DONE in ${System.currentTimeMillis() - start}ms")
         }.start()
     }
+    val appPrefs by lazy { AppPrefs(this) }
     private val syncPrefs by lazy { SyncPrefs(this) }
 
     private val authRetrofit by lazy {

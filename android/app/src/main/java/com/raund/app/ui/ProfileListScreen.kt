@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
+import com.raund.app.RaundApplication
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 
@@ -300,6 +301,8 @@ fun ProfileListScreen(
     }
 
     if (showSettings) {
+        val appPrefs = (context.applicationContext as RaundApplication).appPrefs
+        var pauseOnScreenOff by remember { mutableStateOf(appPrefs.pauseOnScreenOff) }
         AlertDialog(
             onDismissRequest = { showSettings = false },
             title = {
@@ -308,7 +311,35 @@ fun ProfileListScreen(
                     fontWeight = FontWeight.Bold
                 )
             },
-            text = { },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.screen_off_behavior),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                stringResource(R.string.screen_off_continue),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = pauseOnScreenOff,
+                            onCheckedChange = {
+                                pauseOnScreenOff = it
+                                appPrefs.pauseOnScreenOff = it
+                            }
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { showSettings = false }) {
                     Text(stringResource(R.string.cancel))

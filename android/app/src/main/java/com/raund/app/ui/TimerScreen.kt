@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
+import com.raund.app.RaundApplication
 import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerProfile
@@ -96,6 +97,7 @@ fun TimerScreen(
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
+    var pausedByScreenOff by remember { mutableStateOf(false) }
     var cacheReady by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val timerFinishedText = stringResource(R.string.timer_finished)
@@ -166,12 +168,23 @@ fun TimerScreen(
     DisposableEffect(Unit) {
         val activity = context as? Activity
         val lifecycleOwner = activity as? androidx.lifecycle.LifecycleOwner
+        val appPrefs = (context.applicationContext as RaundApplication).appPrefs
         val lifecycleObserver = object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
+                if (pausedByScreenOff && running) {
+                    pausedByScreenOff = false
+                    paused = false
+                    TimerService.resume(context)
+                }
             }
             override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
+                if (appPrefs.pauseOnScreenOff && running && !paused) {
+                    pausedByScreenOff = true
+                    paused = true
+                    TimerService.pause(context)
+                }
             }
         }
         lifecycleOwner?.lifecycle?.addObserver(lifecycleObserver)
