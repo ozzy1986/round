@@ -7,6 +7,7 @@ const profileSchema = {
   type: 'object',
   required: ['name', 'emoji'],
   properties: {
+    id: { type: 'string', format: 'uuid' },
     name: { type: 'string', minLength: 1, maxLength: 255 },
     emoji: { type: 'string', minLength: 1, maxLength: 10 },
   },
@@ -164,7 +165,7 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.post<{ Body: { name: string; emoji: string } }>(
+  app.post<{ Body: { name: string; emoji: string; id?: string } }>(
     '/profiles',
     {
       schema: {
@@ -185,9 +186,14 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async (req: FastifyRequest<{ Body: { name: string; emoji: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
+    async (req: FastifyRequest<{ Body: { name?: string; emoji: string; id?: string } }> & AuthenticatedRequest, reply: FastifyReply) => {
       const userId = getUserId(req);
-      const created = await profilesDb.createProfile(pool, { ...req.body, user_id: userId });
+      const created = await profilesDb.createProfile(pool, {
+        name: req.body.name!,
+        emoji: req.body.emoji,
+        user_id: userId,
+        ...(req.body.id ? { id: req.body.id } : {}),
+      });
       return reply.status(201).send(created);
     }
   );

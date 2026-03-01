@@ -21,6 +21,7 @@ export interface ProfileWithRounds extends Profile {
 }
 
 export interface CreateProfileInput {
+  id?: string;
   name: string;
   emoji: string;
   user_id: string;

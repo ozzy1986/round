@@ -79,7 +79,7 @@ class ProfileRepository(
             val apiStart = SystemClock.elapsedRealtime()
             try {
                 ensureToken()
-                api?.createProfile(CreateProfileRequest(safeName, safeEmoji))
+                api?.createProfile(CreateProfileRequest(safeName, safeEmoji, id))
                 Log.i(PERF, "insertProfile: API call completed in ${SystemClock.elapsedRealtime() - apiStart}ms (background)")
             } catch (e: Exception) {
                 Log.i(PERF, "insertProfile: API call failed in ${SystemClock.elapsedRealtime() - apiStart}ms: ${e.message}")

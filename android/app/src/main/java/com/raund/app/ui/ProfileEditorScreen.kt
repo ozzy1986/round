@@ -65,11 +65,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.data.repository.ProfileRepository
+import com.raund.app.tts.TtsCache
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
@@ -83,6 +87,7 @@ fun ProfileEditorScreen(
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var name by remember { mutableStateOf("") }
     var emoji by remember { mutableStateOf("⏱") }
     var showNameError by remember { mutableStateOf(false) }
@@ -442,6 +447,10 @@ fun ProfileEditorScreen(
                         }
                         repository.saveRounds(id, roundsToSave)
                         onBack()
+                        val phrases = roundsToSave.map { it.first } + safeName + context.getString(R.string.timer_finished)
+                        scope.launch(Dispatchers.IO) {
+                            TtsCache.ensureCache(context, LocaleManager.currentLanguageTag(context), phrases)
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),

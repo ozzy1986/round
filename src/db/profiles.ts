@@ -147,16 +147,26 @@ export async function getProfileWithRoundsById(
   };
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function createProfile(
   pool: Pool,
   input: CreateProfileInput
 ): Promise<Profile> {
-  const result = await pool.query(
-    `INSERT INTO profiles (name, emoji, user_id)
-     VALUES ($1, $2, $3)
-     RETURNING id, name, emoji, user_id, created_at, updated_at`,
-    [input.name, input.emoji, input.user_id]
-  );
+  const useId = input.id && UUID_REGEX.test(input.id) ? input.id : null;
+  const result = useId
+    ? await pool.query(
+        `INSERT INTO profiles (id, name, emoji, user_id)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, name, emoji, user_id, created_at, updated_at`,
+        [useId, input.name, input.emoji, input.user_id]
+      )
+    : await pool.query(
+        `INSERT INTO profiles (name, emoji, user_id)
+         VALUES ($1, $2, $3)
+         RETURNING id, name, emoji, user_id, created_at, updated_at`,
+        [input.name, input.emoji, input.user_id]
+      );
   return profileFromRow(result.rows[0]);
 }
 

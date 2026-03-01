@@ -3,9 +3,12 @@ package com.raund.app
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -21,6 +24,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
 import com.raund.app.timer.TimerProfile
@@ -48,6 +52,21 @@ class TimerService : Service() {
     @Volatile
     private var running = false
 
+    @Volatile
+    private var timerScreenVisible = false
+
+    @Volatile
+    private var currentProfileId: String? = null
+
+    private val visibilityReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACTION_TIMER_VISIBLE -> timerScreenVisible = true
+                ACTION_TIMER_HIDDEN -> timerScreenVisible = false
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "onCreate")
@@ -66,6 +85,11 @@ class TimerService : Service() {
         channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
             .createNotificationChannel(channel)
+        val filter = IntentFilter().apply {
+            addAction(ACTION_TIMER_VISIBLE)
+            addAction(ACTION_TIMER_HIDDEN)
+        }
+        registerReceiver(visibilityReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     private fun stopPreviousTimer() {
@@ -124,6 +148,7 @@ class TimerService : Service() {
             intent?.getParcelableExtra(EXTRA_PROFILE)
         } ?: run {
             Log.w(TAG, "No profile in intent, showing foreground and exiting")
+            currentProfileId = null
             val n = Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle(getString(R.string.app_name))
                 .setContentText(getString(R.string.timer_running))
@@ -138,6 +163,7 @@ class TimerService : Service() {
             return START_NOT_STICKY
         }
 
+        currentProfileId = intent?.getStringExtra(EXTRA_PROFILE_ID)
         val langTag = intent?.getStringExtra(EXTRA_LANG) ?: "en"
         val finishedText = intent?.getStringExtra(EXTRA_FINISHED_TEXT) ?: getString(R.string.timer_finished)
         val phrases = TtsCache.buildPhraseList(profile, finishedText)
@@ -152,11 +178,24 @@ class TimerService : Service() {
 
         Log.d(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, lang=$langTag")
 
+        val contentIntent = currentProfileId?.let { pid ->
+            PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, pid)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(getString(R.string.timer_running))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .apply { contentIntent?.let { setContentIntent(it) } }
             .build()
         if (Build.VERSION.SDK_INT >= 29) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -374,15 +413,29 @@ class TimerService : Service() {
     }
 
     private fun showNotification(text: String, forceStartForeground: Boolean = false) {
+        if (timerScreenVisible && !forceStartForeground) return
         val start = android.os.SystemClock.elapsedRealtime()
+        val profileId = currentProfileId
+        val contentIntent = if (profileId != null) {
+            PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, profileId)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else null
         val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setCategory(Notification.CATEGORY_PROGRESS)
+            .setOnlyAlertOnce(true)
             .also { cachedNotifBuilder = it }
-
+        if (contentIntent != null) builder.setContentIntent(contentIntent)
         builder.setContentText(text)
         builder.setStyle(Notification.BigTextStyle().bigText(text))
         val notification = builder.build()
@@ -437,6 +490,7 @@ class TimerService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy")
+        try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
         running = false
         timerThread?.let { t ->
             t.join(3000)
@@ -469,7 +523,10 @@ class TimerService : Service() {
         const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"
         const val ACTION_RESUME = "com.raund.app.TimerService.RESUME"
         const val ACTION_TIMER_STATE = "com.raund.app.TIMER_STATE"
+        const val ACTION_TIMER_VISIBLE = "com.raund.app.TIMER_VISIBLE"
+        const val ACTION_TIMER_HIDDEN = "com.raund.app.TIMER_HIDDEN"
         const val EXTRA_PROFILE = "profile"
+        const val EXTRA_PROFILE_ID = "profileId"
         const val EXTRA_LANG = "lang"
         const val EXTRA_FINISHED_TEXT = "finishedText"
         const val EXTRA_REMAINING = "remaining"
@@ -485,9 +542,10 @@ class TimerService : Service() {
             })
         }
 
-        fun start(context: Context, profile: TimerProfile, languageTag: String, finishedText: String) {
+        fun start(context: Context, profileId: String, profile: TimerProfile, languageTag: String, finishedText: String) {
             context.startForegroundService(Intent(context, TimerService::class.java).apply {
                 action = ACTION_START
+                putExtra(EXTRA_PROFILE_ID, profileId)
                 putExtra(EXTRA_PROFILE, profile)
                 putExtra(EXTRA_LANG, languageTag)
                 putExtra(EXTRA_FINISHED_TEXT, finishedText)

@@ -32,7 +32,7 @@ data class RoundDto(
     val position: Int
 )
 
-data class CreateProfileRequest(val name: String, val emoji: String)
+data class CreateProfileRequest(val name: String, val emoji: String, val id: String? = null)
 data class UpdateProfileRequest(val name: String? = null, val emoji: String? = null)
 data class CreateRoundRequest(
     val name: String,
