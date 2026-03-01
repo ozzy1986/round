@@ -281,6 +281,11 @@ class TimerService : Service() {
         try { alarmTone?.release() } catch (_: Exception) {}
     }
 
+    private var cachedMediaPlayer: MediaPlayer? = null
+    private val cachePlayerLock = Object()
+    private var cachedToneBuffer: ShortArray? = null
+    private var cachedToneDurationMs: Int = 0
+
     private fun playCacheFile(text: String, langTag: String, onDone: (() -> Unit)? = null) {
         Thread {
             try {
@@ -289,18 +294,22 @@ class TimerService : Service() {
                     Handler(Looper.getMainLooper()).post { onDone?.invoke() }
                     return@Thread
                 }
-                MediaPlayer().apply {
-                    setAudioAttributes(AudioAttributes.Builder()
+                synchronized(cachePlayerLock) {
+                    cachedMediaPlayer?.let {
+                        try { it.stop(); it.reset() } catch (_: Exception) {}
+                    }
+                    val player = cachedMediaPlayer ?: MediaPlayer().also { cachedMediaPlayer = it }
+                    player.setAudioAttributes(AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build())
-                    setDataSource(file.absolutePath)
-                    prepare()
-                    setOnCompletionListener {
-                        release()
+                    player.setDataSource(file.absolutePath)
+                    player.prepare()
+                    player.setOnCompletionListener {
+                        try { it.reset() } catch (_: Exception) {}
                         Handler(Looper.getMainLooper()).post { onDone?.invoke() }
                     }
-                    start()
+                    player.start()
                 }
             } catch (_: Exception) {
                 Handler(Looper.getMainLooper()).post { onDone?.invoke() }
@@ -308,21 +317,31 @@ class TimerService : Service() {
         }.start()
     }
 
+    private fun getToneBuffer(durationMs: Int): ShortArray {
+        if (cachedToneBuffer != null && cachedToneDurationMs == durationMs) return cachedToneBuffer!!
+        val sampleRate = 44100
+        val numSamples = sampleRate * durationMs / 1000
+        val buffer = ShortArray(numSamples)
+        val freq = 880.0
+        val vol = 0.55f
+        for (i in 0 until numSamples) {
+            buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * vol).toInt().toShort()
+        }
+        cachedToneBuffer = buffer
+        cachedToneDurationMs = durationMs
+        return buffer
+    }
+
     private fun playProlongedTone(durationMs: Int) {
         try {
+            val buffer = getToneBuffer(durationMs)
             val sampleRate = 44100
-            val numSamples = sampleRate * durationMs / 1000
-            val buffer = ShortArray(numSamples)
-            val freq = 880.0
             val vol = 0.55f
-            for (i in 0 until numSamples) {
-                buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * vol).toInt().toShort()
-            }
             val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
             val track = AudioTrack.Builder()
                 .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
                 .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-                .setBufferSizeInBytes((numSamples * 2).coerceAtLeast(minBuf))
+                .setBufferSizeInBytes((buffer.size * 2).coerceAtLeast(minBuf))
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
             track.setVolume(vol)
@@ -332,6 +351,12 @@ class TimerService : Service() {
             track.release()
         } catch (_: Exception) {}
     }
+
+    private var cachedNotifBuilder: Notification.Builder? = null
+    private var lastForegroundMs = 0L
+    private var notifTickCount = 0
+    private var notifFgCount = 0
+    private var notifTotalMs = 0L
 
     private fun broadcastState(roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
         val i = Intent(ACTION_TIMER_STATE).apply {
@@ -345,24 +370,40 @@ class TimerService : Service() {
         }
         sendBroadcast(i)
         val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
-        showNotification(text)
+        showNotification(text, forceStartForeground = !isRunning)
     }
 
-    private fun showNotification(text: String) {
-        val notification = Notification.Builder(this, CHANNEL_ID)
+    private fun showNotification(text: String, forceStartForeground: Boolean = false) {
+        val start = android.os.SystemClock.elapsedRealtime()
+        val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(text)
-            .setStyle(Notification.BigTextStyle().bigText(text))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setCategory(Notification.CATEGORY_PROGRESS)
-            .build()
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            .also { cachedNotifBuilder = it }
+
+        builder.setContentText(text)
+        builder.setStyle(Notification.BigTextStyle().bigText(text))
+        val notification = builder.build()
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        val needFg = forceStartForeground || (now - lastForegroundMs > 5000)
+        if (needFg) {
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            lastForegroundMs = now
+            notifFgCount++
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
+        }
+        notifTickCount++
+        notifTotalMs += android.os.SystemClock.elapsedRealtime() - start
+        if (notifTickCount % 10 == 0) {
+            Log.i("PerfFix", "notification: ticks=$notifTickCount fgCalls=$notifFgCount avgMs=${notifTotalMs / notifTickCount}ms")
         }
     }
 
@@ -404,6 +445,11 @@ class TimerService : Service() {
         timerThread = null
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
+        synchronized(cachePlayerLock) {
+            try { cachedMediaPlayer?.release() } catch (_: Exception) {}
+            cachedMediaPlayer = null
+        }
+        cachedToneBuffer = null
         stopSilentAudio()
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()

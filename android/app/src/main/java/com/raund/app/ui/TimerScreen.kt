@@ -180,11 +180,7 @@ fun TimerScreen(
             }
         }
         val filter = IntentFilter(TimerService.ACTION_TIMER_STATE)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
-        }
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         onDispose {
             try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
             if (running) TimerService.stop(context)

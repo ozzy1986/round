@@ -1,6 +1,7 @@
 package com.raund.app
 
 import android.app.Application
+import android.util.Log
 import com.raund.app.data.db.AppDatabase
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.local.TokenStore
@@ -9,9 +10,11 @@ import com.raund.app.data.remote.AuthAuthenticator
 import com.raund.app.data.remote.AuthService
 import com.raund.app.data.remote.TokenInterceptor
 import com.raund.app.data.repository.ProfileRepository
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 class RaundApplication : Application() {
     val database by lazy { AppDatabase.get(this) }
@@ -28,7 +31,25 @@ class RaundApplication : Application() {
 
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
             .addInterceptor(TokenInterceptor(tokenStore))
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val startMs = System.currentTimeMillis()
+                try {
+                    val response = chain.proceed(request)
+                    val elapsed = System.currentTimeMillis() - startMs
+                    Log.i("PerfFix", "HTTP ${request.method} ${request.url.encodedPath}: ${response.code} in ${elapsed}ms")
+                    response
+                } catch (e: Exception) {
+                    val elapsed = System.currentTimeMillis() - startMs
+                    Log.i("PerfFix", "HTTP ${request.method} ${request.url.encodedPath}: FAILED in ${elapsed}ms: ${e.message}")
+                    throw e
+                }
+            }
             .authenticator(AuthAuthenticator(tokenStore, authService))
             .build()
     }
@@ -47,7 +68,8 @@ class RaundApplication : Application() {
             api = api,
             tokenStore = tokenStore,
             authService = authService,
-            syncPrefs = syncPrefs
+            syncPrefs = syncPrefs,
+            database = database
         )
     }
 }
