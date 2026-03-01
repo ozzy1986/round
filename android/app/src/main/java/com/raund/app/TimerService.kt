@@ -62,11 +62,11 @@ class TimerService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_TIMER_VISIBLE -> {
-                    Log.d(TAG, "Timer screen VISIBLE")
+                    Log.i(TAG, "NOTIF: received TIMER_VISIBLE -> timerScreenVisible=true (no notification updates in app)")
                     timerScreenVisible = true
                 }
                 ACTION_TIMER_HIDDEN -> {
-                    Log.d(TAG, "Timer screen HIDDEN")
+                    Log.i(TAG, "NOTIF: received TIMER_HIDDEN -> timerScreenVisible=false (will show/update notification)")
                     timerScreenVisible = false
                 }
             }
@@ -81,17 +81,20 @@ class TimerService : Service() {
             setReferenceCounted(false)
         }
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        nm.deleteNotificationChannel("raund_timer")
         nm.deleteNotificationChannel("raund_timer_visible")
+        nm.deleteNotificationChannel("raund_timer_v2")
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.app_name),
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_DEFAULT
         )
         channel.description = getString(R.string.timer_running)
         channel.setSound(null, null)
-        channel.setShowBadge(false)
+        channel.setShowBadge(true)
         channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(channel)
+        Log.i(TAG, "NOTIF: channel $CHANNEL_ID created importance=DEFAULT")
         val filter = IntentFilter().apply {
             addAction(ACTION_TIMER_VISIBLE)
             addAction(ACTION_TIMER_HIDDEN)
@@ -401,6 +404,7 @@ class TimerService : Service() {
     private var cachedNotifBuilder: Notification.Builder? = null
     private var lastForegroundMs = 0L
     private var notifTickCount = 0
+    private var notifSkipCount = 0
     private var notifFgCount = 0
     private var notifTotalMs = 0L
 
@@ -420,7 +424,11 @@ class TimerService : Service() {
     }
 
     private fun showNotification(text: String, forceStartForeground: Boolean = false) {
-        if (timerScreenVisible && !forceStartForeground) return
+        if (timerScreenVisible && !forceStartForeground) {
+            notifSkipCount++
+            if (notifSkipCount == 1 || notifSkipCount % 60 == 0) Log.i(TAG, "NOTIF: skip (screen visible) skipCount=$notifSkipCount")
+            return
+        }
         val start = android.os.SystemClock.elapsedRealtime()
         val profileId = currentProfileId
         val contentIntent = if (profileId != null) {
@@ -462,6 +470,9 @@ class TimerService : Service() {
         }
         notifTickCount++
         notifTotalMs += android.os.SystemClock.elapsedRealtime() - start
+        if (notifTickCount == 1 || notifTickCount % 60 == 0) {
+            Log.i(TAG, "NOTIF: posted tick=$notifTickCount fg=$needFg text=${text.take(20)}")
+        }
         if (notifTickCount % 10 == 0) {
             Log.i("PerfFix", "notification: ticks=$notifTickCount fgCalls=$notifFgCount avgMs=${notifTotalMs / notifTickCount}ms")
         }
@@ -523,7 +534,7 @@ class TimerService : Service() {
 
     companion object {
         private const val TAG = "RaundTimer"
-        private const val CHANNEL_ID = "raund_timer_v2"
+        private const val CHANNEL_ID = "raund_timer_v3"
         private const val NOTIFICATION_ID = 1
         const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"
