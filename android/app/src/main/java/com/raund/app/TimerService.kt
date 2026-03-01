@@ -89,7 +89,7 @@ class TimerService : Service() {
             addAction(ACTION_TIMER_VISIBLE)
             addAction(ACTION_TIMER_HIDDEN)
         }
-        registerReceiver(visibilityReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(this, visibilityReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     private fun stopPreviousTimer() {

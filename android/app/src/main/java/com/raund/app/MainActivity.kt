@@ -89,9 +89,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent?.getStringExtra(EXTRA_OPEN_TIMER_PROFILE_ID)?.let { id ->
+        intent.getStringExtra(EXTRA_OPEN_TIMER_PROFILE_ID)?.let { id ->
             pendingOpenTimerId.value = id
         }
     }
