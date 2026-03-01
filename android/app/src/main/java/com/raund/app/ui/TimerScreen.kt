@@ -197,7 +197,6 @@ fun TimerScreen(
             lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
             context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
             try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
-            if (running) TimerService.stop(context)
         }
     }
 
