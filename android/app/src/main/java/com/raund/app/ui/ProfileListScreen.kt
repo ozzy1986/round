@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
-import com.raund.app.RaundApplication
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 
@@ -301,8 +300,6 @@ fun ProfileListScreen(
     }
 
     if (showSettings) {
-        val appPrefs = (context.applicationContext as RaundApplication).appPrefs
-        var keepRunningWhenScreenOff by remember { mutableStateOf(appPrefs.keepRunningWhenScreenOff) }
         AlertDialog(
             onDismissRequest = { showSettings = false },
             title = {
@@ -311,27 +308,7 @@ fun ProfileListScreen(
                     fontWeight = FontWeight.Bold
                 )
             },
-            text = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        stringResource(R.string.keep_running_when_screen_off),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Switch(
-                        checked = keepRunningWhenScreenOff,
-                        onCheckedChange = {
-                            keepRunningWhenScreenOff = it
-                            appPrefs.keepRunningWhenScreenOff = it
-                        }
-                    )
-                }
-            },
+            text = { },
             confirmButton = {
                 TextButton(onClick = { showSettings = false }) {
                     Text(stringResource(R.string.cancel))

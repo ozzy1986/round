@@ -77,7 +77,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
-import com.raund.app.RaundApplication
 import com.raund.app.TimerService
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerProfile
@@ -97,7 +96,6 @@ fun TimerScreen(
     var running by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
-    var pausedByScreenOff by remember { mutableStateOf(false) }
     var cacheReady by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val timerFinishedText = stringResource(R.string.timer_finished)
@@ -119,11 +117,15 @@ fun TimerScreen(
         val phrases = TtsCache.buildPhraseList(p, finishedText)
         Log.d("TimerScreen", "cache check profile=${p.name} locale=$locale phrases=${phrases.size}")
         val allExist = TtsCache.allExist(context, locale, phrases)
-        cacheReady = true
-        if (!allExist) {
-            Log.d("TimerScreen", "cache missing, prefill in background (Start enabled immediately)")
-            repository.prefillTtsInBackground(context, locale, phrases)
+        if (allExist) {
+            Log.d("TimerScreen", "cache full, skip ensureCache")
+            cacheReady = true
+            return@LaunchedEffect
         }
+        Log.d("TimerScreen", "cache missing, calling ensureCache")
+        TtsCache.ensureCache(context, locale, phrases)
+        Log.d("TimerScreen", "ensureCache returned")
+        cacheReady = true
     }
 
     LaunchedEffect(profile) {
@@ -164,26 +166,12 @@ fun TimerScreen(
     DisposableEffect(Unit) {
         val activity = context as? Activity
         val lifecycleOwner = activity as? androidx.lifecycle.LifecycleOwner
-        val appPrefs = (context.applicationContext as RaundApplication).appPrefs
         val lifecycleObserver = object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
-                if (pausedByScreenOff && running) {
-                    pausedByScreenOff = false
-                    paused = false
-                    TimerService.resume(context)
-                }
             }
             override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
-                val keepRunning = appPrefs.keepRunningWhenScreenOff
-                val shouldPause = !keepRunning && running && !paused
-                Log.i("PerfFix", "TimerScreen onPause: keepRunningWhenScreenOff=$keepRunning running=$running paused=$paused -> shouldPause=$shouldPause")
-                if (shouldPause) {
-                    pausedByScreenOff = true
-                    paused = true
-                    TimerService.pause(context)
-                }
             }
         }
         lifecycleOwner?.lifecycle?.addObserver(lifecycleObserver)

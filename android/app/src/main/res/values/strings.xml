@@ -44,6 +44,7 @@
     <string name="move_round_down">Move down</string>
     <string name="reorder_round">Hold and drag to reorder</string>
     <string name="settings">Settings</string>
-    <string name="keep_running_when_screen_off">Keep training running when screen is off</string>
+    <string name="screen_off_behavior">Pause when screen turns off</string>
+    <string name="screen_off_continue">Training keeps running in the background</string>
     <string name="timer_running">Timer running</string>
 </resources>
