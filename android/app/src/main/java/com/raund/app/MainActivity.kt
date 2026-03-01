@@ -3,6 +3,7 @@ package com.raund.app
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import android.util.Log
 import androidx.navigation.compose.rememberNavController
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.sync.SyncOnConnectivityEffect
@@ -48,7 +50,9 @@ class MainActivity : ComponentActivity() {
                 Box(modifier = Modifier.fillMaxSize()) {
                     var repo by remember { mutableStateOf<ProfileRepository?>(null) }
                     LaunchedEffect(Unit) {
+                        val t0 = SystemClock.elapsedRealtime()
                         repo = withContext(Dispatchers.IO) { app.profileRepository }
+                        Log.i("PerfFix", "MainActivity: repo ready in ${SystemClock.elapsedRealtime() - t0}ms")
                     }
                     val r = repo
                     if (r != null) {

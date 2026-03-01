@@ -119,15 +119,11 @@ fun TimerScreen(
         val phrases = TtsCache.buildPhraseList(p, finishedText)
         Log.d("TimerScreen", "cache check profile=${p.name} locale=$locale phrases=${phrases.size}")
         val allExist = TtsCache.allExist(context, locale, phrases)
-        if (allExist) {
-            Log.d("TimerScreen", "cache full, skip ensureCache")
-            cacheReady = true
-            return@LaunchedEffect
-        }
-        Log.d("TimerScreen", "cache missing, calling ensureCache")
-        TtsCache.ensureCache(context, locale, phrases)
-        Log.d("TimerScreen", "ensureCache returned")
         cacheReady = true
+        if (!allExist) {
+            Log.d("TimerScreen", "cache missing, prefill in background (Start enabled immediately)")
+            repository.prefillTtsInBackground(context, locale, phrases)
+        }
     }
 
     LaunchedEffect(profile) {
@@ -180,7 +176,10 @@ fun TimerScreen(
             }
             override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
-                if (!appPrefs.keepRunningWhenScreenOff && running && !paused) {
+                val keepRunning = appPrefs.keepRunningWhenScreenOff
+                val shouldPause = !keepRunning && running && !paused
+                Log.i("PerfFix", "TimerScreen onPause: keepRunningWhenScreenOff=$keepRunning running=$running paused=$paused -> shouldPause=$shouldPause")
+                if (shouldPause) {
                     pausedByScreenOff = true
                     paused = true
                     TimerService.pause(context)
