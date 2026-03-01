@@ -58,11 +58,28 @@ class TimerService : Service() {
     @Volatile
     private var currentProfileId: String? = null
 
+    private var lastNotifText: String = ""
+
     private val visibilityReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                ACTION_TIMER_VISIBLE -> timerScreenVisible = true
-                ACTION_TIMER_HIDDEN -> timerScreenVisible = false
+                ACTION_TIMER_VISIBLE -> {
+                    Log.d(TAG, "Timer screen VISIBLE, removing notification")
+                    timerScreenVisible = true
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                    }
+                }
+                ACTION_TIMER_HIDDEN -> {
+                    Log.d(TAG, "Timer screen HIDDEN, restoring notification")
+                    timerScreenVisible = false
+                    if (running) {
+                        showNotification(lastNotifText.ifEmpty { getString(R.string.timer_running) }, forceStartForeground = true)
+                    }
+                }
             }
         }
     }
@@ -409,6 +426,7 @@ class TimerService : Service() {
         }
         sendBroadcast(i)
         val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
+        lastNotifText = text
         showNotification(text, forceStartForeground = !isRunning)
     }
 

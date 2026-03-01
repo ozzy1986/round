@@ -164,11 +164,21 @@ fun TimerScreen(
     }
 
     DisposableEffect(Unit) {
+        val activity = context as? Activity
+        val lifecycleOwner = activity as? androidx.lifecycle.LifecycleOwner
+        val lifecycleObserver = object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+                context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
+            }
+            override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
+                context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
+            }
+        }
+        lifecycleOwner?.lifecycle?.addObserver(lifecycleObserver)
         context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) {
                 if (i == null) return
-                context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
                 remaining = i.getIntExtra(TimerService.EXTRA_REMAINING, remaining)
                 currentRound = i.getStringExtra(TimerService.EXTRA_ROUND_NAME) ?: currentRound
                 roundTotal = i.getIntExtra(TimerService.EXTRA_ROUND_TOTAL, roundTotal)
@@ -184,6 +194,7 @@ fun TimerScreen(
         val filter = IntentFilter(TimerService.ACTION_TIMER_STATE)
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         onDispose {
+            lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
             context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
             try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
             if (running) TimerService.stop(context)

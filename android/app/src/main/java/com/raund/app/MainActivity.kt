@@ -18,11 +18,14 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.sync.SyncOnConnectivityEffect
 import com.raund.app.ui.ProfileListScreen
 import com.raund.app.ui.ProfileEditorScreen
 import com.raund.app.ui.TimerScreen
 import com.raund.app.ui.theme.RaundTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
 
@@ -43,16 +46,26 @@ class MainActivity : ComponentActivity() {
         setContent {
             RaundTheme {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    var runSync by remember { mutableStateOf(false) }
-                    LaunchedEffect(Unit) { runSync = true }
-                    if (runSync) SyncOnConnectivityEffect(app.profileRepository)
+                    var repo by remember { mutableStateOf<ProfileRepository?>(null) }
+                    LaunchedEffect(Unit) {
+                        repo = withContext(Dispatchers.IO) { app.profileRepository }
+                    }
+                    val r = repo
+                    if (r != null) {
+                    SyncOnConnectivityEffect(r)
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         val navController = rememberNavController()
                         val openTimerId = remember { pendingOpenTimerId }
                         LaunchedEffect(openTimerId.value) {
                             openTimerId.value?.let { id ->
-                                navController.navigate("timer/$id") {
-                                    popUpTo("profiles") { inclusive = false }
+                                val currentEntry = navController.currentBackStackEntry
+                                val alreadyOnTimer = currentEntry?.destination?.route == "timer/{profileId}" &&
+                                        currentEntry.arguments?.getString("profileId") == id
+                                if (!alreadyOnTimer) {
+                                    navController.navigate("timer/$id") {
+                                        popUpTo("profiles") { inclusive = false }
+                                        launchSingleTop = true
+                                    }
                                 }
                                 openTimerId.value = null
                             }
@@ -60,7 +73,7 @@ class MainActivity : ComponentActivity() {
                     NavHost(navController = navController, startDestination = "profiles") {
                         composable("profiles") {
                             ProfileListScreen(
-                                repository = app.profileRepository,
+                                repository = r,
                                 onProfileClick = { id -> navController.navigate("editor/$id") },
                                 onAddProfile = { navController.navigate("editor/new") },
                                 onStartTimer = { id -> navController.navigate("timer/$id") }
@@ -69,7 +82,7 @@ class MainActivity : ComponentActivity() {
                         composable("editor/{profileId}") { backStackEntry ->
                             val id = backStackEntry.arguments?.getString("profileId") ?: "new"
                             ProfileEditorScreen(
-                                repository = app.profileRepository,
+                                repository = r,
                                 profileId = if (id == "new") null else id,
                                 onBack = { navController.popBackStack() }
                             )
@@ -77,11 +90,12 @@ class MainActivity : ComponentActivity() {
                         composable("timer/{profileId}") { backStackEntry ->
                             val profileId = backStackEntry.arguments?.getString("profileId") ?: return@composable
                             TimerScreen(
-                                repository = app.profileRepository,
+                                repository = r,
                                 profileId = profileId,
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                    }
                     }
                     }
                 }

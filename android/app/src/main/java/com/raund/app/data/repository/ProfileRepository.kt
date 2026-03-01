@@ -19,6 +19,7 @@ import com.raund.app.data.remote.PutRoundsRequest
 import com.raund.app.data.remote.UpdateProfileRequest
 import com.raund.app.timer.TimerProfile
 import com.raund.app.timer.TimerRound
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class ProfileRepository(
     private val profileDao: ProfileDao,
@@ -39,6 +41,7 @@ class ProfileRepository(
 ) {
 
     private val bgScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val pendingProfileCreate = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
 
     val profiles: Flow<List<Profile>> = profileDao.getAll()
     val roundStats: Flow<Map<String, RoundStats>> = roundDao
@@ -75,6 +78,8 @@ class ProfileRepository(
         val roomMs = SystemClock.elapsedRealtime() - start
         Log.i(PERF, "insertProfile: Room insert took ${roomMs}ms, id=$id")
 
+        val deferred = CompletableDeferred<Unit>()
+        pendingProfileCreate[id] = deferred
         bgScope.launch {
             val apiStart = SystemClock.elapsedRealtime()
             try {
@@ -83,6 +88,9 @@ class ProfileRepository(
                 Log.i(PERF, "insertProfile: API call completed in ${SystemClock.elapsedRealtime() - apiStart}ms (background)")
             } catch (e: Exception) {
                 Log.i(PERF, "insertProfile: API call failed in ${SystemClock.elapsedRealtime() - apiStart}ms: ${e.message}")
+            } finally {
+                deferred.complete(Unit)
+                pendingProfileCreate.remove(id)
             }
             requestSync()
         }
@@ -151,6 +159,11 @@ class ProfileRepository(
         Log.i(PERF, "saveRounds: Room save took ${SystemClock.elapsedRealtime() - start}ms (${entities.size} rounds)")
 
         bgScope.launch {
+            pendingProfileCreate[profileId]?.let { pending ->
+                Log.i(PERF, "saveRounds: waiting for pending profile create for $profileId")
+                pending.await()
+                Log.i(PERF, "saveRounds: profile create completed, proceeding with rounds PUT")
+            }
             val apiStart = SystemClock.elapsedRealtime()
             try {
                 ensureToken()
