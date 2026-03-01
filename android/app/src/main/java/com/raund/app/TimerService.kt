@@ -58,27 +58,16 @@ class TimerService : Service() {
     @Volatile
     private var currentProfileId: String? = null
 
-    private var lastNotifText: String = ""
-
     private val visibilityReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_TIMER_VISIBLE -> {
-                    Log.d(TAG, "Timer screen VISIBLE, removing notification")
+                    Log.d(TAG, "Timer screen VISIBLE")
                     timerScreenVisible = true
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        stopForeground(true)
-                    }
                 }
                 ACTION_TIMER_HIDDEN -> {
-                    Log.d(TAG, "Timer screen HIDDEN, restoring notification")
+                    Log.d(TAG, "Timer screen HIDDEN")
                     timerScreenVisible = false
-                    if (running) {
-                        showNotification(lastNotifText.ifEmpty { getString(R.string.timer_running) }, forceStartForeground = true)
-                    }
                 }
             }
         }
@@ -91,17 +80,18 @@ class TimerService : Service() {
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer").apply {
             setReferenceCounted(false)
         }
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        nm.deleteNotificationChannel("raund_timer_visible")
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.app_name),
-            NotificationManager.IMPORTANCE_HIGH
+            NotificationManager.IMPORTANCE_LOW
         )
         channel.description = getString(R.string.timer_running)
         channel.setSound(null, null)
-        channel.setShowBadge(true)
+        channel.setShowBadge(false)
         channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-            .createNotificationChannel(channel)
+        nm.createNotificationChannel(channel)
         val filter = IntentFilter().apply {
             addAction(ACTION_TIMER_VISIBLE)
             addAction(ACTION_TIMER_HIDDEN)
@@ -426,7 +416,6 @@ class TimerService : Service() {
         }
         sendBroadcast(i)
         val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
-        lastNotifText = text
         showNotification(text, forceStartForeground = !isRunning)
     }
 
@@ -534,7 +523,7 @@ class TimerService : Service() {
 
     companion object {
         private const val TAG = "RaundTimer"
-        private const val CHANNEL_ID = "raund_timer_visible"
+        private const val CHANNEL_ID = "raund_timer_v2"
         private const val NOTIFICATION_ID = 1
         const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"

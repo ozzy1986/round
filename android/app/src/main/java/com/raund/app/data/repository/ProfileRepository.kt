@@ -17,8 +17,10 @@ import com.raund.app.data.remote.CreateProfileRequest
 import com.raund.app.data.remote.PutRoundItem
 import com.raund.app.data.remote.PutRoundsRequest
 import com.raund.app.data.remote.UpdateProfileRequest
+import android.content.Context
 import com.raund.app.timer.TimerProfile
 import com.raund.app.timer.TimerRound
+import com.raund.app.tts.TtsCache
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +94,6 @@ class ProfileRepository(
                 deferred.complete(Unit)
                 pendingProfileCreate.remove(id)
             }
-            requestSync()
         }
         id
     }
@@ -180,6 +181,17 @@ class ProfileRepository(
                 Log.i(PERF, "saveRounds: API call failed in ${SystemClock.elapsedRealtime() - apiStart}ms: ${e.message}")
             }
             requestSync()
+        }
+    }
+
+    fun prefillTtsInBackground(context: Context, locale: String, phrases: List<String>) {
+        bgScope.launch {
+            try {
+                TtsCache.ensureCache(context, locale, phrases)
+                Log.i(PERF, "prefillTts: completed ${phrases.size} phrases")
+            } catch (e: Exception) {
+                Log.i(PERF, "prefillTts: failed: ${e.message}")
+            }
         }
     }
 

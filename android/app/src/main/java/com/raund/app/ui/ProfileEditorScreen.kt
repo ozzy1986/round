@@ -71,9 +71,7 @@ import androidx.compose.ui.zIndex
 import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.data.repository.ProfileRepository
-import com.raund.app.tts.TtsCache
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
@@ -446,11 +444,9 @@ fun ProfileEditorScreen(
                             Triple(rName.take(MAX_ROUND_NAME_LENGTH), durInt, warn)
                         }
                         repository.saveRounds(id, roundsToSave)
-                        onBack()
                         val phrases = roundsToSave.map { it.first } + safeName + context.getString(R.string.timer_finished)
-                        scope.launch(Dispatchers.IO) {
-                            TtsCache.ensureCache(context, LocaleManager.currentLanguageTag(context), phrases)
-                        }
+                        repository.prefillTtsInBackground(context, LocaleManager.currentLanguageTag(context), phrases)
+                        onBack()
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),

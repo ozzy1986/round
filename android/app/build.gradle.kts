@@ -19,6 +19,12 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"https://round.ozzy1986.com/\"")
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // default debug keystore
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -27,6 +33,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
