@@ -60,12 +60,10 @@ class TimerService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_TIMER_VISIBLE -> {
-                    Log.i(TAG, "NOTIF: received TIMER_VISIBLE -> hiding notification")
                     timerScreenVisible = true
                     stopForeground(STOP_FOREGROUND_REMOVE)
                 }
                 ACTION_TIMER_HIDDEN -> {
-                    Log.i(TAG, "NOTIF: received TIMER_HIDDEN -> showing notification")
                     timerScreenVisible = false
                     if (running) {
                         showNotification(
@@ -94,7 +92,6 @@ class TimerService : Service() {
         channel.setShowBadge(true)
         channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(channel)
-        Log.i(TAG, "NOTIF: channel $CHANNEL_ID created")
         val filter = IntentFilter().apply {
             addAction(ACTION_TIMER_VISIBLE)
             addAction(ACTION_TIMER_HIDDEN)
@@ -217,10 +214,7 @@ class TimerService : Service() {
                 }
                 is TimerEvent.Tick -> {
                     tickCount++
-                    if (tickCount % 10 == 0 || tickCount == 1) {
-                        val elapsed = SystemClock.elapsedRealtime() - runStartMs
-                        Log.i(TAG, "TICK round=${event.roundIndex + 1}/${event.totalRounds} rem=${event.remainingSeconds} elapsed=${elapsed}ms screenVis=$timerScreenVisible")
-                    }
+                    Log.i(TAG, "T $tickCount r${event.roundIndex + 1} ${event.remainingSeconds}s")
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
                     if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
                         try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
@@ -394,10 +388,6 @@ class TimerService : Service() {
 
     private var cachedNotifBuilder: Notification.Builder? = null
     private var lastForegroundMs = 0L
-    private var notifTickCount = 0
-    private var notifSkipCount = 0
-    private var notifFgCount = 0
-    private var notifTotalMs = 0L
 
     private fun broadcastState(roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
         val i = Intent(ACTION_TIMER_STATE).apply {
@@ -416,12 +406,7 @@ class TimerService : Service() {
     }
 
     private fun showNotification(text: String, forceStartForeground: Boolean = false) {
-        if (timerScreenVisible && !forceStartForeground) {
-            notifSkipCount++
-            if (notifSkipCount == 1 || notifSkipCount % 60 == 0) Log.i(TAG, "NOTIF: skip (screen visible) skipCount=$notifSkipCount")
-            return
-        }
-        val start = SystemClock.elapsedRealtime()
+        if (timerScreenVisible && !forceStartForeground) return
         val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -450,17 +435,8 @@ class TimerService : Service() {
         if (needFg) {
             doStartForeground(notification)
             lastForegroundMs = now
-            notifFgCount++
         } else {
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
-        }
-        notifTickCount++
-        notifTotalMs += SystemClock.elapsedRealtime() - start
-        if (notifTickCount == 1 || notifTickCount % 60 == 0) {
-            Log.i(TAG, "NOTIF: posted tick=$notifTickCount fg=$needFg text=${text.take(20)}")
-        }
-        if (notifTickCount % 10 == 0) {
-            Log.i("PerfFix", "notification: ticks=$notifTickCount fgCalls=$notifFgCount avgMs=${notifTotalMs / notifTickCount}ms")
         }
     }
 
@@ -527,7 +503,6 @@ class TimerService : Service() {
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "onDestroy")
         try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
         running = false
         cancelAlarmTick()
@@ -548,7 +523,6 @@ class TimerService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        Log.i(TAG, "onTaskRemoved: user removed app from recents, stopping timer")
         running = false
         cancelAlarmTick()
         stopSelf()
