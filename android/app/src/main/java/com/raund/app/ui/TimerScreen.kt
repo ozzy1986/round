@@ -8,10 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioManager
-import android.net.Uri
 import android.os.Build
-import android.os.PowerManager
-import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
@@ -409,18 +406,6 @@ fun TimerScreen(
                             roundTotal = p.rounds[0].durationSeconds
                             currentRound = p.rounds[0].name
                             roundInfo = "1 / ${p.rounds.size}"
-                            (context as? Activity)?.let { activity ->
-                                val pm = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
-                                if (pm != null && !pm.isIgnoringBatteryOptimizations(activity.packageName)) {
-                                    try {
-                                        val intent = Intent().apply {
-                                            action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                                            data = Uri.parse("package:${activity.packageName}")
-                                        }
-                                        activity.startActivity(intent)
-                                    } catch (_: Exception) {}
-                                }
-                            }
                             TimerService.start(context, profileId, p, LocaleManager.currentLanguageTag(context), timerFinishedText)
                         },
                         modifier = Modifier

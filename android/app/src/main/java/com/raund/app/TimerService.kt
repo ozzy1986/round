@@ -1,6 +1,5 @@
 package com.raund.app
 
-import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -53,10 +52,17 @@ class TimerService : Service() {
     private var useCacheOnly = false
     private var langTag = "en"
     private var tickCount = 0
-    private var runStartMs = 0L
-    private var lastTickRealtimeMs = 0L
-    @Volatile private var silentAdvance = false
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    private val tickRunnable = object : Runnable {
+        override fun run() {
+            if (!running || paused) return
+            val e = engine ?: return
+            if (e.advance()) {
+                mainHandler.postDelayed(this, 1000)
+            }
+        }
+    }
 
     private val visibilityReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -103,7 +109,7 @@ class TimerService : Service() {
 
     private fun stopPreviousTimer() {
         running = false
-        cancelAlarmTick()
+        mainHandler.removeCallbacks(tickRunnable)
         engine = null
         try { alarmTone?.release() } catch (_: Exception) {}
         alarmTone = null
@@ -122,15 +128,12 @@ class TimerService : Service() {
             }
             ACTION_PAUSE -> {
                 paused = true
+                mainHandler.removeCallbacks(tickRunnable)
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
                 paused = false
-                scheduleAlarmTick()
-                return START_NOT_STICKY
-            }
-            ACTION_TICK -> {
-                handleTick()
+                mainHandler.postDelayed(tickRunnable, 1000)
                 return START_NOT_STICKY
             }
         }
@@ -160,8 +163,6 @@ class TimerService : Service() {
 
         running = true
         paused = false
-        runStartMs = SystemClock.elapsedRealtime()
-        lastTickRealtimeMs = runStartMs
         tickCount = 0
 
         Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
@@ -206,7 +207,6 @@ class TimerService : Service() {
             when (event) {
                 is TimerEvent.RoundStart -> {
                     broadcastState(event.round.name, event.round.durationSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
-                    if (silentAdvance) return@TimerEngine
                     if (event.roundIndex == 0) {
                         Thread { playProlongedTone(prolongedMs) }.start()
                     }
@@ -218,22 +218,19 @@ class TimerService : Service() {
                 }
                 is TimerEvent.Tick -> {
                     tickCount++
-                    Log.i(TAG, "T $tickCount r${event.roundIndex + 1} ${event.remainingSeconds}s")
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
-                    if (silentAdvance) return@TimerEngine
                     if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
                         try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
                     }
                 }
                 is TimerEvent.RoundEnd -> {
-                    if (!silentAdvance) Thread { playProlongedTone(prolongedMs) }.start()
+                    Thread { playProlongedTone(prolongedMs) }.start()
                 }
                 is TimerEvent.TrainingEnd -> {
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
                     running = false
-                    cancelAlarmTick()
-                    val totalElapsed = SystemClock.elapsedRealtime() - runStartMs
-                    Log.i(TAG, "Timer finished ticks=$tickCount totalElapsed=${totalElapsed}ms")
+                    mainHandler.removeCallbacks(tickRunnable)
+                    Log.i(TAG, "Timer finished ticks=$tickCount")
                     if (useCacheOnly) {
                         playCacheFile(profile.name, langTag) {
                             playCacheFile(savedFinishedText, langTag) {
@@ -251,77 +248,9 @@ class TimerService : Service() {
         }
 
         engine?.advance()
-        scheduleAlarmTick()
+        mainHandler.postDelayed(tickRunnable, 1000)
 
         return START_NOT_STICKY
-    }
-
-    private fun handleTick() {
-        if (!running) return
-        if (paused) {
-            lastTickRealtimeMs = SystemClock.elapsedRealtime()
-            scheduleAlarmTick()
-            return
-        }
-        try {
-            val e = engine ?: return
-            val now = SystemClock.elapsedRealtime()
-            val elapsedMs = now - lastTickRealtimeMs
-            val steps = (elapsedMs / 1000).toInt().coerceIn(1, 60)
-            lastTickRealtimeMs = now
-            for (i in 0 until steps) {
-                silentAdvance = (i < steps - 1)
-                if (!e.advance()) break
-            }
-            scheduleAlarmTick()
-        } catch (_: Exception) {
-            scheduleAlarmTick()
-        }
-    }
-
-    private fun scheduleAlarmTick() {
-        if (!running) return
-        val am = getSystemService(ALARM_SERVICE) as AlarmManager
-        val tickPi = PendingIntent.getService(
-            this, ALARM_REQUEST_CODE,
-            Intent(this, TimerService::class.java).apply { action = ACTION_TICK },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val triggerAtWall = System.currentTimeMillis() + 1000
-        val showIntent = currentProfileId?.let { pid ->
-            PendingIntent.getActivity(
-                this, ALARM_SHOW_REQUEST_CODE,
-                Intent(this, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, pid)
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        } ?: PendingIntent.getActivity(
-            this, ALARM_SHOW_REQUEST_CODE,
-            Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        try {
-            am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAtWall, showIntent), tickPi)
-        } catch (e: Exception) {
-            Log.e(TAG, "AlarmManager.setAlarmClock failed, falling back to handler", e)
-            mainHandler.postDelayed({
-                if (running) handleTick()
-            }, 1000)
-        }
-    }
-
-    private fun cancelAlarmTick() {
-        try {
-            val am = getSystemService(ALARM_SERVICE) as AlarmManager
-            val pi = PendingIntent.getService(
-                this, ALARM_REQUEST_CODE,
-                Intent(this, TimerService::class.java).apply { action = ACTION_TICK },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
-            )
-            if (pi != null) am.cancel(pi)
-        } catch (_: Exception) {}
     }
 
     private var cachedMediaPlayer: MediaPlayer? = null
@@ -514,7 +443,7 @@ class TimerService : Service() {
     override fun onDestroy() {
         try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
         running = false
-        cancelAlarmTick()
+        mainHandler.removeCallbacks(tickRunnable)
         engine = null
         try { alarmTone?.release() } catch (_: Exception) {}
         alarmTone = null
@@ -533,7 +462,7 @@ class TimerService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         running = false
-        cancelAlarmTick()
+        mainHandler.removeCallbacks(tickRunnable)
         stopSelf()
         super.onTaskRemoved(rootIntent)
     }
@@ -544,13 +473,10 @@ class TimerService : Service() {
         private const val TAG = "RaundTimer"
         private const val CHANNEL_ID = "raund_timer_v3"
         private const val NOTIFICATION_ID = 1
-        private const val ALARM_REQUEST_CODE = 42
-        private const val ALARM_SHOW_REQUEST_CODE = 43
         const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"
         const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"
         const val ACTION_RESUME = "com.raund.app.TimerService.RESUME"
-        private const val ACTION_TICK = "com.raund.app.TimerService.TICK"
         const val ACTION_TIMER_STATE = "com.raund.app.TIMER_STATE"
         const val ACTION_TIMER_VISIBLE = "com.raund.app.TIMER_VISIBLE"
         const val ACTION_TIMER_HIDDEN = "com.raund.app.TIMER_HIDDEN"
