@@ -320,8 +320,21 @@ class TimerService : Service() {
             val remainingSeconds = (remainingMs / 1000).coerceAtLeast(0).toInt()
 
             if (remainingMs <= 0) {
+                var skippedRounds = 0
+                var rm = remainingMs
+                while (rm <= 0) {
+                    roundStartRealtimeMs += roundDurationMs
+                    roundIndex++
+                    skippedRounds++
+                    if (roundIndex >= totalRounds) break
+                    round = rounds[roundIndex]
+                    roundDurationMs = round.durationSeconds * 1000L
+                    rm = roundStartRealtimeMs + roundDurationMs - now
+                }
+                if (skippedRounds > 1) {
+                    Log.i(TAG, "freeze skip: jumped $skippedRounds rounds at once")
+                }
                 Thread { playProlongedTone(prolongedMs) }.start()
-                roundIndex++
                 if (roundIndex >= totalRounds) {
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
                     running = false
@@ -339,17 +352,17 @@ class TimerService : Service() {
                     try { alarmTone?.release() } catch (_: Exception) {}
                     return
                 }
-                round = rounds[roundIndex]
-                roundStartRealtimeMs = now
-                roundDurationMs = round.durationSeconds * 1000L
-                lastBroadcastRemainingSeconds = round.durationSeconds
-                broadcastState(round.name, round.durationSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
+                val currentRemaining = ((roundStartRealtimeMs + roundDurationMs - now) / 1000).coerceAtLeast(0).toInt()
+                lastBroadcastRemainingSeconds = currentRemaining
+                broadcastState(round.name, currentRemaining, round.durationSeconds, roundIndex + 1, totalRounds)
                 if (useCacheOnly) {
                     playCacheFile(round.name, langTag, null)
                 } else {
                     tts?.speak(round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
                 }
-                val sleepMs = 1000L.coerceAtMost((roundStartRealtimeMs + 1000 - SystemClock.elapsedRealtime()).coerceAtLeast(1))
+                val secondsElapsed = (now - roundStartRealtimeMs) / 1000
+                val nextMs = roundStartRealtimeMs + (secondsElapsed + 1) * 1000
+                val sleepMs = (nextMs - SystemClock.elapsedRealtime()).coerceIn(1, 1000)
                 Thread.sleep(sleepMs)
                 continue
             }
