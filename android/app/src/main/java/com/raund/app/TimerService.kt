@@ -25,6 +25,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.raund.app.timer.TimerEngine
 import com.raund.app.timer.TimerEvent
@@ -51,17 +52,20 @@ class TimerService : Service() {
     private var alarmTone: ToneGenerator? = null
     private var useCacheOnly = false
     private var langTag = "en"
-    private var lastTickRealtimeMs = 0L
+    private var tickCount = 0
+    private var runStartMs = 0L
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val visibilityReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_TIMER_VISIBLE -> {
+                    Log.i(TAG, "NOTIF: received TIMER_VISIBLE -> hiding notification")
                     timerScreenVisible = true
                     stopForeground(STOP_FOREGROUND_REMOVE)
                 }
                 ACTION_TIMER_HIDDEN -> {
+                    Log.i(TAG, "NOTIF: received TIMER_HIDDEN -> showing notification")
                     timerScreenVisible = false
                     if (running) {
                         showNotification(
@@ -90,6 +94,7 @@ class TimerService : Service() {
         channel.setShowBadge(true)
         channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(channel)
+        Log.i(TAG, "NOTIF: channel $CHANNEL_ID created")
         val filter = IntentFilter().apply {
             addAction(ACTION_TIMER_VISIBLE)
             addAction(ACTION_TIMER_HIDDEN)
@@ -106,8 +111,7 @@ class TimerService : Service() {
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
         ttsReady = false
-        cachedTickPi = null
-        cachedShowPi = null
+        tickCount = 0
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -157,7 +161,10 @@ class TimerService : Service() {
 
         running = true
         paused = false
-        lastTickRealtimeMs = SystemClock.elapsedRealtime()
+        runStartMs = SystemClock.elapsedRealtime()
+        tickCount = 0
+
+        Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
 
         doStartForeground(buildContentNotification(getString(R.string.timer_running)))
 
@@ -209,6 +216,11 @@ class TimerService : Service() {
                     }
                 }
                 is TimerEvent.Tick -> {
+                    tickCount++
+                    if (tickCount % 10 == 0 || tickCount == 1) {
+                        val elapsed = SystemClock.elapsedRealtime() - runStartMs
+                        Log.i(TAG, "TICK round=${event.roundIndex + 1}/${event.totalRounds} rem=${event.remainingSeconds} elapsed=${elapsed}ms screenVis=$timerScreenVisible")
+                    }
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
                     if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
                         try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
@@ -221,6 +233,8 @@ class TimerService : Service() {
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
                     running = false
                     cancelAlarmTick()
+                    val totalElapsed = SystemClock.elapsedRealtime() - runStartMs
+                    Log.i(TAG, "Timer finished ticks=$tickCount totalElapsed=${totalElapsed}ms")
                     if (useCacheOnly) {
                         playCacheFile(profile.name, langTag) {
                             playCacheFile(savedFinishedText, langTag) {
@@ -246,58 +260,49 @@ class TimerService : Service() {
     private fun handleTick() {
         if (!running) return
         if (paused) {
-            lastTickRealtimeMs = SystemClock.elapsedRealtime()
             scheduleAlarmTick()
             return
         }
         try {
             val e = engine ?: return
-            val now = SystemClock.elapsedRealtime()
-            val elapsedMs = now - lastTickRealtimeMs
-            val steps = (elapsedMs / 1000).toInt().coerceAtLeast(1)
-            lastTickRealtimeMs = now
-            for (i in 0 until steps) {
-                if (!e.advance()) return
+            if (!e.advance()) {
+                Log.i(TAG, "Timer loop ended (advance=false)")
+                return
             }
             scheduleAlarmTick()
-        } catch (_: Exception) {
+        } catch (ex: Exception) {
+            Log.e(TAG, "Timer tick error, rescheduling", ex)
             scheduleAlarmTick()
-        }
-    }
-
-    private var cachedTickPi: PendingIntent? = null
-    private var cachedShowPi: PendingIntent? = null
-
-    private fun getTickPendingIntent(): PendingIntent {
-        return cachedTickPi ?: PendingIntent.getService(
-            this, ALARM_REQUEST_CODE,
-            Intent(this, TimerService::class.java).apply { action = ACTION_TICK },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        ).also { cachedTickPi = it }
-    }
-
-    private fun getShowPendingIntent(): PendingIntent {
-        return cachedShowPi ?: run {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                currentProfileId?.let { putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, it) }
-            }
-            PendingIntent.getActivity(
-                this, ALARM_SHOW_REQUEST_CODE, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            ).also { cachedShowPi = it }
         }
     }
 
     private fun scheduleAlarmTick() {
         if (!running) return
         val am = getSystemService(ALARM_SERVICE) as AlarmManager
-        try {
-            am.setAlarmClock(
-                AlarmManager.AlarmClockInfo(System.currentTimeMillis() + 1000, getShowPendingIntent()),
-                getTickPendingIntent()
+        val tickPi = PendingIntent.getService(
+            this, ALARM_REQUEST_CODE,
+            Intent(this, TimerService::class.java).apply { action = ACTION_TICK },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val triggerAtWall = System.currentTimeMillis() + 1000
+        val showIntent = currentProfileId?.let { pid ->
+            PendingIntent.getActivity(
+                this, ALARM_SHOW_REQUEST_CODE,
+                Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, pid)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-        } catch (_: Exception) {
+        } ?: PendingIntent.getActivity(
+            this, ALARM_SHOW_REQUEST_CODE,
+            Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAtWall, showIntent), tickPi)
+        } catch (e: Exception) {
+            Log.e(TAG, "AlarmManager.setAlarmClock failed, falling back to handler", e)
             mainHandler.postDelayed({
                 if (running) handleTick()
             }, 1000)
@@ -389,6 +394,10 @@ class TimerService : Service() {
 
     private var cachedNotifBuilder: Notification.Builder? = null
     private var lastForegroundMs = 0L
+    private var notifTickCount = 0
+    private var notifSkipCount = 0
+    private var notifFgCount = 0
+    private var notifTotalMs = 0L
 
     private fun broadcastState(roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
         val i = Intent(ACTION_TIMER_STATE).apply {
@@ -407,7 +416,12 @@ class TimerService : Service() {
     }
 
     private fun showNotification(text: String, forceStartForeground: Boolean = false) {
-        if (timerScreenVisible && !forceStartForeground) return
+        if (timerScreenVisible && !forceStartForeground) {
+            notifSkipCount++
+            if (notifSkipCount == 1 || notifSkipCount % 60 == 0) Log.i(TAG, "NOTIF: skip (screen visible) skipCount=$notifSkipCount")
+            return
+        }
+        val start = SystemClock.elapsedRealtime()
         val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -436,8 +450,17 @@ class TimerService : Service() {
         if (needFg) {
             doStartForeground(notification)
             lastForegroundMs = now
+            notifFgCount++
         } else {
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
+        }
+        notifTickCount++
+        notifTotalMs += SystemClock.elapsedRealtime() - start
+        if (notifTickCount == 1 || notifTickCount % 60 == 0) {
+            Log.i(TAG, "NOTIF: posted tick=$notifTickCount fg=$needFg text=${text.take(20)}")
+        }
+        if (notifTickCount % 10 == 0) {
+            Log.i("PerfFix", "notification: ticks=$notifTickCount fgCalls=$notifFgCount avgMs=${notifTotalMs / notifTickCount}ms")
         }
     }
 
@@ -504,6 +527,7 @@ class TimerService : Service() {
     }
 
     override fun onDestroy() {
+        Log.i(TAG, "onDestroy")
         try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
         running = false
         cancelAlarmTick()
@@ -524,6 +548,7 @@ class TimerService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.i(TAG, "onTaskRemoved: user removed app from recents, stopping timer")
         running = false
         cancelAlarmTick()
         stopSelf()
@@ -533,6 +558,7 @@ class TimerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        private const val TAG = "RaundTimer"
         private const val CHANNEL_ID = "raund_timer_v3"
         private const val NOTIFICATION_ID = 1
         private const val ALARM_REQUEST_CODE = 42
