@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Raund"
 include(":app")
+include(":baselineprofile")

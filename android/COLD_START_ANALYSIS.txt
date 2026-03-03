@@ -1,0 +1,87 @@
+COLD START ROOT CAUSE ANALYSIS (from logcat 04:21:28–29)
+================================================================
+Source: Single cold launch, logcat -d -v time. No guesses—log evidence only.
+
+OFFICIAL METRIC
+---------------
+ActivityTaskManager: Displayed com.raund.app/.MainActivity for user 0: +2s626ms
+SP_SmartPanelService: windowsDrawnDelayMs = 2626
+
+So time-to-display (TTD) = 2626 ms.
+
+
+TIMELINE (app process 15467, relevant entries only)
+--------------------------------------------------
+04:21:28.288  PerfFix: preloadCache: 4 profiles in 36ms
+04:21:28.288  PerfFix: Background init (full repo + cache) in 441ms
+              → Repo ready; splash can dismiss.
+
+04:21:28.310  M-ProMotion, PowerHalWrapper, SurfaceFactory
+04:21:28.341  TranWindowConfigurationImpl (many lines) — OEM window config
+04:21:28.342  config_debug: updateDecorCaptionStatus [ru]
+04:21:28.347  BufferQueue [MainActivity]
+04:21:28.358  Choreographer: Skipped 30 frames!  (first skip)
+04:21:28.359  TranChoreographerImpl: skippedFrames: 30
+
+04:21:28.729  SnapshotStateList.conditionalUpdate/mutate/update: failed lock verification and will run slower.
+              → Compose runtime runs in unoptimized path (no baseline profile / debug dex).
+
+04:21:28.940  Compiler allocated 6110KB to compile void android.view.ViewRootImpl.performTraversals()
+              → ROOT CAUSE 1: JIT compiles the entire layout/traversal path on first frame.
+
+04:21:29.274  BufferQueue, WindowManager Relayout MainActivity
+04:21:29.282  Relayout Window MainActivity: oldVis=4 newVis=0 ...
+04:21:29.287  FBI (TECNO), config_debug [ru_RU]
+04:21:29.297  BufferQueueProducer: fps=38.54 dur=1453.16 max=536.38
+04:21:29.426  finishDrawingWindow: Window MainActivity mDrawState=DRAW_PENDING
+04:21:29.433  SP_SmartPanelService: windowsDrawnDelayMs = 2626
+04:21:29.435  _T_AppBehavior: APP_START_OCCURRED ... windowsDrawnDelayMs: 2626
+04:21:29.436  ActivityTaskManager: Displayed com.raund.app/.MainActivity for user 0: +2s626ms
+
+04:21:29.446  Choreographer: Skipped 61 frames!  (second skip)
+04:21:29.446  TranChoreographerImpl: skippedFrames: 61
+04:21:29.452  OpenGLRenderer: Davey! duration=1579ms; ... QueueBufferDuration=564923 ...
+              → ROOT CAUSE 2: Single frame takes 1579 ms (main thread + ~565 ms GPU).
+
+
+ROOT CAUSES (evidence-only)
+---------------------------
+1. JIT compilation on first frame
+   - Log: "Compiler allocated 6110KB to compile void android.view.ViewRootImpl.performTraversals()"
+   - performTraversals() is the measure/layout/draw pass. It is JIT-compiled when first used.
+   - Impact: Large one-time cost on first launch (debug + no AOT/baseline profile).
+
+2. First-frame composition cost (Davey 1579 ms)
+   - One frame from start to completion = 1579 ms. QueueBufferDuration ≈ 565 ms (GPU).
+   - Implies main-thread work for that frame ≈ 1000+ ms (Compose + Material 3 + NavHost + list).
+   - Combined with JIT of performTraversals, the first draw is dominated by:
+     - Compilation of view/layout code
+     - Compose composition (lock verification warnings → unoptimized snapshot code)
+     - Full tree measure/layout/draw
+
+3. Compose snapshot running in slow path
+   - Log: "SnapshotStateList ... failed lock verification and will run slower"
+   - Debug dex / missing baseline profile → lock verification fails → slower runtime.
+
+4. Two Choreographer skips (30 + 61 = 91 frames ≈ 1.5 s at 60 fps)
+   - First 30: activity/window/surface setup (OEM + system).
+   - Second 61: first Compose-driven frame (setContent → RaundTheme → NavHost → ProfileListScreen with 4 items).
+
+5. OEM / device (TECNO)
+   - TranWindowConfigurationImpl, TranChoreographerImpl, config_debug, FBI.
+   - Not reducible in app code.
+
+
+SUMMARY
+-------
+- TTD = 2.6 s. Dominated by: (a) JIT compiling performTraversals() on first frame, (b) first-frame composition taking 1.58 s (main + GPU), (c) Compose snapshot in unoptimized path.
+- App-side init is fast (repo + cache 441 ms in background). The bottleneck is first frame: JIT + Compose + traversal, not our business logic.
+- Next steps (when implementing): Baseline Profile to reduce JIT/lock verification cost; consider lighter first screen or deferring heavy composition (evidence-based, not guesswork).
+
+FIXES APPLIED
+-------------
+- Baseline Profile: androidx.baselineprofile plugin (1.2.3) applied on :app; androidx.profileinstaller:profileinstaller added; baselineProfile(project(":baselineprofile")).
+- :baselineprofile module (com.android.test) with BaselineProfileGenerator: pressHome(), startActivityAndWait().
+- To generate baseline-prof.txt (and get AOT gains): run on device or emulator:
+  ./gradlew :app:generateBaselineProfile -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=BaselineProfile
+  Then rebuild release/debug; the generated file is merged into the app by the plugin.
