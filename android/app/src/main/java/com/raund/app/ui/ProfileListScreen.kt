@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
+import com.raund.app.SettingsManager
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 
@@ -87,7 +88,7 @@ fun ProfileListScreen(
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
     var showSettings by remember { mutableStateOf(false) }
-
+    var keepRunning by remember { mutableStateOf(SettingsManager.isKeepRunningOnScreenOff(context)) }
 
     Scaffold(
         topBar = {
@@ -309,7 +310,34 @@ fun ProfileListScreen(
                     fontWeight = FontWeight.Bold
                 )
             },
-            text = { },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.screen_off_continue),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                stringResource(R.string.screen_off_behavior),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = keepRunning,
+                            onCheckedChange = { checked ->
+                                keepRunning = checked
+                                SettingsManager.setKeepRunningOnScreenOff(context, checked)
+                            }
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = { showSettings = false }) {
                     Text(stringResource(R.string.cancel))

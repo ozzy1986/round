@@ -47,6 +47,7 @@ class TimerService : Service() {
     @Volatile private var keepAliveRunning = false
 
     @Volatile private var paused = false
+    @Volatile private var autoPausedByScreenOff = false
     @Volatile private var ttsRef: TextToSpeech? = null
     @Volatile private var ttsReady = false
     @Volatile private var running = false
@@ -80,6 +81,29 @@ class TimerService : Service() {
         }
     }
 
+    private val screenStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (!running) return
+            val keepRunning = SettingsManager.isKeepRunningOnScreenOff(this@TimerService)
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    if (!keepRunning && !paused) {
+                        Log.i(TAG, "screenStateReceiver: SCREEN_OFF -> auto-pause")
+                        paused = true
+                        autoPausedByScreenOff = true
+                    }
+                }
+                Intent.ACTION_SCREEN_ON -> {
+                    if (autoPausedByScreenOff) {
+                        Log.i(TAG, "screenStateReceiver: SCREEN_ON -> auto-resume")
+                        paused = false
+                        autoPausedByScreenOff = false
+                    }
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "onCreate")
@@ -102,6 +126,12 @@ class TimerService : Service() {
             addAction(ACTION_TIMER_HIDDEN)
         }
         ContextCompat.registerReceiver(this, visibilityReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+
+        val screenFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+        }
+        registerReceiver(screenStateReceiver, screenFilter)
     }
 
     private fun stopPreviousTimer() {
@@ -126,10 +156,12 @@ class TimerService : Service() {
             }
             ACTION_PAUSE -> {
                 paused = true
+                autoPausedByScreenOff = false
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
                 paused = false
+                autoPausedByScreenOff = false
                 return START_NOT_STICKY
             }
         }
@@ -162,6 +194,7 @@ class TimerService : Service() {
 
         running = true
         paused = false
+        autoPausedByScreenOff = false
 
         Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
 
@@ -560,7 +593,9 @@ class TimerService : Service() {
     override fun onDestroy() {
         Log.i(TAG, "onDestroy running=$running timerThread.alive=${timerThread?.isAlive} wakeLock.isHeld=${wakeLock?.isHeld}")
         try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
+        try { unregisterReceiver(screenStateReceiver) } catch (_: Exception) {}
         running = false
+        autoPausedByScreenOff = false
         timerThread?.let { t ->
             t.join(3000)
             if (t.isAlive) {
