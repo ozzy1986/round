@@ -14,6 +14,9 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles ORDER BY updatedAt DESC")
     fun getAll(): Flow<List<Profile>>
 
+    @Query("SELECT * FROM profiles ORDER BY updatedAt DESC")
+    suspend fun getAllOnce(): List<Profile>
+
     @Query("SELECT * FROM profiles WHERE id = :id")
     suspend fun getById(id: String): Profile?
 

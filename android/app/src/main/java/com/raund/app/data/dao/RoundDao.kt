@@ -38,4 +38,16 @@ interface RoundDao {
         """
     )
     fun getStatsByProfile(): Flow<List<RoundStats>>
+
+    @Query(
+        """
+        SELECT
+            profileId AS profileId,
+            COUNT(*) AS roundsCount,
+            COALESCE(SUM(durationSeconds), 0) AS totalDurationSeconds
+        FROM rounds
+        GROUP BY profileId
+        """
+    )
+    suspend fun getStatsByProfileOnce(): List<RoundStats>
 }

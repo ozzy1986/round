@@ -45,10 +45,25 @@ class ProfileRepository(
     private val bgScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val pendingProfileCreate = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
 
+    @Volatile
+    var cachedProfiles: List<Profile> = emptyList()
+        private set
+
+    @Volatile
+    var cachedRoundStats: Map<String, RoundStats> = emptyMap()
+        private set
+
     val profiles: Flow<List<Profile>> = profileDao.getAll()
     val roundStats: Flow<Map<String, RoundStats>> = roundDao
         .getStatsByProfile()
         .map { stats -> stats.associateBy { it.profileId } }
+
+    suspend fun preloadCache() {
+        val start = SystemClock.elapsedRealtime()
+        cachedProfiles = profileDao.getAllOnce()
+        cachedRoundStats = roundDao.getStatsByProfileOnce().associateBy { it.profileId }
+        Log.i(PERF, "preloadCache: ${cachedProfiles.size} profiles in ${SystemClock.elapsedRealtime() - start}ms")
+    }
 
     fun getRounds(profileId: String): Flow<List<Round>> = roundDao.getByProfileId(profileId)
 

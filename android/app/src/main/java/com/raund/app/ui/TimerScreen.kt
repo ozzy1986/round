@@ -84,31 +84,10 @@ import com.raund.app.tts.TtsCache
 
 @Composable
 fun TimerScreen(
-    repository: ProfileRepository?,
+    repository: ProfileRepository,
     profileId: String,
     onBack: () -> Unit
 ) {
-    if (repository == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                CircularProgressIndicator()
-                Text(
-                    stringResource(R.string.loading),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        return
-    }
     var profile by remember { mutableStateOf<TimerProfile?>(null) }
     var currentRound by remember { mutableStateOf("") }
     var remaining by remember { mutableIntStateOf(0) }

@@ -77,34 +77,13 @@ private val supportedLanguages = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileListScreen(
-    repository: ProfileRepository?,
+    repository: ProfileRepository,
     onProfileClick: (String) -> Unit,
     onAddProfile: () -> Unit,
     onStartTimer: (String) -> Unit
 ) {
-    if (repository == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                CircularProgressIndicator()
-                Text(
-                    stringResource(R.string.loading),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        return
-    }
-    val profiles by repository.profiles.collectAsState(initial = emptyList())
-    val roundStats by repository.roundStats.collectAsState(initial = emptyMap())
+    val profiles by repository.profiles.collectAsState(initial = repository.cachedProfiles)
+    val roundStats by repository.roundStats.collectAsState(initial = repository.cachedRoundStats)
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
     var showSettings by remember { mutableStateOf(false) }
