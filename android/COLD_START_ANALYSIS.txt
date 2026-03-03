@@ -85,3 +85,5 @@ FIXES APPLIED
 - To generate baseline-prof.txt (and get AOT gains): run on device or emulator:
   ./gradlew :app:generateBaselineProfile -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=BaselineProfile
   Then rebuild release/debug; the generated file is merged into the app by the plugin.
+
+- Deferred composition (MainActivity): first frame draws only RaundTheme + Box(background); full UI (NavHost, ProfileListScreen, etc.) is composed after withFrameMillis { } so "Displayed" fires on the light first frame. Measured TTD: 2562ms -> ~1884ms (device, cold start, same conditions).

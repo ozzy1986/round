@@ -78,6 +78,7 @@ Android:
   - Min SDK 26, target/compile 36
   - Build: Gradle 8.9
   - Baseline Profile: plugin (androidx.baselineprofile 1.2.3) + profileinstaller on :app; :baselineprofile module (com.android.test) with BaselineProfileGenerator. Generate profile: run :app:generateBaselineProfile on device/emulator (see android/COLD_START_ANALYSIS.txt).
+  - Cold start: MainActivity uses deferred composition (first frame = RaundTheme + Box(background); full UI after withFrameMillis) so TTD ~1.9s (was ~2.6s). See android/COLD_START_ANALYSIS.txt.
 
 
 5. REPOSITORY LAYOUT
