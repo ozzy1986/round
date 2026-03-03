@@ -54,6 +54,8 @@ class TimerService : Service() {
     private var langTag = "en"
     private var tickCount = 0
     private var runStartMs = 0L
+    private var lastTickRealtimeMs = 0L
+    @Volatile private var silentAdvance = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val visibilityReceiver = object : BroadcastReceiver() {
@@ -159,6 +161,7 @@ class TimerService : Service() {
         running = true
         paused = false
         runStartMs = SystemClock.elapsedRealtime()
+        lastTickRealtimeMs = runStartMs
         tickCount = 0
 
         Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
@@ -203,6 +206,7 @@ class TimerService : Service() {
             when (event) {
                 is TimerEvent.RoundStart -> {
                     broadcastState(event.round.name, event.round.durationSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
+                    if (silentAdvance) return@TimerEngine
                     if (event.roundIndex == 0) {
                         Thread { playProlongedTone(prolongedMs) }.start()
                     }
@@ -216,12 +220,13 @@ class TimerService : Service() {
                     tickCount++
                     Log.i(TAG, "T $tickCount r${event.roundIndex + 1} ${event.remainingSeconds}s")
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
+                    if (silentAdvance) return@TimerEngine
                     if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
                         try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
                     }
                 }
                 is TimerEvent.RoundEnd -> {
-                    Thread { playProlongedTone(prolongedMs) }.start()
+                    if (!silentAdvance) Thread { playProlongedTone(prolongedMs) }.start()
                 }
                 is TimerEvent.TrainingEnd -> {
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
@@ -254,18 +259,22 @@ class TimerService : Service() {
     private fun handleTick() {
         if (!running) return
         if (paused) {
+            lastTickRealtimeMs = SystemClock.elapsedRealtime()
             scheduleAlarmTick()
             return
         }
         try {
             val e = engine ?: return
-            if (!e.advance()) {
-                Log.i(TAG, "Timer loop ended (advance=false)")
-                return
+            val now = SystemClock.elapsedRealtime()
+            val elapsedMs = now - lastTickRealtimeMs
+            val steps = (elapsedMs / 1000).toInt().coerceIn(1, 60)
+            lastTickRealtimeMs = now
+            for (i in 0 until steps) {
+                silentAdvance = (i < steps - 1)
+                if (!e.advance()) break
             }
             scheduleAlarmTick()
-        } catch (ex: Exception) {
-            Log.e(TAG, "Timer tick error, rescheduling", ex)
+        } catch (_: Exception) {
             scheduleAlarmTick()
         }
     }
