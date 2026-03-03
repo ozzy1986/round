@@ -3,6 +3,7 @@ package com.raund.app
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -89,6 +90,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.i("RaundLifecycle", "MainActivity.onPause")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.i("RaundLifecycle", "MainActivity.onStop")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.i("RaundLifecycle", "MainActivity.onDestroy")
     }
 
     override fun onNewIntent(intent: Intent) {

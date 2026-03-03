@@ -12,10 +12,13 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.ToneGenerator
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -37,7 +40,8 @@ import java.util.Locale
 class TimerService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
-    private var silentTrack: AudioTrack? = null
+    private var mediaSession: MediaSessionCompat? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     @Volatile private var paused = false
     @Volatile private var ttsRef: TextToSpeech? = null
@@ -47,31 +51,20 @@ class TimerService : Service() {
     @Volatile private var currentProfileId: String? = null
     @Volatile private var lastNotifText: String = ""
 
-    private var engine: TimerEngine? = null
-    private var alarmTone: ToneGenerator? = null
+    private var timerThread: Thread? = null
     private var useCacheOnly = false
     private var langTag = "en"
-    private var tickCount = 0
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    private val tickRunnable = object : Runnable {
-        override fun run() {
-            if (!running || paused) return
-            val e = engine ?: return
-            if (e.advance()) {
-                mainHandler.postDelayed(this, 1000)
-            }
-        }
-    }
 
     private val visibilityReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_TIMER_VISIBLE -> {
+                    Log.i(TAG, "visibilityReceiver: TIMER_VISIBLE running=$running wakeLock.isHeld=${wakeLock?.isHeld}")
                     timerScreenVisible = true
-                    stopForeground(STOP_FOREGROUND_REMOVE)
                 }
                 ACTION_TIMER_HIDDEN -> {
+                    Log.i(TAG, "visibilityReceiver: TIMER_HIDDEN -> startForeground notification, running=$running wakeLock.isHeld=${wakeLock?.isHeld}")
                     timerScreenVisible = false
                     if (running) {
                         showNotification(
@@ -86,6 +79,7 @@ class TimerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.i(TAG, "onCreate")
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer").apply {
             setReferenceCounted(false)
@@ -109,17 +103,18 @@ class TimerService : Service() {
 
     private fun stopPreviousTimer() {
         running = false
-        mainHandler.removeCallbacks(tickRunnable)
-        engine = null
-        try { alarmTone?.release() } catch (_: Exception) {}
-        alarmTone = null
+        timerThread?.let { t ->
+            t.join(3000)
+            if (t.isAlive) t.interrupt()
+        }
+        timerThread = null
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
         ttsReady = false
-        tickCount = 0
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(TAG, "onStartCommand action=${intent?.action} flags=$flags startId=$startId")
         when (intent?.action) {
             ACTION_WARMUP -> {
                 val n = buildBasicNotification()
@@ -128,12 +123,10 @@ class TimerService : Service() {
             }
             ACTION_PAUSE -> {
                 paused = true
-                mainHandler.removeCallbacks(tickRunnable)
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
                 paused = false
-                mainHandler.postDelayed(tickRunnable, 1000)
                 return START_NOT_STICKY
             }
         }
@@ -142,8 +135,11 @@ class TimerService : Service() {
 
         if (!(wakeLock?.isHeld == true)) {
             wakeLock?.acquire()
+            Log.i(TAG, "wakeLock.acquire() -> isHeld=${wakeLock?.isHeld}")
+        } else {
+            Log.i(TAG, "wakeLock already held, skip acquire")
         }
-        startSilentAudio()
+        startMediaSession()
 
         @Suppress("DEPRECATION")
         val profile = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -163,7 +159,6 @@ class TimerService : Service() {
 
         running = true
         paused = false
-        tickCount = 0
 
         Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
 
@@ -196,14 +191,35 @@ class TimerService : Service() {
             ttsReady = true
         }
 
-        try { alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100) } catch (_: Exception) {}
+        timerThread = Thread {
+            runTimer(profile, useCacheOnly, langTag, finishedText)
+        }.apply {
+            name = "raund-timer"
+            start()
+            Log.i(TAG, "timerThread started")
+        }
+
+        return START_NOT_STICKY
+    }
+
+    private fun runTimer(profile: TimerProfile, useCacheOnly: Boolean, langTag: String, finishedText: String) {
+        if (!useCacheOnly) {
+            var waited = 0
+            while (!ttsReady && waited < 5000 && running) {
+                Thread.sleep(100)
+                waited += 100
+            }
+        }
+
         val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
-        val prolongedMs = 1200
+        val tts = ttsRef
+        var alarmTone: ToneGenerator? = null
+        try { alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100) } catch (_: Exception) {}
         val tickTone = ToneGenerator.TONE_CDMA_PIP
         val tickMs = 200
-        val savedFinishedText = finishedText
+        val prolongedMs = 1200
 
-        engine = TimerEngine(profile) { event ->
+        val engine = TimerEngine(profile) { event ->
             when (event) {
                 is TimerEvent.RoundStart -> {
                     broadcastState(event.round.name, event.round.durationSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
@@ -213,11 +229,10 @@ class TimerService : Service() {
                     if (useCacheOnly) {
                         playCacheFile(event.round.name, langTag, null)
                     } else {
-                        ttsRef?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                        tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
                     }
                 }
                 is TimerEvent.Tick -> {
-                    tickCount++
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
                     if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
                         try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
@@ -229,17 +244,15 @@ class TimerService : Service() {
                 is TimerEvent.TrainingEnd -> {
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
                     running = false
-                    mainHandler.removeCallbacks(tickRunnable)
-                    Log.i(TAG, "Timer finished ticks=$tickCount")
                     if (useCacheOnly) {
                         playCacheFile(profile.name, langTag) {
-                            playCacheFile(savedFinishedText, langTag) {
+                            playCacheFile(finishedText, langTag) {
                                 mainHandler.postDelayed({ stopSelf() }, 6000)
                             }
                         }
                     } else {
-                        ttsRef?.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
-                        ttsRef?.speak(savedFinishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
+                        tts?.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                        tts?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
                         mainHandler.postDelayed({ stopSelf() }, 6000)
                     }
                 }
@@ -247,10 +260,21 @@ class TimerService : Service() {
             }
         }
 
-        engine?.advance()
-        mainHandler.postDelayed(tickRunnable, 1000)
+        engine.advance()
+        var loopTick = 0
+        while (running) {
+            if (paused) {
+                Thread.sleep(500)
+            } else {
+                Thread.sleep(1000)
+                loopTick++
+                Log.i(TAG, "tick #$loopTick at ${SystemClock.elapsedRealtime()} wl=${wakeLock?.isHeld}")
+                if (!engine.advance()) break
+            }
+        }
+        Log.i(TAG, "runTimer loop exited running=$running ticks=$loopTick")
 
-        return START_NOT_STICKY
+        try { alarmTone?.release() } catch (_: Exception) {}
     }
 
     private var cachedMediaPlayer: MediaPlayer? = null
@@ -409,44 +433,77 @@ class TimerService : Service() {
 
     private fun doStartForeground(notification: Notification) {
         if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
     }
 
-    private fun startSilentAudio() {
-        if (silentTrack != null) return
+    private fun startMediaSession() {
+        if (mediaSession != null) return
         try {
-            val sampleRate = 8000
-            val bufferSize = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-                .setBufferSizeInBytes(bufferSize)
-                .setTransferMode(AudioTrack.MODE_STATIC)
+            val session = MediaSessionCompat(this, "RaundTimer")
+            session.isActive = true
+            session.setPlaybackState(
+                PlaybackStateCompat.Builder()
+                    .setActions(PlaybackStateCompat.ACTION_PLAY_PAUSE)
+                    .setState(PlaybackStateCompat.STATE_PLAYING, 0, 1.0f)
+                    .build()
+            )
+            mediaSession = session
+            Log.i(TAG, "MediaSession started, isActive=true")
+        } catch (e: Exception) {
+            Log.e(TAG, "MediaSession start failed", e)
+        }
+
+        try {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            val focusReq = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setOnAudioFocusChangeListener {}
                 .build()
-            val silence = ShortArray(sampleRate)
-            track.write(silence, 0, silence.size)
-            track.setLoopPoints(0, sampleRate, -1)
-            track.setVolume(0f)
-            track.play()
-            silentTrack = track
-        } catch (_: Exception) {}
+            am.requestAudioFocus(focusReq)
+            audioFocusRequest = focusReq
+            Log.i(TAG, "AudioFocus requested AUDIOFOCUS_GAIN")
+        } catch (e: Exception) {
+            Log.e(TAG, "AudioFocus request failed", e)
+        }
     }
 
-    private fun stopSilentAudio() {
-        try { silentTrack?.stop(); silentTrack?.release() } catch (_: Exception) {}
-        silentTrack = null
+    private fun stopMediaSession() {
+        try {
+            mediaSession?.isActive = false
+            mediaSession?.release()
+        } catch (_: Exception) {}
+        mediaSession = null
+
+        try {
+            val afr = audioFocusRequest
+            if (afr != null) {
+                val am = getSystemService(AUDIO_SERVICE) as AudioManager
+                am.abandonAudioFocusRequest(afr)
+            }
+        } catch (_: Exception) {}
+        audioFocusRequest = null
     }
 
     override fun onDestroy() {
+        Log.i(TAG, "onDestroy running=$running timerThread.alive=${timerThread?.isAlive} wakeLock.isHeld=${wakeLock?.isHeld}")
         try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
         running = false
-        mainHandler.removeCallbacks(tickRunnable)
-        engine = null
-        try { alarmTone?.release() } catch (_: Exception) {}
-        alarmTone = null
+        timerThread?.let { t ->
+            t.join(3000)
+            if (t.isAlive) {
+                Log.i(TAG, "onDestroy: timerThread still alive after 3s, interrupting")
+                t.interrupt()
+            }
+        }
+        timerThread = null
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
         synchronized(cachePlayerLock) {
@@ -454,15 +511,18 @@ class TimerService : Service() {
             cachedMediaPlayer = null
         }
         cachedToneBuffer = null
-        stopSilentAudio()
-        if (wakeLock?.isHeld == true) wakeLock?.release()
+        stopMediaSession()
+        if (wakeLock?.isHeld == true) {
+            wakeLock?.release()
+            Log.i(TAG, "wakeLock.release()")
+        }
         wakeLock = null
         super.onDestroy()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.i(TAG, "onTaskRemoved running=$running")
         running = false
-        mainHandler.removeCallbacks(tickRunnable)
         stopSelf()
         super.onTaskRemoved(rootIntent)
     }
