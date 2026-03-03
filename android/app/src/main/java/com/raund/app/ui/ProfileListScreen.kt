@@ -64,13 +64,13 @@ import com.raund.app.data.entity.Profile
 import com.raund.app.data.repository.ProfileRepository
 
 private val supportedLanguages = listOf(
-    Triple("en", "English", "🇬🇧"),
     Triple("ru", "Русский", "🇷🇺"),
     Triple("uz", "Oʻzbek", "🇺🇿"),
     Triple("kk", "Қазақ", "🇰🇿"),
     Triple("az", "Azərbaycan", "🇦🇿"),
     Triple("tg", "Тоҷикӣ", "🇹🇯"),
     Triple("tt", "Татар", "🇷🇺"),
+    Triple("en", "English", "🇬🇧"),
     Triple("zh", "中文", "🇨🇳"),
 )
 

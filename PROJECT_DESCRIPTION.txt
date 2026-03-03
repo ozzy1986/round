@@ -210,7 +210,7 @@ Supported languages (8):
   - Tatar (tt) — Cyrillic script
   - Chinese (zh) — Simplified Chinese
 
-Android: res/values/strings.xml (en), res/values-ru/ (ru), res/values-uz/ (uz), res/values-kk/ (kk), res/values-az/ (az), res/values-tg/ (tg), res/values-tt/ (tt), res/values-zh/ (zh). Language selector in profile list is a dropdown menu showing all 8 languages with native names.
+Android: res/values/strings.xml (en), res/values-ru/ (ru), res/values-uz/ (uz), res/values-kk/ (kk), res/values-az/ (az), res/values-tg/ (tg), res/values-tt/ (tt), res/values-zh/ (zh). Language selector in profile list is a dropdown menu showing all 8 languages with native names (order: Russian first, then UZ, KK, AZ, TG, TT, English and Chinese last).
 
 
 12. ENVIRONMENT & DEPLOYMENT
