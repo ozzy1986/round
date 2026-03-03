@@ -42,6 +42,9 @@ class TimerService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var mediaSession: MediaSessionCompat? = null
     private var audioFocusRequest: AudioFocusRequest? = null
+    private var keepAliveTrack: AudioTrack? = null
+    private var keepAliveThread: Thread? = null
+    @Volatile private var keepAliveRunning = false
 
     @Volatile private var paused = false
     @Volatile private var ttsRef: TextToSpeech? = null
@@ -441,6 +444,27 @@ class TimerService : Service() {
 
     private fun startMediaSession() {
         if (mediaSession != null) return
+
+        val mediaAttrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build()
+
+        try {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            val focusReq = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(mediaAttrs)
+                .setOnAudioFocusChangeListener {}
+                .build()
+            am.requestAudioFocus(focusReq)
+            audioFocusRequest = focusReq
+            Log.i(TAG, "AudioFocus requested AUDIOFOCUS_GAIN")
+        } catch (e: Exception) {
+            Log.e(TAG, "AudioFocus request failed", e)
+        }
+
+        startKeepAliveAudio(mediaAttrs)
+
         try {
             val session = MediaSessionCompat(this, "RaundTimer")
             session.isActive = true
@@ -455,27 +479,68 @@ class TimerService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "MediaSession start failed", e)
         }
+    }
 
+    private fun startKeepAliveAudio(attrs: AudioAttributes) {
+        if (keepAliveRunning) return
         try {
-            val am = getSystemService(AUDIO_SERVICE) as AudioManager
-            val focusReq = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            val sampleRate = 44100
+            val bufSize = AudioTrack.getMinBufferSize(
+                sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+            ).coerceAtLeast(4096)
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(attrs)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .build()
                 )
-                .setOnAudioFocusChangeListener {}
+                .setBufferSizeInBytes(bufSize)
+                .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
-            am.requestAudioFocus(focusReq)
-            audioFocusRequest = focusReq
-            Log.i(TAG, "AudioFocus requested AUDIOFOCUS_GAIN")
+            track.play()
+            keepAliveTrack = track
+            keepAliveRunning = true
+
+            val buf = ShortArray(sampleRate / 10)
+            val amp = 30.toShort()
+            val freq = 1.0
+            for (i in buf.indices) {
+                buf[i] = (sin(2.0 * PI * freq * i / sampleRate) * amp).toInt().toShort()
+            }
+
+            keepAliveThread = Thread {
+                Log.i(TAG, "keepAliveAudio started (stream USAGE_MEDIA, amp=$amp)")
+                while (keepAliveRunning) {
+                    try {
+                        track.write(buf, 0, buf.size)
+                    } catch (_: Exception) { break }
+                }
+                Log.i(TAG, "keepAliveAudio stopped")
+            }.apply {
+                name = "raund-keepalive"
+                isDaemon = true
+                start()
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "AudioFocus request failed", e)
+            Log.e(TAG, "keepAliveAudio start failed", e)
         }
     }
 
+    private fun stopKeepAliveAudio() {
+        keepAliveRunning = false
+        try { keepAliveTrack?.stop() } catch (_: Exception) {}
+        try { keepAliveTrack?.release() } catch (_: Exception) {}
+        keepAliveTrack = null
+        keepAliveThread?.join(2000)
+        keepAliveThread = null
+    }
+
     private fun stopMediaSession() {
+        stopKeepAliveAudio()
+
         try {
             mediaSession?.isActive = false
             mediaSession?.release()
