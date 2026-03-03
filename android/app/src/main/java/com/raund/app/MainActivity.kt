@@ -50,9 +50,9 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         repo = withContext(Dispatchers.IO) { app.profileRepository }
                     }
-                    val r = repo
-                    if (r != null) {
-                    SyncOnConnectivityEffect(r)
+                    if (repo != null) {
+                        SyncOnConnectivityEffect(repo!!)
+                    }
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         val navController = rememberNavController()
                         val openTimerId = remember { pendingOpenTimerId }
@@ -70,33 +70,32 @@ class MainActivity : ComponentActivity() {
                                 openTimerId.value = null
                             }
                         }
-                    NavHost(navController = navController, startDestination = "profiles") {
-                        composable("profiles") {
-                            ProfileListScreen(
-                                repository = r,
-                                onProfileClick = { id -> navController.navigate("editor/$id") },
-                                onAddProfile = { navController.navigate("editor/new") },
-                                onStartTimer = { id -> navController.navigate("timer/$id") }
-                            )
+                        NavHost(navController = navController, startDestination = "profiles") {
+                            composable("profiles") {
+                                ProfileListScreen(
+                                    repository = repo,
+                                    onProfileClick = { id -> navController.navigate("editor/$id") },
+                                    onAddProfile = { navController.navigate("editor/new") },
+                                    onStartTimer = { id -> navController.navigate("timer/$id") }
+                                )
+                            }
+                            composable("editor/{profileId}") { backStackEntry ->
+                                val id = backStackEntry.arguments?.getString("profileId") ?: "new"
+                                ProfileEditorScreen(
+                                    repository = repo,
+                                    profileId = if (id == "new") null else id,
+                                    onBack = { navController.popBackStack() }
+                                )
+                            }
+                            composable("timer/{profileId}") { backStackEntry ->
+                                val profileId = backStackEntry.arguments?.getString("profileId") ?: return@composable
+                                TimerScreen(
+                                    repository = repo,
+                                    profileId = profileId,
+                                    onBack = { navController.popBackStack() }
+                                )
+                            }
                         }
-                        composable("editor/{profileId}") { backStackEntry ->
-                            val id = backStackEntry.arguments?.getString("profileId") ?: "new"
-                            ProfileEditorScreen(
-                                repository = r,
-                                profileId = if (id == "new") null else id,
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
-                        composable("timer/{profileId}") { backStackEntry ->
-                            val profileId = backStackEntry.arguments?.getString("profileId") ?: return@composable
-                            TimerScreen(
-                                repository = r,
-                                profileId = profileId,
-                                onBack = { navController.popBackStack() }
-                            )
-                        }
-                    }
-                    }
                     }
                 }
             }

@@ -47,4 +47,5 @@
     <string name="screen_off_behavior">Ҳангоми хомӯш шудани экран таваққуф</string>
     <string name="screen_off_continue">Машқ дар замина идома меёбад</string>
     <string name="timer_running">Таймер кор мекунад</string>
+    <string name="loading">Бор шуда истодааст…</string>
 </resources>

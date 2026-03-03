@@ -22,11 +22,11 @@ class RaundApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        val start = System.currentTimeMillis()
         Thread {
-            Log.i("PerfFix", "Background init START")
-            profileRepository
-            Log.i("PerfFix", "Background init DONE in ${System.currentTimeMillis() - start}ms")
+            val start = System.currentTimeMillis()
+            database
+            tokenStore
+            Log.i("PerfFix", "Background warmup (database + tokenStore) in ${System.currentTimeMillis() - start}ms")
         }.start()
     }
     private val syncPrefs by lazy { SyncPrefs(this) }

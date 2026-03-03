@@ -47,4 +47,5 @@
     <string name="screen_off_behavior">屏幕关闭时暂停</string>
     <string name="screen_off_continue">训练在后台继续运行</string>
     <string name="timer_running">计时器运行中</string>
+    <string name="loading">加载中…</string>
 </resources>
