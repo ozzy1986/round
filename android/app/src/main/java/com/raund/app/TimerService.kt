@@ -29,8 +29,6 @@ import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.raund.app.timer.TimerEngine
-import com.raund.app.timer.TimerEvent
 import com.raund.app.timer.TimerProfile
 import com.raund.app.tts.TtsCache
 import kotlin.math.PI
@@ -270,6 +268,12 @@ class TimerService : Service() {
             }
         }
 
+        val rounds = profile.rounds
+        if (rounds.isEmpty()) {
+            running = false
+            return
+        }
+
         val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
         val tts = ttsRef
         var alarmTone: ToneGenerator? = null
@@ -277,30 +281,48 @@ class TimerService : Service() {
         val tickTone = ToneGenerator.TONE_CDMA_PIP
         val tickMs = 200
         val prolongedMs = 1200
+        val totalRounds = rounds.size
 
-        val engine = TimerEngine(profile) { event ->
-            when (event) {
-                is TimerEvent.RoundStart -> {
-                    broadcastState(event.round.name, event.round.durationSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
-                    if (event.roundIndex == 0) {
-                        Thread { playProlongedTone(prolongedMs) }.start()
-                    }
-                    if (useCacheOnly) {
-                        playCacheFile(event.round.name, langTag, null)
-                    } else {
-                        tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
-                    }
+        var roundIndex = 0
+        var round = rounds[0]
+        var roundStartRealtimeMs = SystemClock.elapsedRealtime()
+        var roundDurationMs = round.durationSeconds * 1000L
+        var wasPaused = false
+        var remainingMsWhenPaused = 0L
+
+        broadcastState(round.name, round.durationSeconds, round.durationSeconds, 1, totalRounds)
+        if (roundIndex == 0) {
+            Thread { playProlongedTone(prolongedMs) }.start()
+        }
+        if (useCacheOnly) {
+            playCacheFile(round.name, langTag, null)
+        } else {
+            tts?.speak(round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+        }
+
+        var lastBroadcastRemainingSeconds = round.durationSeconds
+        while (running) {
+            if (paused) {
+                if (!wasPaused) {
+                    remainingMsWhenPaused = roundStartRealtimeMs + roundDurationMs - SystemClock.elapsedRealtime()
+                    wasPaused = true
                 }
-                is TimerEvent.Tick -> {
-                    broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
-                    if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
-                        try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
-                    }
-                }
-                is TimerEvent.RoundEnd -> {
-                    Thread { playProlongedTone(prolongedMs) }.start()
-                }
-                is TimerEvent.TrainingEnd -> {
+                Thread.sleep(500)
+                continue
+            }
+            if (wasPaused) {
+                roundStartRealtimeMs = SystemClock.elapsedRealtime() - remainingMsWhenPaused
+                wasPaused = false
+            }
+
+            val now = SystemClock.elapsedRealtime()
+            val remainingMs = roundStartRealtimeMs + roundDurationMs - now
+            val remainingSeconds = (remainingMs / 1000).coerceAtLeast(0).toInt()
+
+            if (remainingMs <= 0) {
+                Thread { playProlongedTone(prolongedMs) }.start()
+                roundIndex++
+                if (roundIndex >= totalRounds) {
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
                     running = false
                     if (useCacheOnly) {
@@ -314,24 +336,38 @@ class TimerService : Service() {
                         tts?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
                         mainHandler.postDelayed({ stopSelf() }, 6000)
                     }
+                    try { alarmTone?.release() } catch (_: Exception) {}
+                    return
                 }
-                else -> {}
+                round = rounds[roundIndex]
+                roundStartRealtimeMs = now
+                roundDurationMs = round.durationSeconds * 1000L
+                lastBroadcastRemainingSeconds = round.durationSeconds
+                broadcastState(round.name, round.durationSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
+                if (useCacheOnly) {
+                    playCacheFile(round.name, langTag, null)
+                } else {
+                    tts?.speak(round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                }
+                val sleepMs = 1000L.coerceAtMost((roundStartRealtimeMs + 1000 - SystemClock.elapsedRealtime()).coerceAtLeast(1))
+                Thread.sleep(sleepMs)
+                continue
             }
-        }
 
-        engine.advance()
-        var loopTick = 0
-        while (running) {
-            if (paused) {
-                Thread.sleep(500)
-            } else {
-                Thread.sleep(1000)
-                loopTick++
-                Log.i(TAG, "tick #$loopTick at ${SystemClock.elapsedRealtime()} wl=${wakeLock?.isHeld}")
-                if (!engine.advance()) break
+            if (remainingSeconds != lastBroadcastRemainingSeconds) {
+                lastBroadcastRemainingSeconds = remainingSeconds
+                broadcastState(round.name, remainingSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
+                if (round.warn10sec && round.durationSeconds >= 10 && remainingSeconds in 1..10) {
+                    try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
+                }
             }
+
+            val secondsElapsedInRound = (now - roundStartRealtimeMs) / 1000
+            val nextTickRealtimeMs = roundStartRealtimeMs + (secondsElapsedInRound + 1) * 1000
+            val sleepMs = (nextTickRealtimeMs - SystemClock.elapsedRealtime()).coerceIn(1, 1000)
+            Thread.sleep(sleepMs)
         }
-        Log.i(TAG, "runTimer loop exited running=$running ticks=$loopTick")
+        Log.i(TAG, "runTimer loop exited running=$running")
 
         try { alarmTone?.release() } catch (_: Exception) {}
     }
