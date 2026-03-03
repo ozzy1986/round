@@ -179,6 +179,9 @@ D. TIMER UX / STATE MACHINE
 27) Back from timer returns to profile list and stops active speech playback.
 28) Profiles without rounds: timer start remains disabled and helper text is shown.
 29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
+29a) Screen-off behavior: start timer, press power button to turn screen off. Timer, sounds, and TTS must continue. Notification appears with round name and countdown. Turn screen on: notification disappears, timer screen shows current state.
+29b) Swiping app from recents while timer is running: timer continues, notification stays visible.
+29c) Tapping notification while timer is running opens the app on the active timer screen.
 
 E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with device volume up)
 30) Start of training (first round only): one continuous prolonged tone (1200 ms), then TTS speaks round name. Subsequent round starts: TTS only (no tone).
@@ -255,6 +258,13 @@ Run in order. After any code change, re-run from scenario 1.
     10.2 Tap "Продолжить" → countdown continues from same time.
     10.3 Tap "Стоп" while paused → "Тренировка завершена", "Повторить" (Restart) shown.
     10.4 Start, let it finish naturally. "Тренировка завершена". Tap "Повторить" → reset, Start again.
+
+10a. TIMER — SCREEN OFF (timer keeps running)
+    10a.1 Start timer with a longer profile (e.g. 30+ sec). Press power button to turn screen off.
+    10a.2 Timer, TTS, tones must continue in background. Notification shows round name + countdown.
+    10a.3 Turn screen back on → app resumes with current timer state, notification disappears.
+    10a.4 Start timer, turn off screen, swipe app from recents. Timer should keep running.
+    10a.5 Tap notification → opens app on the running timer screen.
 
 11. TIMER — BACK
     11.1 Start timer, tap Back. Return to profile list, TTS/beeps stop.

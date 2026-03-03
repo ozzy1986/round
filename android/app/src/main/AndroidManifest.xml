@@ -21,7 +21,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.Round">
+            android:theme="@style/Theme.Round.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -30,8 +30,7 @@
         <service
             android:name=".TimerService"
             android:foregroundServiceType="specialUse"
-            android:exported="false"
-            android:process=":timer">
+            android:exported="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Interval timer with audio alerts that must continue when screen is off" />

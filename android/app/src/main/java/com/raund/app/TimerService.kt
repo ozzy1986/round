@@ -58,16 +58,26 @@ class TimerService : Service() {
     @Volatile
     private var currentProfileId: String? = null
 
+    @Volatile
+    private var lastNotifText: String = ""
+
     private val visibilityReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 ACTION_TIMER_VISIBLE -> {
-                    Log.i(TAG, "NOTIF: received TIMER_VISIBLE -> timerScreenVisible=true (no notification updates in app)")
+                    Log.i(TAG, "NOTIF: received TIMER_VISIBLE -> hiding notification")
                     timerScreenVisible = true
+                    stopForeground(STOP_FOREGROUND_REMOVE)
                 }
                 ACTION_TIMER_HIDDEN -> {
-                    Log.i(TAG, "NOTIF: received TIMER_HIDDEN -> timerScreenVisible=false (will show/update notification)")
+                    Log.i(TAG, "NOTIF: received TIMER_HIDDEN -> showing notification")
                     timerScreenVisible = false
+                    if (running) {
+                        showNotification(
+                            lastNotifText.ifEmpty { getString(R.string.timer_running) },
+                            forceStartForeground = true
+                        )
+                    }
                 }
             }
         }
@@ -420,6 +430,7 @@ class TimerService : Service() {
         }
         sendBroadcast(i)
         val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
+        lastNotifText = text
         showNotification(text, forceStartForeground = !isRunning)
     }
 
@@ -528,6 +539,20 @@ class TimerService : Service() {
         }
         wakeLock = null
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (running) {
+            Log.i(TAG, "onTaskRemoved: timer running, keeping service alive")
+            if (!timerScreenVisible) {
+                showNotification(
+                    lastNotifText.ifEmpty { getString(R.string.timer_running) },
+                    forceStartForeground = true
+                )
+            }
+            return
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

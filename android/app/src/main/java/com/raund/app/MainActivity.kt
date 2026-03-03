@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -34,9 +35,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val app = application as RaundApplication
+        installSplashScreen().setKeepOnScreenCondition { !app.repositoryReady }
         super.onCreate(savedInstanceState)
         pendingOpenTimerId.value = intent?.getStringExtra(EXTRA_OPEN_TIMER_PROFILE_ID)
-        val repo = (application as RaundApplication).profileRepository
+        val repo = app.profileRepository
         setContent {
             RaundTheme {
                 SyncOnConnectivityEffect(repo)

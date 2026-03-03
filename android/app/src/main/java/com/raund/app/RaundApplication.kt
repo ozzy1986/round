@@ -10,6 +10,10 @@ import com.raund.app.data.remote.AuthAuthenticator
 import com.raund.app.data.remote.AuthService
 import com.raund.app.data.remote.TokenInterceptor
 import com.raund.app.data.repository.ProfileRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -20,6 +24,12 @@ class RaundApplication : Application() {
     val database by lazy { AppDatabase.get(this) }
     val tokenStore by lazy { TokenStore(this) }
     private val syncPrefs by lazy { SyncPrefs(this) }
+
+    @Volatile
+    var repositoryReady = false
+        private set
+
+    private val initScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val authRetrofit by lazy {
         Retrofit.Builder()
@@ -71,5 +81,15 @@ class RaundApplication : Application() {
             syncPrefs = syncPrefs,
             database = database
         )
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        initScope.launch {
+            val start = android.os.SystemClock.elapsedRealtime()
+            profileRepository.preloadCache()
+            repositoryReady = true
+            Log.i("PerfFix", "App init: preloadCache done in ${android.os.SystemClock.elapsedRealtime() - start}ms")
+        }
     }
 }
