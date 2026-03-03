@@ -1,6 +1,7 @@
 package com.raund.app
 
 import android.app.Application
+import android.os.SystemClock
 import android.util.Log
 import com.raund.app.data.db.AppDatabase
 import com.raund.app.data.local.SyncPrefs
@@ -85,11 +86,15 @@ class RaundApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        val appStartMs = SystemClock.elapsedRealtime()
+        Log.i("PerfFix", "App onCreate start")
         initScope.launch {
-            val start = android.os.SystemClock.elapsedRealtime()
+            val start = SystemClock.elapsedRealtime()
             profileRepository.preloadCache()
             repositoryReady = true
-            Log.i("PerfFix", "App init: preloadCache done in ${android.os.SystemClock.elapsedRealtime() - start}ms")
+            val preloadMs = SystemClock.elapsedRealtime() - start
+            val totalMs = SystemClock.elapsedRealtime() - appStartMs
+            Log.i("PerfFix", "App ready in ${totalMs}ms (preload=${preloadMs}ms)")
         }
     }
 }

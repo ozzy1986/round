@@ -166,18 +166,26 @@ fun TimerScreen(
         val lifecycleOwner = activity as? androidx.lifecycle.LifecycleOwner
         val lifecycleObserver = object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+                android.util.Log.i("TimerScreen", "onResume -> sending TIMER_VISIBLE")
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
             }
             override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
+                android.util.Log.i("TimerScreen", "onPause -> sending TIMER_HIDDEN")
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
             }
         }
         lifecycleOwner?.lifecycle?.addObserver(lifecycleObserver)
         context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
+        var recvCount = 0
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) {
                 if (i == null) return
-                remaining = i.getIntExtra(TimerService.EXTRA_REMAINING, remaining)
+                val rem = i.getIntExtra(TimerService.EXTRA_REMAINING, remaining)
+                recvCount++
+                if (recvCount % 10 == 0 || recvCount == 1 || rem == 0) {
+                    android.util.Log.i("TimerScreen", "recv #$recvCount rem=$rem round=${i.getIntExtra(TimerService.EXTRA_ROUND_INDEX, 0)}/${i.getIntExtra(TimerService.EXTRA_TOTAL_ROUNDS, 1)}")
+                }
+                remaining = rem
                 currentRound = i.getStringExtra(TimerService.EXTRA_ROUND_NAME) ?: currentRound
                 roundTotal = i.getIntExtra(TimerService.EXTRA_ROUND_TOTAL, roundTotal)
                 val idx = i.getIntExtra(TimerService.EXTRA_ROUND_INDEX, 0)

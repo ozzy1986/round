@@ -1,5 +1,6 @@
 package com.raund.app
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -22,6 +23,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -31,35 +33,28 @@ import com.raund.app.timer.TimerProfile
 import com.raund.app.tts.TtsCache
 import kotlin.math.PI
 import kotlin.math.sin
-import java.io.File
 import java.util.Locale
 
 class TimerService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var silentTrack: AudioTrack? = null
-    private var timerThread: Thread? = null
 
-    @Volatile
-    private var paused = false
+    @Volatile private var paused = false
+    @Volatile private var ttsRef: TextToSpeech? = null
+    @Volatile private var ttsReady = false
+    @Volatile private var running = false
+    @Volatile private var timerScreenVisible = false
+    @Volatile private var currentProfileId: String? = null
+    @Volatile private var lastNotifText: String = ""
 
-    @Volatile
-    private var ttsRef: TextToSpeech? = null
-
-    @Volatile
-    private var ttsReady = false
-
-    @Volatile
-    private var running = false
-
-    @Volatile
-    private var timerScreenVisible = false
-
-    @Volatile
-    private var currentProfileId: String? = null
-
-    @Volatile
-    private var lastNotifText: String = ""
+    private var engine: TimerEngine? = null
+    private var alarmTone: ToneGenerator? = null
+    private var useCacheOnly = false
+    private var langTag = "en"
+    private var tickCount = 0
+    private var runStartMs = 0L
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val visibilityReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -85,7 +80,6 @@ class TimerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "onCreate")
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer").apply {
             setReferenceCounted(false)
@@ -94,17 +88,13 @@ class TimerService : Service() {
         nm.deleteNotificationChannel("raund_timer")
         nm.deleteNotificationChannel("raund_timer_visible")
         nm.deleteNotificationChannel("raund_timer_v2")
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.app_name),
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
+        val channel = NotificationChannel(CHANNEL_ID, getString(R.string.app_name), NotificationManager.IMPORTANCE_DEFAULT)
         channel.description = getString(R.string.timer_running)
         channel.setSound(null, null)
         channel.setShowBadge(true)
         channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         nm.createNotificationChannel(channel)
-        Log.i(TAG, "NOTIF: channel $CHANNEL_ID created importance=DEFAULT")
+        Log.i(TAG, "NOTIF: channel $CHANNEL_ID created")
         val filter = IntentFilter().apply {
             addAction(ACTION_TIMER_VISIBLE)
             addAction(ACTION_TIMER_HIDDEN)
@@ -114,42 +104,34 @@ class TimerService : Service() {
 
     private fun stopPreviousTimer() {
         running = false
-        timerThread?.let { t ->
-            t.join(3000)
-            if (t.isAlive) t.interrupt()
-        }
-        timerThread = null
+        cancelAlarmTick()
+        engine = null
+        try { alarmTone?.release() } catch (_: Exception) {}
+        alarmTone = null
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
         ttsReady = false
+        tickCount = 0
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand action=${intent?.action}")
         when (intent?.action) {
             ACTION_WARMUP -> {
-                Log.d(TAG, "warmup: process ready")
-                val n = Notification.Builder(this, CHANNEL_ID)
-                    .setContentTitle(getString(R.string.app_name))
-                    .setContentText(getString(R.string.timer_running))
-                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                    .setOngoing(true)
-                    .build()
-                if (Build.VERSION.SDK_INT >= 29) {
-                    startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-                } else {
-                    startForeground(NOTIFICATION_ID, n)
-                }
+                val n = buildBasicNotification()
+                doStartForeground(n)
                 return START_NOT_STICKY
             }
             ACTION_PAUSE -> {
                 paused = true
-                Log.d(TAG, "paused")
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
                 paused = false
-                Log.d(TAG, "resumed")
+                scheduleAlarmTick()
+                return START_NOT_STICKY
+            }
+            ACTION_TICK -> {
+                handleTick()
                 return START_NOT_STICKY
             }
         }
@@ -167,66 +149,28 @@ class TimerService : Service() {
         } else {
             intent?.getParcelableExtra(EXTRA_PROFILE)
         } ?: run {
-            Log.w(TAG, "No profile in intent, showing foreground and exiting")
             currentProfileId = null
-            val n = Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle(getString(R.string.app_name))
-                .setContentText(getString(R.string.timer_running))
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setOngoing(true)
-                .build()
-            if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(NOTIFICATION_ID, n)
-            }
+            doStartForeground(buildBasicNotification())
             return START_NOT_STICKY
         }
 
         currentProfileId = intent?.getStringExtra(EXTRA_PROFILE_ID)
-        val langTag = intent?.getStringExtra(EXTRA_LANG) ?: "en"
+        langTag = intent?.getStringExtra(EXTRA_LANG) ?: "en"
         val finishedText = intent?.getStringExtra(EXTRA_FINISHED_TEXT) ?: getString(R.string.timer_finished)
-        val phrases = TtsCache.buildPhraseList(profile, finishedText)
-        Log.d(TAG, "cacheDir=${TtsCache.cacheDir(applicationContext).absolutePath} phrases count=${phrases.size} langTag=$langTag finishedText='${finishedText.take(30)}'")
-        phrases.forEachIndexed { i, s -> Log.d(TAG, "  phrase[$i] exists=${TtsCache.exists(applicationContext, langTag, s)} '${s.take(25)}'") }
-        val useCacheOnly = TtsCache.allExist(applicationContext, langTag, phrases)
-        Log.d(TAG, "useCacheOnly=$useCacheOnly (allExist=$useCacheOnly)")
-        if (useCacheOnly) Log.d(TAG, "All phrases in cache, starting without TTS")
+        useCacheOnly = TtsCache.allExist(applicationContext, langTag, TtsCache.buildPhraseList(profile, finishedText))
 
         running = true
         paused = false
+        runStartMs = SystemClock.elapsedRealtime()
+        tickCount = 0
 
-        Log.d(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, lang=$langTag")
+        Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
 
-        val contentIntent = currentProfileId?.let { pid ->
-            PendingIntent.getActivity(
-                this,
-                0,
-                Intent(this, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, pid)
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        }
-        val notification = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.timer_running))
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .apply { contentIntent?.let { setContentIntent(it) } }
-            .build()
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        doStartForeground(buildContentNotification(getString(R.string.timer_running)))
 
         if (!useCacheOnly) {
             var ttsHolder: TextToSpeech? = null
             ttsHolder = TextToSpeech(applicationContext) { status ->
-                Log.d(TAG, "TTS init status=$status")
                 if (status == TextToSpeech.SUCCESS) {
                     val ttsLocale = when (langTag) {
                         "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")
@@ -237,11 +181,12 @@ class TimerService : Service() {
                     ttsHolder?.setLanguage(ttsLocale)
                     ttsHolder?.setSpeechRate(1f)
                     ttsHolder?.setPitch(1f)
-                    val attrs = AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                    ttsHolder?.setAudioAttributes(attrs)
+                    ttsHolder?.setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build()
+                    )
                     ttsRef = ttsHolder
                     ttsReady = true
                 }
@@ -250,42 +195,16 @@ class TimerService : Service() {
             ttsReady = true
         }
 
-        timerThread = Thread {
-            runTimer(profile, useCacheOnly, langTag, finishedText)
-        }.apply { start() }
-
-        return START_NOT_STICKY
-    }
-
-    private fun runTimer(profile: TimerProfile, useCacheOnly: Boolean, langTag: String, finishedText: String) {
-        Log.d(TAG, "runTimer useCacheOnly=$useCacheOnly")
-        if (!useCacheOnly) {
-            var waited = 0
-            while (!ttsReady && waited < 5000 && running) {
-                Thread.sleep(100)
-                waited += 100
-            }
-            val tts = ttsRef
-            if (tts == null) Log.w(TAG, "TTS not ready after ${waited}ms, continuing without TTS")
-            else Log.d(TAG, "TTS ready after ${waited}ms")
-        } else {
-            Log.d(TAG, "runTimer using cache only, no TTS wait")
-        }
-
+        try { alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100) } catch (_: Exception) {}
         val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
-        val tts = ttsRef
-        var alarmTone: ToneGenerator? = null
-        try {
-            alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-        } catch (_: Exception) {}
+        val prolongedMs = 1200
         val tickTone = ToneGenerator.TONE_CDMA_PIP
         val tickMs = 200
-        val prolongedMs = 1200
+        val savedFinishedText = finishedText
 
-        val engine = TimerEngine(profile) { event ->
+        engine = TimerEngine(profile) { event ->
             when (event) {
                 is TimerEvent.RoundStart -> {
-                    Log.d(TAG, "RoundStart ${event.roundIndex+1}/${event.totalRounds} '${event.round.name}'")
                     broadcastState(event.round.name, event.round.durationSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
                     if (event.roundIndex == 0) {
                         Thread { playProlongedTone(prolongedMs) }.start()
@@ -293,51 +212,113 @@ class TimerService : Service() {
                     if (useCacheOnly) {
                         playCacheFile(event.round.name, langTag, null)
                     } else {
-                        tts?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                        ttsRef?.speak(event.round.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
                     }
                 }
                 is TimerEvent.Tick -> {
+                    tickCount++
+                    if (tickCount % 10 == 0 || tickCount == 1) {
+                        val elapsed = SystemClock.elapsedRealtime() - runStartMs
+                        Log.i(TAG, "TICK round=${event.roundIndex + 1}/${event.totalRounds} rem=${event.remainingSeconds} elapsed=${elapsed}ms screenVis=$timerScreenVisible")
+                    }
                     broadcastState(event.round.name, event.remainingSeconds, event.round.durationSeconds, event.roundIndex + 1, event.totalRounds)
                     if (event.round.warn10sec && event.round.durationSeconds >= 10 && event.remainingSeconds in 1..10) {
                         try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
                     }
                 }
                 is TimerEvent.RoundEnd -> {
-                    Log.d(TAG, "RoundEnd ${event.roundIndex+1}")
                     Thread { playProlongedTone(prolongedMs) }.start()
                 }
                 is TimerEvent.TrainingEnd -> {
-                    Log.d(TAG, "TrainingEnd")
                     broadcastState("", 0, 0, 0, 0, isRunning = false)
                     running = false
+                    cancelAlarmTick()
+                    val totalElapsed = SystemClock.elapsedRealtime() - runStartMs
+                    Log.i(TAG, "Timer finished ticks=$tickCount totalElapsed=${totalElapsed}ms")
                     if (useCacheOnly) {
                         playCacheFile(profile.name, langTag) {
-                            playCacheFile(finishedText, langTag) {
-                                Handler(Looper.getMainLooper()).postDelayed({ stopSelf() }, 6000)
+                            playCacheFile(savedFinishedText, langTag) {
+                                mainHandler.postDelayed({ stopSelf() }, 6000)
                             }
                         }
                     } else {
-                        tts?.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
-                        tts?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
-                        Handler(Looper.getMainLooper()).postDelayed({ stopSelf() }, 6000)
+                        ttsRef?.speak(profile.name, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                        ttsRef?.speak(savedFinishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
+                        mainHandler.postDelayed({ stopSelf() }, 6000)
                     }
                 }
                 else -> {}
             }
         }
 
-        engine.advance()
-        while (running) {
-            if (paused) {
-                Thread.sleep(500)
-            } else {
-                Thread.sleep(1000)
-                if (!engine.advance()) break
-            }
-        }
-        Log.d(TAG, "Timer loop ended, running=$running")
+        engine?.advance()
+        scheduleAlarmTick()
 
-        try { alarmTone?.release() } catch (_: Exception) {}
+        return START_NOT_STICKY
+    }
+
+    private fun handleTick() {
+        if (!running) return
+        if (paused) {
+            scheduleAlarmTick()
+            return
+        }
+        try {
+            val e = engine ?: return
+            if (!e.advance()) {
+                Log.i(TAG, "Timer loop ended (advance=false)")
+                return
+            }
+            scheduleAlarmTick()
+        } catch (ex: Exception) {
+            Log.e(TAG, "Timer tick error, rescheduling", ex)
+            scheduleAlarmTick()
+        }
+    }
+
+    private fun scheduleAlarmTick() {
+        if (!running) return
+        val am = getSystemService(ALARM_SERVICE) as AlarmManager
+        val tickPi = PendingIntent.getService(
+            this, ALARM_REQUEST_CODE,
+            Intent(this, TimerService::class.java).apply { action = ACTION_TICK },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val triggerAtWall = System.currentTimeMillis() + 1000
+        val showIntent = currentProfileId?.let { pid ->
+            PendingIntent.getActivity(
+                this, ALARM_SHOW_REQUEST_CODE,
+                Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, pid)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } ?: PendingIntent.getActivity(
+            this, ALARM_SHOW_REQUEST_CODE,
+            Intent(this, MainActivity::class.java).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAtWall, showIntent), tickPi)
+        } catch (e: Exception) {
+            Log.e(TAG, "AlarmManager.setAlarmClock failed, falling back to handler", e)
+            mainHandler.postDelayed({
+                if (running) handleTick()
+            }, 1000)
+        }
+    }
+
+    private fun cancelAlarmTick() {
+        try {
+            val am = getSystemService(ALARM_SERVICE) as AlarmManager
+            val pi = PendingIntent.getService(
+                this, ALARM_REQUEST_CODE,
+                Intent(this, TimerService::class.java).apply { action = ACTION_TICK },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+            )
+            if (pi != null) am.cancel(pi)
+        } catch (_: Exception) {}
     }
 
     private var cachedMediaPlayer: MediaPlayer? = null
@@ -350,7 +331,7 @@ class TimerService : Service() {
             try {
                 val file = TtsCache.cacheFile(applicationContext, langTag, text)
                 if (!file.exists()) {
-                    Handler(Looper.getMainLooper()).post { onDone?.invoke() }
+                    mainHandler.post { onDone?.invoke() }
                     return@Thread
                 }
                 synchronized(cachePlayerLock) {
@@ -366,12 +347,12 @@ class TimerService : Service() {
                     player.prepare()
                     player.setOnCompletionListener {
                         try { it.reset() } catch (_: Exception) {}
-                        Handler(Looper.getMainLooper()).post { onDone?.invoke() }
+                        mainHandler.post { onDone?.invoke() }
                     }
                     player.start()
                 }
             } catch (_: Exception) {
-                Handler(Looper.getMainLooper()).post { onDone?.invoke() }
+                mainHandler.post { onDone?.invoke() }
             }
         }.start()
     }
@@ -440,19 +421,7 @@ class TimerService : Service() {
             if (notifSkipCount == 1 || notifSkipCount % 60 == 0) Log.i(TAG, "NOTIF: skip (screen visible) skipCount=$notifSkipCount")
             return
         }
-        val start = android.os.SystemClock.elapsedRealtime()
-        val profileId = currentProfileId
-        val contentIntent = if (profileId != null) {
-            PendingIntent.getActivity(
-                this,
-                0,
-                Intent(this, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, profileId)
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        } else null
+        val start = SystemClock.elapsedRealtime()
         val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -461,31 +430,74 @@ class TimerService : Service() {
             .setCategory(Notification.CATEGORY_PROGRESS)
             .setOnlyAlertOnce(true)
             .also { cachedNotifBuilder = it }
-        if (contentIntent != null) builder.setContentIntent(contentIntent)
+        val profileId = currentProfileId
+        if (profileId != null) {
+            builder.setContentIntent(PendingIntent.getActivity(
+                this, 0,
+                Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, profileId)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            ))
+        }
         builder.setContentText(text)
         builder.setStyle(Notification.BigTextStyle().bigText(text))
         val notification = builder.build()
 
-        val now = android.os.SystemClock.elapsedRealtime()
+        val now = SystemClock.elapsedRealtime()
         val needFg = forceStartForeground || (now - lastForegroundMs > 5000)
         if (needFg) {
-            if (Build.VERSION.SDK_INT >= 29) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
+            doStartForeground(notification)
             lastForegroundMs = now
             notifFgCount++
         } else {
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
         }
         notifTickCount++
-        notifTotalMs += android.os.SystemClock.elapsedRealtime() - start
+        notifTotalMs += SystemClock.elapsedRealtime() - start
         if (notifTickCount == 1 || notifTickCount % 60 == 0) {
             Log.i(TAG, "NOTIF: posted tick=$notifTickCount fg=$needFg text=${text.take(20)}")
         }
         if (notifTickCount % 10 == 0) {
             Log.i("PerfFix", "notification: ticks=$notifTickCount fgCalls=$notifFgCount avgMs=${notifTotalMs / notifTickCount}ms")
+        }
+    }
+
+    private fun buildBasicNotification(): Notification =
+        Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(getString(R.string.timer_running))
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setOngoing(true)
+            .build()
+
+    private fun buildContentNotification(text: String): Notification {
+        val builder = Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+        val profileId = currentProfileId
+        if (profileId != null) {
+            builder.setContentIntent(PendingIntent.getActivity(
+                this, 0,
+                Intent(this, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra(MainActivity.EXTRA_OPEN_TIMER_PROFILE_ID, profileId)
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            ))
+        }
+        return builder.build()
+    }
+
+    private fun doStartForeground(notification: Notification) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
         }
     }
 
@@ -510,22 +522,18 @@ class TimerService : Service() {
     }
 
     private fun stopSilentAudio() {
-        try {
-            silentTrack?.stop()
-            silentTrack?.release()
-        } catch (_: Exception) {}
+        try { silentTrack?.stop(); silentTrack?.release() } catch (_: Exception) {}
         silentTrack = null
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "onDestroy")
+        Log.i(TAG, "onDestroy")
         try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
         running = false
-        timerThread?.let { t ->
-            t.join(3000)
-            if (t.isAlive) t.interrupt()
-        }
-        timerThread = null
+        cancelAlarmTick()
+        engine = null
+        try { alarmTone?.release() } catch (_: Exception) {}
+        alarmTone = null
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
         synchronized(cachePlayerLock) {
@@ -534,24 +542,16 @@ class TimerService : Service() {
         }
         cachedToneBuffer = null
         stopSilentAudio()
-        if (wakeLock?.isHeld == true) {
-            wakeLock?.release()
-        }
+        if (wakeLock?.isHeld == true) wakeLock?.release()
         wakeLock = null
         super.onDestroy()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        if (running) {
-            Log.i(TAG, "onTaskRemoved: timer running, keeping service alive")
-            if (!timerScreenVisible) {
-                showNotification(
-                    lastNotifText.ifEmpty { getString(R.string.timer_running) },
-                    forceStartForeground = true
-                )
-            }
-            return
-        }
+        Log.i(TAG, "onTaskRemoved: user removed app from recents, stopping timer")
+        running = false
+        cancelAlarmTick()
+        stopSelf()
         super.onTaskRemoved(rootIntent)
     }
 
@@ -561,10 +561,13 @@ class TimerService : Service() {
         private const val TAG = "RaundTimer"
         private const val CHANNEL_ID = "raund_timer_v3"
         private const val NOTIFICATION_ID = 1
+        private const val ALARM_REQUEST_CODE = 42
+        private const val ALARM_SHOW_REQUEST_CODE = 43
         const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"
         const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"
         const val ACTION_RESUME = "com.raund.app.TimerService.RESUME"
+        private const val ACTION_TICK = "com.raund.app.TimerService.TICK"
         const val ACTION_TIMER_STATE = "com.raund.app.TIMER_STATE"
         const val ACTION_TIMER_VISIBLE = "com.raund.app.TIMER_VISIBLE"
         const val ACTION_TIMER_HIDDEN = "com.raund.app.TIMER_HIDDEN"
