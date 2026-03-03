@@ -12,7 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.util.Log
+
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -113,16 +113,12 @@ fun TimerScreen(
         val locale = LocaleManager.currentLanguageTag(context)
         val finishedText = context.getString(R.string.timer_finished)
         val phrases = TtsCache.buildPhraseList(p, finishedText)
-        Log.d("TimerScreen", "cache check profile=${p.name} locale=$locale phrases=${phrases.size}")
         val allExist = TtsCache.allExist(context, locale, phrases)
         if (allExist) {
-            Log.d("TimerScreen", "cache full, skip ensureCache")
             cacheReady = true
             return@LaunchedEffect
         }
-        Log.d("TimerScreen", "cache missing, calling ensureCache")
         TtsCache.ensureCache(context, locale, phrases)
-        Log.d("TimerScreen", "ensureCache returned")
         cacheReady = true
     }
 
@@ -166,25 +162,18 @@ fun TimerScreen(
         val lifecycleOwner = activity as? androidx.lifecycle.LifecycleOwner
         val lifecycleObserver = object : androidx.lifecycle.DefaultLifecycleObserver {
             override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
-                android.util.Log.i("TimerScreen", "onResume -> sending TIMER_VISIBLE")
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
             }
             override fun onPause(owner: androidx.lifecycle.LifecycleOwner) {
-                android.util.Log.i("TimerScreen", "onPause -> sending TIMER_HIDDEN")
                 context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
             }
         }
         lifecycleOwner?.lifecycle?.addObserver(lifecycleObserver)
         context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
-        var recvCount = 0
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, i: Intent?) {
                 if (i == null) return
                 val rem = i.getIntExtra(TimerService.EXTRA_REMAINING, remaining)
-                recvCount++
-                if (recvCount % 10 == 0 || recvCount == 1 || rem == 0) {
-                    android.util.Log.i("TimerScreen", "recv #$recvCount rem=$rem round=${i.getIntExtra(TimerService.EXTRA_ROUND_INDEX, 0)}/${i.getIntExtra(TimerService.EXTRA_TOTAL_ROUNDS, 1)}")
-                }
                 remaining = rem
                 currentRound = i.getStringExtra(TimerService.EXTRA_ROUND_NAME) ?: currentRound
                 roundTotal = i.getIntExtra(TimerService.EXTRA_ROUND_TOTAL, roundTotal)
