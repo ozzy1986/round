@@ -46,6 +46,9 @@
     <string name="settings">Танзимот</string>
     <string name="screen_off_behavior">Ҳангоми хомӯш шудани экран таваққуф</string>
     <string name="screen_off_continue">Машқ дар замина идома меёбад</string>
+    <string name="screen_off_setting_hint">Барои таваққуф ҳангоми хомӯш шудани экран хомӯш кунед</string>
+    <string name="leave_app_continue">Ҳангоми баромадан аз барнома идома медиҳад</string>
+    <string name="leave_app_setting_hint">Барои таваққуф ҳангоми баромадан аз барнома хомӯш кунед</string>
     <string name="timer_running">Таймер кор мекунад</string>
     <string name="loading">Бор шуда истодааст…</string>
 </resources>

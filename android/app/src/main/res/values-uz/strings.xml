@@ -46,6 +46,9 @@
     <string name="settings">Sozlamalar</string>
     <string name="screen_off_behavior">Ekran oʻchganda pauza</string>
     <string name="screen_off_continue">Mashq fonda davom etadi</string>
+    <string name="screen_off_setting_hint">Ekran oʻchganda pauza qilish uchun oʻchiring</string>
+    <string name="leave_app_continue">Ilovadan chiqqanda davom etadi</string>
+    <string name="leave_app_setting_hint">Ilovadan chiqqanda pauza qilish uchun oʻchiring</string>
     <string name="timer_running">Taymer ishlayapti</string>
     <string name="loading">Yuklanmoqda…</string>
 </resources>

@@ -46,6 +46,9 @@
     <string name="settings">Parametrlər</string>
     <string name="screen_off_behavior">Ekran sönəndə fasilə</string>
     <string name="screen_off_continue">Məşq arxa planda davam edir</string>
+    <string name="screen_off_setting_hint">Ekran sönəndə fasilə üçün söndürün</string>
+    <string name="leave_app_continue">Tətbiqdən çıxanda davam edir</string>
+    <string name="leave_app_setting_hint">Tətbiqdən çıxanda fasilə üçün söndürün</string>
     <string name="timer_running">Taymer işləyir</string>
     <string name="loading">Yüklənir…</string>
 </resources>

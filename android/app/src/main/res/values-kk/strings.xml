@@ -46,6 +46,9 @@
     <string name="settings">Баптаулар</string>
     <string name="screen_off_behavior">Экран өшкенде кідірту</string>
     <string name="screen_off_continue">Жаттығу фонда жалғасады</string>
+    <string name="screen_off_setting_hint">Экран өшкенде кідірту үшін өшіріңіз</string>
+    <string name="leave_app_continue">Қосымшадан шыққанда жалғастыру</string>
+    <string name="leave_app_setting_hint">Қосымшадан шыққанда кідірту үшін өшіріңіз</string>
     <string name="timer_running">Таймер жұмыс істеуде</string>
     <string name="loading">Жүктелуде…</string>
 </resources>

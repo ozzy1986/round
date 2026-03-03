@@ -46,6 +46,9 @@
     <string name="settings">Настройки</string>
     <string name="screen_off_behavior">Пауза при выключении экрана</string>
     <string name="screen_off_continue">Тренировка продолжается в фоновом режиме</string>
+    <string name="screen_off_setting_hint">Выключите, чтобы ставить на паузу при выключении экрана</string>
+    <string name="leave_app_continue">Продолжать при выходе из приложения</string>
+    <string name="leave_app_setting_hint">Выключите, чтобы ставить на паузу при выходе</string>
     <string name="timer_running">Таймер работает</string>
     <string name="loading">Загрузка…</string>
 </resources>
