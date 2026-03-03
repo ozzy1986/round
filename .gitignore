@@ -8,7 +8,10 @@ Round-debug.apk
 android/Round-debug.apk
 android/local.properties
 android/app/build/
+android/baselineprofile/build/
 android/.gradle/
+logcat_*.txt
+android/logcat_*.txt
 *.hprof
 android/ui*.xml
 android/screenshot.png

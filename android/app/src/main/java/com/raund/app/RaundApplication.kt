@@ -19,21 +19,6 @@ import java.util.concurrent.TimeUnit
 class RaundApplication : Application() {
     val database by lazy { AppDatabase.get(this) }
     val tokenStore by lazy { TokenStore(this) }
-
-    @Volatile
-    var repositoryReady = false
-        private set
-
-    override fun onCreate() {
-        super.onCreate()
-        Thread {
-            val start = System.currentTimeMillis()
-            val repo = profileRepository
-            kotlinx.coroutines.runBlocking { repo.preloadCache() }
-            repositoryReady = true
-            Log.i("PerfFix", "Background init (full repo + cache) in ${System.currentTimeMillis() - start}ms")
-        }.start()
-    }
     private val syncPrefs by lazy { SyncPrefs(this) }
 
     private val authRetrofit by lazy {

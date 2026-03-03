@@ -42,16 +42,16 @@ BUILD THE APK
 From project root (d:\laragon\www\raund):
 
   cd android
-  .\gradlew.bat assembleDebug
+  .\gradlew.bat assembleRelease
 
-Output APK: android\app\build\outputs\apk\debug\app-debug.apk
+Output APK: android\app\build\outputs\apk\release\app-release.apk
 
-Alternative: run scripts\build-apk.ps1 from project root (builds and copies APK
-to android\Round-debug.apk).
+IMPORTANT: Always use release builds for the phone. Debug builds are 3-4x slower
+(no R8, unoptimized DEX, no AOT). Use assembleDebug only for development/debugging.
 
 INSTALL THE APK
 ---------------
-  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\debug\app-debug.apk
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\release\app-release.apk
 
 The -r flag reinstalls, keeping app data.
 

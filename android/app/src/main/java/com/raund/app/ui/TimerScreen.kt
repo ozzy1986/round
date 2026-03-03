@@ -41,9 +41,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -452,7 +450,7 @@ fun TimerScreen(
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     ) {
-                        Icon(Icons.Filled.Pause, contentDescription = pauseTimerText, modifier = Modifier.size(32.dp))
+                        Icon(AppIcons.Pause, contentDescription = pauseTimerText, modifier = Modifier.size(32.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             pauseTimerText,
@@ -503,7 +501,7 @@ fun TimerScreen(
                             1.dp, MaterialTheme.colorScheme.error
                         )
                     ) {
-                        Icon(Icons.Filled.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(24.dp))
+                        Icon(AppIcons.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             stringResource(R.string.stop_timer),
