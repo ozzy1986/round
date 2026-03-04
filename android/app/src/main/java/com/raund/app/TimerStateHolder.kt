@@ -3,11 +3,8 @@ package com.raund.app
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
-/**
- * Immutable timer state emitted by TimerService and collected by the timer UI.
- * Replaces Intent-based broadcast for per-second updates.
- */
 data class TimerState(
     val remaining: Int = 0,
     val roundName: String = "",
@@ -18,32 +15,30 @@ data class TimerState(
     val paused: Boolean = false
 )
 
-/**
- * Singleton holding the current timer state. TimerService updates it;
- * TimerScreen collects via state.asStateFlow().
- */
 object TimerStateHolder {
     private val _state = MutableStateFlow(TimerState())
     val state: StateFlow<TimerState> = _state.asStateFlow()
 
     fun update(
-        remaining: Int = _state.value.remaining,
-        roundName: String = _state.value.roundName,
-        roundTotal: Int = _state.value.roundTotal,
-        roundIndex: Int = _state.value.roundIndex,
-        totalRounds: Int = _state.value.totalRounds,
-        isRunning: Boolean = _state.value.isRunning,
-        paused: Boolean = _state.value.paused
+        remaining: Int? = null,
+        roundName: String? = null,
+        roundTotal: Int? = null,
+        roundIndex: Int? = null,
+        totalRounds: Int? = null,
+        isRunning: Boolean? = null,
+        paused: Boolean? = null
     ) {
-        _state.value = TimerState(
-            remaining = remaining,
-            roundName = roundName,
-            roundTotal = roundTotal,
-            roundIndex = roundIndex,
-            totalRounds = totalRounds,
-            isRunning = isRunning,
-            paused = paused
-        )
+        _state.update { current ->
+            TimerState(
+                remaining = remaining ?: current.remaining,
+                roundName = roundName ?: current.roundName,
+                roundTotal = roundTotal ?: current.roundTotal,
+                roundIndex = roundIndex ?: current.roundIndex,
+                totalRounds = totalRounds ?: current.totalRounds,
+                isRunning = isRunning ?: current.isRunning,
+                paused = paused ?: current.paused
+            )
+        }
     }
 
     fun reset() {

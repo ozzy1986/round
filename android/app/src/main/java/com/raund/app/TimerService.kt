@@ -315,7 +315,8 @@ class TimerService : Service() {
                 continue
             }
             if (wasPaused) {
-                roundStartRealtimeMs = SystemClock.elapsedRealtime() - remainingMsWhenPaused
+                val elapsedBeforePause = roundDurationMs - remainingMsWhenPaused
+                roundStartRealtimeMs = SystemClock.elapsedRealtime() - elapsedBeforePause
                 wasPaused = false
             }
 
@@ -406,7 +407,7 @@ class TimerService : Service() {
                 }
                 synchronized(cachePlayerLock) {
                     cachedMediaPlayer?.let {
-                        try { it.stop(); it.reset() } catch (_: Exception) {}
+                        try { it.reset() } catch (_: Exception) {}
                     }
                     val player = cachedMediaPlayer ?: MediaPlayer().also { cachedMediaPlayer = it }
                     player.setAudioAttributes(AudioAttributes.Builder()
@@ -468,8 +469,6 @@ class TimerService : Service() {
                     track.setPlaybackHeadPosition(0)
                     track.play()
                 }
-                Thread.sleep(durationMs.toLong())
-                prolongedToneTrack?.stop()
             } catch (e: Exception) {
                 Log.w(TAG, "playProlongedTone failed", e)
             }
