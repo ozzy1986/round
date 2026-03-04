@@ -82,8 +82,29 @@ FIXES APPLIED
 -------------
 - Baseline Profile: androidx.baselineprofile plugin (1.2.3) applied on :app; androidx.profileinstaller:profileinstaller added; baselineProfile(project(":baselineprofile")).
 - :baselineprofile module (com.android.test) with BaselineProfileGenerator: pressHome(), startActivityAndWait().
+- Manual baseline profile: app/src/main/baseline-prof.txt covers Compose runtime, Material3, Navigation, Lifecycle hot paths.
+- Force AOT compile on device: adb shell cmd package compile -m speed-profile -f com.raund.app
 - To generate baseline-prof.txt (and get AOT gains): run on device or emulator:
   ./gradlew :app:generateBaselineProfile -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=BaselineProfile
   Then rebuild release/debug; the generated file is merged into the app by the plugin.
+
+- Three-stage deferred launch (MainActivity):
+  1. installSplashScreen() with immediate dismiss (setKeepOnScreenCondition { false })
+  2. Native FrameLayout placeholder (solid dark background) set via setContentView — draws
+     as the first frame with zero Compose overhead
+  3. Compose (RaundTheme + full UI) initialized via placeholder.post{} after first frame;
+     reportFullyDrawn() called when ready
+
+- Application.onCreate: zero main-thread work. No eager database init, no profileRepository
+  access. All init (profileRepository lazy, preloadCache, requestSync) runs on Dispatchers.IO.
+  requestSync() in a separate coroutine so it doesn't block repositoryReady.
+
+LATEST MEASUREMENTS (TECNO KL6, Android 14, release build, post-AOT compile)
+- Cold start: avg 330ms, min 299ms (7 runs)
+  - Process creation: ~123ms (Zygote fork, cannot reduce)
+  - System window/surface overhead: ~170ms (cannot reduce)
+  - App code: ~7ms
+- Warm start: avg 83ms, min 66ms (7 runs)
+- Previous TTD: 2626ms → 1884ms → 541ms → 330ms (current)
 
 - Deferred composition (MainActivity): first frame draws only RaundTheme + Box(background); full UI (NavHost, ProfileListScreen, etc.) is composed after withFrameMillis { } so "Displayed" fires on the light first frame. Measured TTD: 2562ms -> ~1884ms (device, cold start, same conditions).

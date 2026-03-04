@@ -23,11 +23,13 @@ class TimerViewModel(
     private val _cacheReady = MutableStateFlow(false)
     private val _finished = MutableStateFlow(false)
     private val _prevTimerRunning = MutableStateFlow(false)
+    private val _isRefreshing = MutableStateFlow(false)
 
     val timerState = TimerStateHolder.state
     val profile: StateFlow<TimerProfile?> = _profile.asStateFlow()
     val cacheReady: StateFlow<Boolean> = _cacheReady.asStateFlow()
     val finished: StateFlow<Boolean> = _finished.asStateFlow()
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -39,6 +41,19 @@ class TimerViewModel(
                     _finished.value = true
                 }
                 _prevTimerRunning.value = state.isRunning
+            }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                repository.syncSingleProfile(profileId)
+                _profile.value = repository.getProfileWithRounds(profileId)
+                _cacheReady.value = false
+            } finally {
+                _isRefreshing.value = false
             }
         }
     }

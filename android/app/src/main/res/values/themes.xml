@@ -6,8 +6,8 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
     <style name="Theme.Round.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#FFFBFF</item>
-        <item name="windowSplashScreenAnimatedIcon">@android:drawable/ic_lock_idle_alarm</item>
+        <item name="windowSplashScreenBackground">#1A1110</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
         <item name="postSplashScreenTheme">@style/Theme.Round</item>
     </style>
 </resources>

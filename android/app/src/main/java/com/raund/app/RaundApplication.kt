@@ -14,6 +14,9 @@ import com.raund.app.data.repository.ProfileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
@@ -29,6 +32,9 @@ class RaundApplication : Application() {
     @Volatile
     var repositoryReady = false
         private set
+
+    private val _repositoryReadyFlow = MutableStateFlow(false)
+    val repositoryReadyFlow: StateFlow<Boolean> = _repositoryReadyFlow.asStateFlow()
 
     private val initScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -92,9 +98,13 @@ class RaundApplication : Application() {
             val start = SystemClock.elapsedRealtime()
             profileRepository.preloadCache()
             repositoryReady = true
+            _repositoryReadyFlow.value = true
             val preloadMs = SystemClock.elapsedRealtime() - start
             val totalMs = SystemClock.elapsedRealtime() - appStartMs
             Log.i("PerfFix", "App ready in ${totalMs}ms (preload=${preloadMs}ms)")
+        }
+        initScope.launch {
+            try { profileRepository.requestSync() } catch (_: Exception) {}
         }
     }
 }

@@ -33,20 +33,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -78,6 +84,7 @@ import com.raund.app.timer.TimerProfile
 import com.raund.app.tts.TtsCache
 import com.raund.app.viewmodel.TimerViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimerScreen(
     viewModel: TimerViewModel,
@@ -87,6 +94,7 @@ fun TimerScreen(
     val profile by viewModel.profile.collectAsState()
     val cacheReady by viewModel.cacheReady.collectAsState()
     val finished by viewModel.finished.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val timerState by viewModel.timerState.collectAsState()
     val running = timerState.isRunning
     val remaining = if (running) timerState.remaining else (profile?.rounds?.firstOrNull()?.durationSeconds ?: 0)
@@ -183,10 +191,25 @@ fun TimerScreen(
         label = "bgColor"
     )
 
-    BoxWithConstraints(
+    val canRefresh = !running && !finished
+    val pullToRefreshState = rememberPullToRefreshState()
+    if (pullToRefreshState.isRefreshing && canRefresh) {
+        LaunchedEffect(true) {
+            viewModel.refresh()
+        }
+    }
+    LaunchedEffect(isRefreshing) {
+        if (!isRefreshing) pullToRefreshState.endRefresh()
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(animatedBgColor)
+            .then(if (canRefresh) Modifier.nestedScroll(pullToRefreshState.nestedScrollConnection) else Modifier)
+    ) {
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize()
     ) {
         val maxW = maxWidth.value
         val maxH = maxHeight.value
@@ -196,8 +219,11 @@ fun TimerScreen(
         val onBgColor = MaterialTheme.colorScheme.onBackground
         val onSurfaceVarColor = MaterialTheme.colorScheme.onSurfaceVariant
 
+        val scrollState = rememberScrollState()
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (canRefresh) Modifier.verticalScroll(scrollState) else Modifier)
         ) {
             TimerTopBar(
                 profileName = profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
@@ -210,7 +236,7 @@ fun TimerScreen(
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .then(if (!canRefresh) Modifier.weight(1f) else Modifier.height((maxH * 0.7f).dp))
                     .padding(horizontal = 24.dp)
             ) {
                 if (finished) {
@@ -281,6 +307,7 @@ fun TimerScreen(
                 hasRounds = profile?.rounds?.isNotEmpty() == true,
                 profile = profile,
                 cacheReady = cacheReady,
+                syncing = isRefreshing || profile == null,
                 running = running,
                 paused = paused,
                 finished = finished,
@@ -294,6 +321,13 @@ fun TimerScreen(
                 onRestart = { viewModel.setFinished(false) }
             )
         }
+    }
+    if (canRefresh) {
+        PullToRefreshContainer(
+            state = pullToRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+    }
     }
 }
 
@@ -396,6 +430,7 @@ private fun TimerControls(
     hasRounds: Boolean,
     profile: TimerProfile?,
     cacheReady: Boolean,
+    syncing: Boolean,
     running: Boolean,
     paused: Boolean,
     finished: Boolean,
@@ -415,7 +450,7 @@ private fun TimerControls(
             .padding(24.dp)
     ) {
         if (!running && !finished) {
-            if (!hasRounds && profile != null) {
+            if (!hasRounds && profile != null && !syncing) {
                 Text(
                     stringResource(R.string.no_rounds),
                     style = MaterialTheme.typography.bodyMedium,
@@ -426,25 +461,40 @@ private fun TimerControls(
                         .padding(bottom = 16.dp)
                 )
             }
+            val startEnabled = hasRounds && cacheReady && !syncing
             Button(
                 onClick = onStart,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp),
                 shape = RoundedCornerShape(32.dp),
-                enabled = hasRounds && cacheReady,
+                enabled = startEnabled,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.start_timer), modifier = Modifier.size(32.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    stringResource(R.string.start_timer),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (syncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        stringResource(R.string.loading),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.start_timer), modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        stringResource(R.string.start_timer),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
         if (running && !paused) {
