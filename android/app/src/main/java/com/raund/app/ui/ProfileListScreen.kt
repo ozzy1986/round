@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -247,20 +250,23 @@ fun ProfileListScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onProfileClick(profile.id) },
-                            shape = RoundedCornerShape(36.dp),
+                            shape = RoundedCornerShape(percent = 50),
                             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
                             colors = CardDefaults.elevatedCardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(IntrinsicSize.Min),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(72.dp)
+                                        .fillMaxHeight()
+                                        .aspectRatio(1f)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center
@@ -294,7 +300,9 @@ fun ProfileListScreen(
                                 }
                                 IconButton(
                                     onClick = { onStartTimer(profile.id) },
-                                    modifier = Modifier.size(72.dp),
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .aspectRatio(1f),
                                     enabled = hasRounds,
                                     colors = IconButtonDefaults.filledIconButtonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
