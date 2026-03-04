@@ -322,7 +322,7 @@ class TimerService : Service() {
 
             val now = SystemClock.elapsedRealtime()
             val remainingMs = roundStartRealtimeMs + roundDurationMs - now
-            val remainingSeconds = (remainingMs / 1000).coerceAtLeast(0).toInt()
+            val remainingSeconds = if (remainingMs > 0) ((remainingMs + 999) / 1000).toInt() else 0
 
             if (remainingMs <= 0) {
                 var skippedRounds = 0
@@ -337,7 +337,7 @@ class TimerService : Service() {
                     rm = roundStartRealtimeMs + roundDurationMs - now
                 }
                 if (skippedRounds > 1) {
-                    Log.i(TAG, "freeze skip: jumped $skippedRounds rounds at once")
+                    Log.w(TAG, "freeze skip: jumped $skippedRounds rounds at once")
                 }
                 playProlongedTone(prolongedMs)
                 if (roundIndex >= totalRounds) {
@@ -357,7 +357,8 @@ class TimerService : Service() {
                     try { alarmTone?.release() } catch (_: Exception) {}
                     return
                 }
-                val currentRemaining = ((roundStartRealtimeMs + roundDurationMs - now) / 1000).coerceAtLeast(0).toInt()
+                val currentRemainingMs = roundStartRealtimeMs + roundDurationMs - now
+                val currentRemaining = if (currentRemainingMs > 0) ((currentRemainingMs + 999) / 1000).toInt() else 0
                 lastBroadcastRemainingSeconds = currentRemaining
                 updateStateAndNotification(round.name, currentRemaining, round.durationSeconds, roundIndex + 1, totalRounds)
                 if (useCacheOnly) {
@@ -373,6 +374,9 @@ class TimerService : Service() {
             }
 
             if (remainingSeconds != lastBroadcastRemainingSeconds) {
+                if (lastBroadcastRemainingSeconds - remainingSeconds > 1) {
+                    Log.w(TAG, "JUMP ${lastBroadcastRemainingSeconds}->${remainingSeconds} round=${roundIndex+1}")
+                }
                 lastBroadcastRemainingSeconds = remainingSeconds
                 updateStateAndNotification(round.name, remainingSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
                 if (round.warn10sec && round.durationSeconds >= 10 && remainingSeconds in 1..10) {
