@@ -1,8 +1,11 @@
 package com.raund.app
 
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,15 +16,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.raund.app.sync.SyncOnConnectivityEffect
 import com.raund.app.ui.ProfileListScreen
 import com.raund.app.ui.ProfileEditorScreen
 import com.raund.app.ui.TimerScreen
 import com.raund.app.ui.theme.RaundTheme
+import com.raund.app.viewmodel.ProfileListViewModel
+import com.raund.app.viewmodel.ProfileEditorViewModel
+import com.raund.app.viewmodel.TimerViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -63,8 +71,9 @@ class MainActivity : ComponentActivity() {
                     }
                     NavHost(navController = navController, startDestination = "profiles") {
                         composable("profiles") {
+                            val listViewModel: ProfileListViewModel = viewModel()
                             ProfileListScreen(
-                                repository = repo,
+                                viewModel = listViewModel,
                                 onProfileClick = { id -> navController.navigate("editor/$id") },
                                 onAddProfile = { navController.navigate("editor/new") },
                                 onStartTimer = { id -> navController.navigate("timer/$id") }
@@ -72,17 +81,37 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("editor/{profileId}") { backStackEntry ->
                             val id = backStackEntry.arguments?.getString("profileId") ?: "new"
+                            val appContext = LocalContext.current.applicationContext
+                            val editorViewModel: ProfileEditorViewModel = viewModel(
+                                factory = object : ViewModelProvider.Factory {
+                                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                        @Suppress("UNCHECKED_CAST")
+                                        return ProfileEditorViewModel(
+                                            if (id == "new") null else id,
+                                            appContext as Application
+                                        ) as T
+                                    }
+                                }
+                            )
                             ProfileEditorScreen(
-                                repository = repo,
+                                viewModel = editorViewModel,
                                 profileId = if (id == "new") null else id,
                                 onBack = { navController.popBackStack() }
                             )
                         }
                         composable("timer/{profileId}") { backStackEntry ->
                             val profileId = backStackEntry.arguments?.getString("profileId") ?: return@composable
+                            val appContext = LocalContext.current.applicationContext
+                            val timerViewModel: TimerViewModel = viewModel(
+                                factory = object : ViewModelProvider.Factory {
+                                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                        @Suppress("UNCHECKED_CAST")
+                                        return TimerViewModel(profileId, appContext as Application) as T
+                                    }
+                                }
+                            )
                             TimerScreen(
-                                repository = repo,
-                                profileId = profileId,
+                                viewModel = timerViewModel,
                                 onBack = { navController.popBackStack() }
                             )
                         }

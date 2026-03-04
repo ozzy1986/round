@@ -1,11 +1,10 @@
 package com.raund.app.ui
 
+import android.app.Application
 import android.Manifest
 import android.app.Activity
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
@@ -51,8 +50,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,30 +67,33 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.TimerService
-import com.raund.app.data.repository.ProfileRepository
+import com.raund.app.TimerStateHolder
 import com.raund.app.timer.TimerProfile
 import com.raund.app.tts.TtsCache
+import com.raund.app.viewmodel.TimerViewModel
 
 @Composable
 fun TimerScreen(
-    repository: ProfileRepository,
-    profileId: String,
+    viewModel: TimerViewModel,
     onBack: () -> Unit
 ) {
-    var profile by remember { mutableStateOf<TimerProfile?>(null) }
-    var currentRound by remember { mutableStateOf("") }
-    var remaining by remember { mutableIntStateOf(0) }
-    var roundTotal by remember { mutableIntStateOf(1) }
-    var roundInfo by remember { mutableStateOf("") }
-    var running by remember { mutableStateOf(false) }
-    var finished by remember { mutableStateOf(false) }
-    var paused by remember { mutableStateOf(false) }
-    var cacheReady by remember { mutableStateOf(false) }
+    val profileId = viewModel.profileId
+    val profile by viewModel.profile.collectAsState()
+    val cacheReady by viewModel.cacheReady.collectAsState()
+    val finished by viewModel.finished.collectAsState()
+    val timerState by viewModel.timerState.collectAsState()
+    val running = timerState.isRunning
+    val remaining = if (running) timerState.remaining else (profile?.rounds?.firstOrNull()?.durationSeconds ?: 0)
+    val roundTotal = if (running) timerState.roundTotal else (profile?.rounds?.firstOrNull()?.durationSeconds ?: 1)
+    val currentRound = if (running) timerState.roundName else (profile?.rounds?.firstOrNull()?.name ?: "")
+    val roundInfo = if (running) "${timerState.roundIndex} / ${timerState.totalRounds}" else (if ((profile?.rounds?.size ?: 0) > 0) "1 / ${profile!!.rounds.size}" else "")
+    val paused = timerState.paused
     val context = LocalContext.current
     val timerFinishedText = stringResource(R.string.timer_finished)
     val restartTimerText = stringResource(R.string.restart_timer)
@@ -100,7 +102,6 @@ fun TimerScreen(
     val timerPausedText = stringResource(R.string.timer_paused)
 
     LaunchedEffect(profileId) {
-        profile = repository.getProfileWithRounds(profileId)
         TimerService.warmup(context)
     }
 
@@ -114,23 +115,13 @@ fun TimerScreen(
         val allExist = TtsCache.allExist(context, locale, phrases)
         if (allExist) {
             Log.d("TimerScreen", "cache full, skip ensureCache")
-            cacheReady = true
+            viewModel.setCacheReady(true)
             return@LaunchedEffect
         }
         Log.d("TimerScreen", "cache missing, calling ensureCache")
         TtsCache.ensureCache(context, locale, phrases)
         Log.d("TimerScreen", "ensureCache returned")
-        cacheReady = true
-    }
-
-    LaunchedEffect(profile) {
-        val p = profile ?: return@LaunchedEffect
-        if (!running && !finished && p.rounds.isNotEmpty()) {
-            remaining = p.rounds[0].durationSeconds
-            roundTotal = p.rounds[0].durationSeconds
-            currentRound = p.rounds[0].name
-            roundInfo = "1 / ${p.rounds.size}"
-        }
+        viewModel.setCacheReady(true)
     }
 
     DisposableEffect(Unit) {
@@ -173,33 +164,9 @@ fun TimerScreen(
         }
         lifecycleOwner?.lifecycle?.addObserver(lifecycleObserver)
         context.sendBroadcast(Intent(TimerService.ACTION_TIMER_VISIBLE).setPackage(context.packageName))
-        var recvCount = 0
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(c: Context?, i: Intent?) {
-                if (i == null) return
-                val rem = i.getIntExtra(TimerService.EXTRA_REMAINING, remaining)
-                recvCount++
-                if (recvCount % 10 == 0 || recvCount == 1 || rem == 0) {
-                    android.util.Log.i("TimerScreen", "recv #$recvCount rem=$rem round=${i.getIntExtra(TimerService.EXTRA_ROUND_INDEX, 0)}/${i.getIntExtra(TimerService.EXTRA_TOTAL_ROUNDS, 1)}")
-                }
-                remaining = rem
-                currentRound = i.getStringExtra(TimerService.EXTRA_ROUND_NAME) ?: currentRound
-                roundTotal = i.getIntExtra(TimerService.EXTRA_ROUND_TOTAL, roundTotal)
-                val idx = i.getIntExtra(TimerService.EXTRA_ROUND_INDEX, 0)
-                val total = i.getIntExtra(TimerService.EXTRA_TOTAL_ROUNDS, 1)
-                roundInfo = "$idx / $total"
-                if (!i.getBooleanExtra(TimerService.EXTRA_IS_RUNNING, true)) {
-                    running = false
-                    finished = true
-                }
-            }
-        }
-        val filter = IntentFilter(TimerService.ACTION_TIMER_STATE)
-        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         onDispose {
             lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
             context.sendBroadcast(Intent(TimerService.ACTION_TIMER_HIDDEN).setPackage(context.packageName))
-            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
         }
     }
 
@@ -228,43 +195,15 @@ fun TimerScreen(
         val primaryColor = MaterialTheme.colorScheme.primary
         val onBgColor = MaterialTheme.colorScheme.onBackground
         val onSurfaceVarColor = MaterialTheme.colorScheme.onSurfaceVariant
-        val errorColor = MaterialTheme.colorScheme.error
-        
+
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    running = false
-                    TimerService.stop(context)
-                    onBack()
-                }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = onBgColor
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(surfaceVarColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(profile?.emoji?.ifBlank { "⏱" } ?: "⏱", fontSize = 24.sp)
-                }
-            }
+            TimerTopBar(
+                profileName = profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
+                profileEmoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱",
+                onBack = { TimerService.stop(context); onBack() }
+            )
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -324,214 +263,269 @@ fun TimerScreen(
                             }
                         }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(48.dp))
-
-                    val inWarningZone = running && !finished && remaining in 1..10
-                    val pulseTransition = rememberInfiniteTransition(label = "pulse")
-                    val pulseScale by pulseTransition.animateFloat(
-                        initialValue = 1f,
-                        targetValue = 1.06f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(500, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "pulseScale"
+                    TimerCountdownRing(
+                        remaining = remaining,
+                        roundTotal = roundTotal,
+                        isRunning = running,
+                        isFinished = finished,
+                        maxRingSize = minOf(this@BoxWithConstraints.maxWidth, 320.dp),
+                        timerFontSize = timerFontSize,
+                        onBgColor = onBgColor
                     )
-                    val ringScale = if (inWarningZone) pulseScale else 1f
-
-                    Box(contentAlignment = Alignment.Center) {
-                        val progressRatio = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
-                        val animatedProgress by animateFloatAsState(
-                            targetValue = progressRatio,
-                            label = "progress"
-                        )
-
-                        val warningColor = MaterialTheme.colorScheme.tertiary
-                        val ringColor = if (inWarningZone) warningColor else primaryColor
-
-                        CircularProgressIndicator(
-                            progress = { animatedProgress },
-                            modifier = Modifier
-                                .size(minOf(this@BoxWithConstraints.maxWidth, 320.dp))
-                                .graphicsLayer {
-                                    scaleX = ringScale
-                                    scaleY = ringScale
-                                },
-                            strokeWidth = 36.dp,
-                            trackColor = surfaceVarColor,
-                            color = ringColor,
-                            strokeCap = StrokeCap.Round
-                        )
-                        
-                        Text(
-                            "%02d:%02d".format(remaining / 60, remaining % 60),
-                            fontSize = timerFontSize,
-                            fontWeight = FontWeight.Black,
-                            color = onBgColor,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            style = TextStyle(fontFeatureSettings = "tnum")
-                        )
-                    }
                 }
             }
 
-            Column(
+            TimerControls(
+                hasRounds = profile?.rounds?.isNotEmpty() == true,
+                profile = profile,
+                cacheReady = cacheReady,
+                running = running,
+                paused = paused,
+                finished = finished,
+                pauseTimerText = pauseTimerText,
+                resumeTimerText = resumeTimerText,
+                restartTimerText = restartTimerText,
+                onStart = { viewModel.setFinished(false); TimerService.start(context, profileId, profile!!, LocaleManager.currentLanguageTag(context), timerFinishedText) },
+                onPause = { TimerService.pause(context) },
+                onResume = { TimerService.resume(context) },
+                onStop = { viewModel.setFinished(true); TimerService.stop(context) },
+                onRestart = { viewModel.setFinished(false) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimerTopBar(
+    profileName: String,
+    profileEmoji: String,
+    onBack: () -> Unit
+) {
+    val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
+    val onBgColor = MaterialTheme.colorScheme.onBackground
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            profileName,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = onBgColor
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(surfaceVarColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(profileEmoji, fontSize = 24.sp)
+        }
+    }
+}
+
+@Composable
+private fun TimerCountdownRing(
+    remaining: Int,
+    roundTotal: Int,
+    isRunning: Boolean,
+    isFinished: Boolean,
+    maxRingSize: Dp,
+    timerFontSize: androidx.compose.ui.unit.TextUnit,
+    onBgColor: Color
+) {
+    val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val inWarningZone = isRunning && !isFinished && remaining in 1..10
+    val pulseTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by pulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    val ringScale = if (inWarningZone) pulseScale else 1f
+    val progressRatio = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
+    val animatedProgress by animateFloatAsState(
+        targetValue = progressRatio,
+        label = "progress"
+    )
+    val warningColor = MaterialTheme.colorScheme.tertiary
+    val ringColor = if (inWarningZone) warningColor else primaryColor
+    Box(contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(
+            progress = { animatedProgress },
+            modifier = Modifier
+                .size(maxRingSize)
+                .graphicsLayer {
+                    scaleX = ringScale
+                    scaleY = ringScale
+                },
+            strokeWidth = 36.dp,
+            trackColor = surfaceVarColor,
+            color = ringColor,
+            strokeCap = StrokeCap.Round
+        )
+        Text(
+            "%02d:%02d".format(remaining / 60, remaining % 60),
+            fontSize = timerFontSize,
+            fontWeight = FontWeight.Black,
+            color = onBgColor,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            style = TextStyle(fontFeatureSettings = "tnum")
+        )
+    }
+}
+
+@Composable
+private fun TimerControls(
+    hasRounds: Boolean,
+    profile: TimerProfile?,
+    cacheReady: Boolean,
+    running: Boolean,
+    paused: Boolean,
+    finished: Boolean,
+    pauseTimerText: String,
+    resumeTimerText: String,
+    restartTimerText: String,
+    onStart: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onStop: () -> Unit,
+    onRestart: () -> Unit
+) {
+    val errorColor = MaterialTheme.colorScheme.error
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+    ) {
+        if (!running && !finished) {
+            if (!hasRounds && profile != null) {
+                Text(
+                    stringResource(R.string.no_rounds),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = errorColor,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                )
+            }
+            Button(
+                onClick = onStart,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp)
+                    .height(64.dp),
+                shape = RoundedCornerShape(32.dp),
+                enabled = hasRounds && cacheReady,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
-                if (!running && !finished) {
-                    val hasRounds = profile?.rounds?.isNotEmpty() == true
-                    if (!hasRounds && profile != null) {
-                        Text(
-                            stringResource(R.string.no_rounds),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = errorColor,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp)
-                        )
-                    }
-                    Button(
-                        onClick = {
-                            val p = profile ?: return@Button
-                            if (p.rounds.isEmpty()) return@Button
-                            running = true
-                            paused = false
-                            finished = false
-                            remaining = p.rounds[0].durationSeconds
-                            roundTotal = p.rounds[0].durationSeconds
-                            currentRound = p.rounds[0].name
-                            roundInfo = "1 / ${p.rounds.size}"
-                            TimerService.start(context, profileId, p, LocaleManager.currentLanguageTag(context), timerFinishedText)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                        shape = RoundedCornerShape(32.dp),
-                        enabled = hasRounds && cacheReady,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.start_timer), modifier = Modifier.size(32.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            stringResource(R.string.start_timer),
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                
-                if (running && !paused) {
-                    Button(
-                        onClick = {
-                            paused = true
-                            TimerService.pause(context)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                        shape = RoundedCornerShape(32.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Icon(AppIcons.Pause, contentDescription = pauseTimerText, modifier = Modifier.size(32.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            pauseTimerText,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                if (running && paused) {
-                    Button(
-                        onClick = {
-                            paused = false
-                            TimerService.resume(context)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                        shape = RoundedCornerShape(32.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = resumeTimerText, modifier = Modifier.size(32.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            resumeTimerText,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = {
-                            running = false
-                            finished = true
-                            paused = false
-                            TimerService.stop(context)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(32.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp, MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(AppIcons.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            stringResource(R.string.stop_timer),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                if (finished) {
-                    Button(
-                        onClick = {
-                            finished = false
-                            paused = false
-                            val p = profile
-                            if (p != null && p.rounds.isNotEmpty()) {
-                                remaining = p.rounds[0].durationSeconds
-                                roundTotal = p.rounds[0].durationSeconds
-                                currentRound = p.rounds[0].name
-                                roundInfo = "1 / ${p.rounds.size}"
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                        shape = RoundedCornerShape(32.dp)
-                    ) {
-                        Text(
-                            restartTimerText,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
+                Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.start_timer), modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    stringResource(R.string.start_timer),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
+        if (running && !paused) {
+            Button(
+                onClick = onPause,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(32.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Icon(AppIcons.Pause, contentDescription = pauseTimerText, modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    pauseTimerText,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        if (running && paused) {
+            Button(
+                onClick = onResume,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(32.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = resumeTimerText, modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    resumeTimerText,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onStop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(32.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp, MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(AppIcons.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.stop_timer),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        if (finished) {
+            Button(
+                onClick = onRestart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp),
+                shape = RoundedCornerShape(32.dp)
+            ) {
+                Text(
+                    restartTimerText,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }

@@ -34,6 +34,7 @@ import com.raund.app.tts.TtsCache
 import kotlin.math.PI
 import kotlin.math.sin
 import java.util.Locale
+import java.util.concurrent.Executors
 
 class TimerService : Service() {
 
@@ -59,6 +60,7 @@ class TimerService : Service() {
     private var useCacheOnly = false
     private var langTag = "en"
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val audioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-audio").apply { isDaemon = true } }
 
     private val leaveAppCheckRunnable = object : Runnable {
         override fun run() {
@@ -176,12 +178,14 @@ class TimerService : Service() {
                 paused = true
                 autoPausedByScreenOff = false
                 autoPausedByLeavingApp = false
+                TimerStateHolder.update(paused = true)
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
                 paused = false
                 autoPausedByScreenOff = false
                 autoPausedByLeavingApp = false
+                TimerStateHolder.update(paused = false)
                 return START_NOT_STICKY
             }
         }
@@ -290,9 +294,9 @@ class TimerService : Service() {
         var wasPaused = false
         var remainingMsWhenPaused = 0L
 
-        broadcastState(round.name, round.durationSeconds, round.durationSeconds, 1, totalRounds)
+        updateStateAndNotification(round.name, round.durationSeconds, round.durationSeconds, 1, totalRounds)
         if (roundIndex == 0) {
-            Thread { playProlongedTone(prolongedMs) }.start()
+            playProlongedTone(prolongedMs)
         }
         if (useCacheOnly) {
             playCacheFile(round.name, langTag, null)
@@ -334,9 +338,9 @@ class TimerService : Service() {
                 if (skippedRounds > 1) {
                     Log.i(TAG, "freeze skip: jumped $skippedRounds rounds at once")
                 }
-                Thread { playProlongedTone(prolongedMs) }.start()
+                playProlongedTone(prolongedMs)
                 if (roundIndex >= totalRounds) {
-                    broadcastState("", 0, 0, 0, 0, isRunning = false)
+                    updateStateAndNotification("", 0, 0, 0, 0, isRunning = false)
                     running = false
                     if (useCacheOnly) {
                         playCacheFile(profile.name, langTag) {
@@ -354,7 +358,7 @@ class TimerService : Service() {
                 }
                 val currentRemaining = ((roundStartRealtimeMs + roundDurationMs - now) / 1000).coerceAtLeast(0).toInt()
                 lastBroadcastRemainingSeconds = currentRemaining
-                broadcastState(round.name, currentRemaining, round.durationSeconds, roundIndex + 1, totalRounds)
+                updateStateAndNotification(round.name, currentRemaining, round.durationSeconds, roundIndex + 1, totalRounds)
                 if (useCacheOnly) {
                     playCacheFile(round.name, langTag, null)
                 } else {
@@ -369,7 +373,7 @@ class TimerService : Service() {
 
             if (remainingSeconds != lastBroadcastRemainingSeconds) {
                 lastBroadcastRemainingSeconds = remainingSeconds
-                broadcastState(round.name, remainingSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
+                updateStateAndNotification(round.name, remainingSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
                 if (round.warn10sec && round.durationSeconds >= 10 && remainingSeconds in 1..10) {
                     try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
                 }
@@ -389,14 +393,16 @@ class TimerService : Service() {
     private val cachePlayerLock = Object()
     private var cachedToneBuffer: ShortArray? = null
     private var cachedToneDurationMs: Int = 0
+    private var prolongedToneTrack: AudioTrack? = null
+    private val prolongedToneLock = Object()
 
     private fun playCacheFile(text: String, langTag: String, onDone: (() -> Unit)? = null) {
-        Thread {
+        audioExecutor.execute {
             try {
                 val file = TtsCache.cacheFile(applicationContext, langTag, text)
                 if (!file.exists()) {
                     mainHandler.post { onDone?.invoke() }
-                    return@Thread
+                    return@execute
                 }
                 synchronized(cachePlayerLock) {
                     cachedMediaPlayer?.let {
@@ -415,10 +421,11 @@ class TimerService : Service() {
                     }
                     player.start()
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w(TAG, "playCacheFile failed", e)
                 mainHandler.post { onDone?.invoke() }
             }
-        }.start()
+        }
     }
 
     private fun getToneBuffer(durationMs: Int): ShortArray {
@@ -437,39 +444,51 @@ class TimerService : Service() {
     }
 
     private fun playProlongedTone(durationMs: Int) {
-        try {
-            val buffer = getToneBuffer(durationMs)
-            val sampleRate = 44100
-            val vol = 0.55f
-            val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-                .setBufferSizeInBytes((buffer.size * 2).coerceAtLeast(minBuf))
-                .setTransferMode(AudioTrack.MODE_STATIC)
-                .build()
-            track.setVolume(vol)
-            track.write(buffer, 0, buffer.size)
-            track.play()
-            Thread.sleep(durationMs.toLong())
-            track.release()
-        } catch (_: Exception) {}
+        audioExecutor.execute {
+            try {
+                synchronized(prolongedToneLock) {
+                    var track = prolongedToneTrack
+                    if (track == null) {
+                        val buffer = getToneBuffer(durationMs)
+                        val sampleRate = 44100
+                        val vol = 0.55f
+                        val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                        track = AudioTrack.Builder()
+                            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
+                            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                            .setBufferSizeInBytes((buffer.size * 2).coerceAtLeast(minBuf))
+                            .setTransferMode(AudioTrack.MODE_STATIC)
+                            .build()
+                        track.setVolume(vol)
+                        track.write(buffer, 0, buffer.size)
+                        prolongedToneTrack = track
+                    }
+                    track.stop()
+                    track.reloadStaticData()
+                    track.setPlaybackHeadPosition(0)
+                    track.play()
+                }
+                Thread.sleep(durationMs.toLong())
+                prolongedToneTrack?.stop()
+            } catch (e: Exception) {
+                Log.w(TAG, "playProlongedTone failed", e)
+            }
+        }
     }
 
     private var cachedNotifBuilder: Notification.Builder? = null
     private var lastForegroundMs = 0L
 
-    private fun broadcastState(roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
-        val i = Intent(ACTION_TIMER_STATE).apply {
-            setPackage(packageName)
-            putExtra(EXTRA_REMAINING, remaining)
-            putExtra(EXTRA_ROUND_NAME, roundName)
-            putExtra(EXTRA_ROUND_TOTAL, roundTotal)
-            putExtra(EXTRA_ROUND_INDEX, roundIndex)
-            putExtra(EXTRA_TOTAL_ROUNDS, totalRounds)
-            putExtra(EXTRA_IS_RUNNING, isRunning)
-        }
-        sendBroadcast(i)
+    private fun updateStateAndNotification(roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
+        TimerStateHolder.update(
+            remaining = remaining,
+            roundName = roundName,
+            roundTotal = roundTotal,
+            roundIndex = roundIndex,
+            totalRounds = totalRounds,
+            isRunning = isRunning,
+            paused = paused
+        )
         val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
         lastNotifText = text
         showNotification(text, forceStartForeground = !isRunning)
@@ -685,12 +704,18 @@ class TimerService : Service() {
             cachedMediaPlayer = null
         }
         cachedToneBuffer = null
+        synchronized(prolongedToneLock) {
+            try { prolongedToneTrack?.release() } catch (_: Exception) {}
+            prolongedToneTrack = null
+        }
+        audioExecutor.shutdown()
         stopMediaSession()
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
             Log.i(TAG, "wakeLock.release()")
         }
         wakeLock = null
+        TimerStateHolder.reset()
         super.onDestroy()
     }
 

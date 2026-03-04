@@ -49,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import android.app.Activity
@@ -62,7 +63,7 @@ import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.SettingsManager
 import com.raund.app.data.entity.Profile
-import com.raund.app.data.repository.ProfileRepository
+import com.raund.app.viewmodel.ProfileListViewModel
 
 private val supportedLanguages = listOf(
     Triple("ru", "Русский", "🇷🇺"),
@@ -78,13 +79,14 @@ private val supportedLanguages = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileListScreen(
-    repository: ProfileRepository,
+    viewModel: ProfileListViewModel,
     onProfileClick: (String) -> Unit,
     onAddProfile: () -> Unit,
     onStartTimer: (String) -> Unit
 ) {
-    val profiles by repository.profiles.collectAsState(initial = repository.cachedProfiles)
-    val roundStats by repository.roundStats.collectAsState(initial = repository.cachedRoundStats)
+    val listState by viewModel.listState.collectAsState()
+    val profiles = listState.profiles
+    val roundStats = listState.roundStats
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
     var showSettings by remember { mutableStateOf(false) }

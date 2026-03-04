@@ -82,7 +82,9 @@ class ProfileRepository(
         try {
             val r = authService.register()
             tokenStore.setTokens(r.token, r.refresh_token)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(PERF, "ensureToken: register failed", e)
+        }
     }
 
     suspend fun insertProfile(name: String, emoji: String): String = withContext(Dispatchers.IO) {
@@ -248,7 +250,9 @@ class ProfileRepository(
             } while (cursor != null)
             syncPrefs.setLastSyncedAtNow()
             Log.i(PERF, "syncFromApi: total sync took ${SystemClock.elapsedRealtime() - totalStart}ms")
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(PERF, "syncFromApi failed", e)
+        }
     }
 
     companion object {
