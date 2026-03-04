@@ -449,131 +449,133 @@ private fun TimerControls(
             .fillMaxWidth()
             .padding(24.dp)
     ) {
-        if (!running && !finished) {
-            if (!hasRounds && profile != null && !syncing) {
-                Text(
-                    stringResource(R.string.no_rounds),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = errorColor,
-                    textAlign = TextAlign.Center,
+        when {
+            finished -> {
+                Button(
+                    onClick = onRestart,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                )
-            }
-            val startEnabled = hasRounds && cacheReady && !syncing
-            Button(
-                onClick = onStart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(32.dp),
-                enabled = startEnabled,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                if (syncing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 3.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
+                        .height(64.dp),
+                    shape = RoundedCornerShape(32.dp)
+                ) {
                     Text(
-                        stringResource(R.string.loading),
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                } else {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.start_timer), modifier = Modifier.size(32.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        stringResource(R.string.start_timer),
+                        restartTimerText,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
-        }
-        if (running && !paused) {
-            Button(
-                onClick = onPause,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(32.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            ) {
-                Icon(AppIcons.Pause, contentDescription = pauseTimerText, modifier = Modifier.size(32.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    pauseTimerText,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            running && paused -> {
+                Button(
+                    onClick = onResume,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = resumeTimerText, modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        resumeTimerText,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onStop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(AppIcons.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.stop_timer),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
-        }
-        if (running && paused) {
-            Button(
-                onClick = onResume,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(32.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = resumeTimerText, modifier = Modifier.size(32.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    resumeTimerText,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            running && !paused -> {
+                Button(
+                    onClick = onPause,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    Icon(AppIcons.Pause, contentDescription = pauseTimerText, modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        pauseTimerText,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = onStop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(32.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                ),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp, MaterialTheme.colorScheme.error
-                )
-            ) {
-                Icon(AppIcons.Stop, contentDescription = stringResource(R.string.stop_timer), modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    stringResource(R.string.stop_timer),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        if (finished) {
-            Button(
-                onClick = onRestart,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = RoundedCornerShape(32.dp)
-            ) {
-                Text(
-                    restartTimerText,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            else -> {
+                if (!hasRounds && profile != null && !syncing) {
+                    Text(
+                        stringResource(R.string.no_rounds),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = errorColor,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    )
+                }
+                val startEnabled = hasRounds && cacheReady && !syncing
+                Button(
+                    onClick = onStart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp),
+                    shape = RoundedCornerShape(32.dp),
+                    enabled = startEnabled,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    if (syncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 3.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.loading),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.start_timer), modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.start_timer),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
         Spacer(modifier = Modifier.height(16.dp))

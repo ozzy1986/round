@@ -64,7 +64,9 @@ class TimerService : Service() {
 
     private val leaveAppCheckRunnable = object : Runnable {
         override fun run() {
-            if (!running || paused || screenIsOff) return
+            if (!running || paused) return
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            if (!pm.isInteractive || screenIsOff) return
             if (!SettingsManager.isKeepRunningWhenLeavingApp(this@TimerService)) {
                 Log.i(TAG, "leaveAppCheck: user left app -> auto-pause")
                 paused = true
