@@ -39,24 +39,30 @@ fun Modifier.dragReorder(
             viewModel.setDragOffset(0f)
             viewModel.clearSelection()
 
+            var totalDragY = 0f
+            val itemHeightPx = state.itemHeightPx
+            val spacerPx = with(density) { 12.dp.toPx() }
+            val stepPx = if (itemHeightPx > 0f) itemHeightPx + spacerPx else 1f
+
             val dragged = drag(longPress.id) { change ->
-                viewModel.addDragOffset(change.positionChange().y)
+                val dy = change.positionChange().y
+                totalDragY += dy
+                viewModel.addDragOffset(dy)
+                val positions = (totalDragY / stepPx).roundToInt()
+                val targetIdx = (index + positions).coerceIn(0, roundsSize - 1)
+                viewModel.setDragTargetIndex(targetIdx)
                 change.consume()
             }
 
-            if (dragged) {
-                val di = state.draggedIndex
-                if (di != null && state.itemHeightPx > 0f) {
-                    val spacerPx = with(density) { 12.dp.toPx() }
-                    val stepPx = state.itemHeightPx + spacerPx
-                    val positions = (state.dragOffset / stepPx).roundToInt()
-                    val targetIdx = (di + positions).coerceIn(0, roundsSize - 1)
-                    if (targetIdx != di) {
-                        viewModel.reorderRounds(di, targetIdx)
-                    }
+            if (dragged && itemHeightPx > 0f) {
+                val positions = (totalDragY / stepPx).roundToInt()
+                val targetIdx = (index + positions).coerceIn(0, roundsSize - 1)
+                if (targetIdx != index) {
+                    viewModel.reorderRounds(index, targetIdx)
                 }
             }
             viewModel.setDraggedIndex(null)
+            viewModel.setDragTargetIndex(null)
             viewModel.setDragOffset(0f)
         } else {
             onTapWhenNoDrag?.invoke()

@@ -28,6 +28,7 @@ data class ProfileEditorState(
     val showCopyNDialog: Boolean = false,
     val copyNValue: String = "12",
     val draggedIndex: Int? = null,
+    val dragTargetIndex: Int? = null,
     val dragOffset: Float = 0f,
     val itemHeightPx: Float = 0f
 )
@@ -154,7 +155,11 @@ class ProfileEditorViewModel(
     }
 
     fun setDraggedIndex(index: Int?) {
-        _state.value = _state.value.copy(draggedIndex = index)
+        _state.value = _state.value.copy(draggedIndex = index, dragTargetIndex = index)
+    }
+
+    fun setDragTargetIndex(index: Int?) {
+        _state.value = _state.value.copy(dragTargetIndex = index)
     }
 
     fun setDragOffset(offset: Float) {
