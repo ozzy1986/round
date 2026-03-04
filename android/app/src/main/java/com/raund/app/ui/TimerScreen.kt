@@ -227,7 +227,6 @@ fun TimerScreen(
         ) {
             TimerTopBar(
                 profileName = profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
-                profileEmoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱",
                 onBack = { TimerService.stop(context); onBack() }
             )
 
@@ -336,10 +335,8 @@ fun TimerScreen(
 @Composable
 private fun TimerTopBar(
     profileName: String,
-    profileEmoji: String,
     onBack: () -> Unit
 ) {
-    val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
     val onBgColor = MaterialTheme.colorScheme.onBackground
     Row(
         modifier = Modifier
@@ -357,16 +354,6 @@ private fun TimerTopBar(
             fontWeight = FontWeight.Bold,
             color = onBgColor
         )
-        Spacer(modifier = Modifier.weight(1f))
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(surfaceVarColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(profileEmoji, fontSize = 24.sp)
-        }
     }
 }
 
