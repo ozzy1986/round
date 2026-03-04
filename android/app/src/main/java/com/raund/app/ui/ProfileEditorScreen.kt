@@ -196,18 +196,11 @@ fun ProfileEditorScreen(
                 val isSelected = selectedRoundIndices.contains(index)
                 val isDragged = draggedIndex == index
                 val isDragging = draggedIndex != null
-                val isDropTarget = isDragging && !isDragged && dragTargetIndex == index
 
-                if (isDropTarget && dragTargetIndex != null && draggedIndex != null && dragTargetIndex < draggedIndex) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .padding(horizontal = 16.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                val showGapBefore = isDragging && dragTargetIndex != null && draggedIndex != null
+                        && dragTargetIndex != draggedIndex && index == dragTargetIndex && dragTargetIndex < draggedIndex
+                if (showGapBefore) {
+                    Spacer(modifier = Modifier.height(48.dp))
                 }
 
                 Card(
@@ -224,9 +217,6 @@ fun ProfileEditorScreen(
                                 scaleY = 1.03f
                                 shadowElevation = 16f
                             }
-                            if (isDragging && !isDragged) {
-                                alpha = if (isDropTarget) 1f else 0.6f
-                            }
                         }
                         .dragReorder(
                             index = index,
@@ -239,17 +229,14 @@ fun ProfileEditorScreen(
                         ),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = when {
-                            isDropTarget -> MaterialTheme.colorScheme.primaryContainer
-                            isSelected -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
+                        containerColor = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant
                     ),
-                    border = when {
-                        isDropTarget -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                        isSelected -> BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                        else -> null
-                    }
+                    border = if (isSelected)
+                        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                    else null
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(
@@ -367,19 +354,9 @@ fun ProfileEditorScreen(
                     }
                 }
 
-                if (isDropTarget && dragTargetIndex != null && draggedIndex != null && dragTargetIndex > draggedIndex) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .padding(horizontal = 16.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
+                val showGapAfter = isDragging && dragTargetIndex != null && draggedIndex != null
+                        && dragTargetIndex != draggedIndex && index == dragTargetIndex && dragTargetIndex > draggedIndex
+                Spacer(modifier = Modifier.height(if (showGapAfter) 48.dp else 12.dp))
             }
             item(key = "copyRow") {
             if (selectedRoundIndices.isNotEmpty()) {
