@@ -247,13 +247,14 @@ fun TimerScreen(
                         textAlign = TextAlign.Center
                     )
                 } else {
-                    val displayRoundName = if (currentRound.length > 10) currentRound.take(10) + "…" else currentRound
                     Text(
-                        displayRoundName,
+                        currentRound,
                         style = MaterialTheme.typography.displaySmall,
                         color = primaryColor,
                         textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                     if (roundInfo.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -298,7 +299,8 @@ fun TimerScreen(
                         isFinished = finished,
                         maxRingSize = minOf(this@BoxWithConstraints.maxWidth, 320.dp),
                         timerFontSize = timerFontSize,
-                        onBgColor = onBgColor
+                        onBgColor = onBgColor,
+                        emoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱"
                     )
                 }
             }
@@ -376,7 +378,8 @@ private fun TimerCountdownRing(
     isFinished: Boolean,
     maxRingSize: Dp,
     timerFontSize: androidx.compose.ui.unit.TextUnit,
-    onBgColor: Color
+    onBgColor: Color,
+    emoji: String
 ) {
     val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -412,6 +415,11 @@ private fun TimerCountdownRing(
             trackColor = surfaceVarColor,
             color = ringColor,
             strokeCap = StrokeCap.Round
+        )
+        Text(
+            emoji,
+            fontSize = 120.sp,
+            modifier = Modifier.graphicsLayer { alpha = 0.5f }
         )
         Text(
             "%02d:%02d".format(remaining / 60, remaining % 60),
@@ -542,6 +550,7 @@ private fun TimerControls(
                     )
                 }
                 val startEnabled = hasRounds && cacheReady && !syncing
+                val showLoading = syncing || (hasRounds && !cacheReady)
                 Button(
                     onClick = onStart,
                     modifier = Modifier
@@ -554,7 +563,7 @@ private fun TimerControls(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    if (syncing) {
+                    if (showLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 3.dp,

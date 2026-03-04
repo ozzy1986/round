@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.raund.app.LocaleManager
@@ -72,6 +73,7 @@ import kotlinx.coroutines.launch
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
 private const val MAX_ROUND_NAME_LENGTH = 20
+private const val MIN_ROUND_DURATION_SECONDS = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -301,7 +303,20 @@ fun ProfileEditorScreen(
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f).padding(end = 16.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 16.dp)
+                                    .onFocusChanged { focusState ->
+                                        if (!focusState.isFocused) {
+                                            val parsed = dur.toIntOrNull() ?: 0
+                                            if (parsed < MIN_ROUND_DURATION_SECONDS) {
+                                                viewModel.updateRoundAt(
+                                                    index,
+                                                    round.copy(duration = MIN_ROUND_DURATION_SECONDS.toString(), warn10sec = false)
+                                                )
+                                            }
+                                        }
+                                    },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -382,7 +397,7 @@ fun ProfileEditorScreen(
                         val id = if (isNew) repository.insertProfile(safeName, safeEmoji) else profileId!!
                         if (!isNew) repository.updateProfile(profileId!!, safeName, safeEmoji)
                         val roundsToSave = rounds.map { r ->
-                            val durInt = r.duration.toIntOrNull()?.coerceAtLeast(5) ?: 5
+                            val durInt = r.duration.toIntOrNull()?.coerceAtLeast(MIN_ROUND_DURATION_SECONDS) ?: MIN_ROUND_DURATION_SECONDS
                             Triple(r.name.take(MAX_ROUND_NAME_LENGTH), durInt, r.warn10sec)
                         }
                         repository.saveRounds(id, roundsToSave)
