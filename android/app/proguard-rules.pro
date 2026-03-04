@@ -8,6 +8,14 @@
 -keepclassmembers,allowobfuscation interface * {
     @retrofit2.http.* <methods>;
 }
+# Retrofit suspend functions: keep Continuation generic signature
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+-if interface * { @retrofit2.http.* <methods>; }
+-keep,allowobfuscation interface <1>
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
 
 # Gson: keep fields used for serialization
 -keep class com.raund.app.data.remote.** { *; }

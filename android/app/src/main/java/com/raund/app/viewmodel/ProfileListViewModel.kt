@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 data class ProfileListState(
     val profiles: List<Profile> = emptyList(),
@@ -20,6 +21,9 @@ data class ProfileListState(
 
 class ProfileListViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: ProfileRepository = (application as RaundApplication).profileRepository
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
     val listState: StateFlow<ProfileListState> = combine(
         repository.profiles,
@@ -34,4 +38,15 @@ class ProfileListViewModel(application: Application) : AndroidViewModel(applicat
             roundStats = repository.cachedRoundStats
         )
     )
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                repository.forceSync()
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
 }

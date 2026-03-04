@@ -29,6 +29,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,6 +91,7 @@ fun ProfileListScreen(
     val listState by viewModel.listState.collectAsState()
     val profiles = listState.profiles
     val roundStats = listState.roundStats
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
     var showSettings by remember { mutableStateOf(false) }
@@ -173,134 +178,152 @@ fun ProfileListScreen(
             }
         }
     ) { padding ->
-        if (profiles.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                    modifier = Modifier.padding(32.dp)
-                ) {
-                    Text(
-                        stringResource(R.string.no_profiles),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                    Button(
-                        onClick = onAddProfile,
-                        modifier = Modifier.height(56.dp),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text(stringResource(R.string.create_first_profile), fontSize = 16.sp)
-                    }
-                }
+        val pullToRefreshState = rememberPullToRefreshState()
+        if (pullToRefreshState.isRefreshing) {
+            LaunchedEffect(true) {
+                viewModel.refresh()
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(4.dp)) }
-                items(profiles, key = { it.id }) { profile: Profile ->
-                    val stats = roundStats[profile.id]
-                    val roundsCount = (stats?.roundsCount ?: 0L).toInt()
-                    val totalDurationSeconds = (stats?.totalDurationSeconds ?: 0L).toInt()
-                    val hasRounds = roundsCount > 0
-                    val profileName = profile.name.ifBlank { stringResource(R.string.unnamed_profile) }
-                    val profileSummary = if (hasRounds) {
-                        stringResource(
-                            R.string.profile_summary,
-                            roundsCount,
-                            formatDurationShort(totalDurationSeconds)
-                        )
-                    } else {
-                        stringResource(R.string.no_rounds_short)
-                    }
+        }
+        LaunchedEffect(isRefreshing) {
+            if (!isRefreshing) pullToRefreshState.endRefresh()
+        }
 
-                    ElevatedCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onProfileClick(profile.id) },
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
+        ) {
+            if (profiles.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                        modifier = Modifier.padding(32.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Text(
+                            stringResource(R.string.no_profiles),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Button(
+                            onClick = onAddProfile,
+                            modifier = Modifier.height(56.dp),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        profile.emoji.ifBlank { "⏱" },
-                                        fontSize = 28.sp
-                                    )
-                                }
-                                Column {
-                                    Text(
-                                        profileName,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        profileSummary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            IconButton(
-                                onClick = { onStartTimer(profile.id) },
-                                modifier = Modifier.size(56.dp),
-                                enabled = hasRounds,
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                                    disabledContainerColor = MaterialTheme.colorScheme.surface,
-                                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Filled.PlayArrow,
-                                    contentDescription = stringResource(R.string.start_timer),
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
+                            Text(stringResource(R.string.create_first_profile), fontSize = 16.sp)
                         }
                     }
                 }
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
+                    items(profiles, key = { it.id }) { profile: Profile ->
+                        val stats = roundStats[profile.id]
+                        val roundsCount = (stats?.roundsCount ?: 0L).toInt()
+                        val totalDurationSeconds = (stats?.totalDurationSeconds ?: 0L).toInt()
+                        val hasRounds = roundsCount > 0
+                        val profileName = profile.name.ifBlank { stringResource(R.string.unnamed_profile) }
+                        val profileSummary = if (hasRounds) {
+                            stringResource(
+                                R.string.profile_summary,
+                                roundsCount,
+                                formatDurationShort(totalDurationSeconds)
+                            )
+                        } else {
+                            stringResource(R.string.no_rounds_short)
+                        }
+
+                        ElevatedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onProfileClick(profile.id) },
+                            shape = RoundedCornerShape(20.dp),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primaryContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            profile.emoji.ifBlank { "⏱" },
+                                            fontSize = 28.sp
+                                        )
+                                    }
+                                    Column {
+                                        Text(
+                                            profileName,
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            profileSummary,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                IconButton(
+                                    onClick = { onStartTimer(profile.id) },
+                                    modifier = Modifier.size(56.dp),
+                                    enabled = hasRounds,
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
+                                    Icon(
+                                        Icons.Filled.PlayArrow,
+                                        contentDescription = stringResource(R.string.start_timer),
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
+                }
             }
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 

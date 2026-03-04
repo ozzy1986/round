@@ -220,6 +220,28 @@ class ProfileRepository(
         syncFromApi()
     }
 
+    suspend fun forceSync() = withContext(Dispatchers.IO) {
+        syncFromApi()
+    }
+
+    suspend fun syncSingleProfile(profileId: String) = withContext(Dispatchers.IO) {
+        ensureToken()
+        try {
+            val api = this@ProfileRepository.api ?: return@withContext
+            val dto = api.getProfileWithRounds(profileId)
+            database.withTransaction {
+                profileDao.insert(Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis()))
+                roundDao.deleteByProfileId(dto.id)
+                roundDao.insertAll(dto.rounds.mapIndexed { i, r ->
+                    Round(r.id, r.profile_id, r.name, r.duration_seconds.coerceAtLeast(5), r.warn10sec, i)
+                })
+            }
+            Log.i(PERF, "syncSingleProfile: synced $profileId (${dto.rounds.size} rounds)")
+        } catch (e: Exception) {
+            Log.w(PERF, "syncSingleProfile failed for $profileId", e)
+        }
+    }
+
     suspend fun syncFromApi() = withContext(Dispatchers.IO) {
         val totalStart = SystemClock.elapsedRealtime()
         ensureToken()

@@ -28,6 +28,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,6 +83,7 @@ fun ProfileEditorScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val repository = viewModel.getRepository()
     val name = state.name
     val emoji = state.emoji
@@ -115,9 +120,25 @@ fun ProfileEditorScreen(
             )
         }
     ) { padding ->
+        val pullToRefreshState = rememberPullToRefreshState()
+        if (pullToRefreshState.isRefreshing) {
+            LaunchedEffect(true) {
+                viewModel.refresh()
+            }
+        }
+        LaunchedEffect(isRefreshing) {
+            if (!isRefreshing) pullToRefreshState.endRefresh()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .nestedScroll(pullToRefreshState.nestedScrollConnection)
+        ) {
         LazyColumn(
             modifier = Modifier
-                .padding(padding)
+                .fillMaxSize()
                 .padding(horizontal = 16.dp),
             userScrollEnabled = draggedIndex == null
         ) {
@@ -397,6 +418,11 @@ fun ProfileEditorScreen(
             item(key = "bottom") {
             Spacer(modifier = Modifier.height(48.dp))
             }
+        }
+        PullToRefreshContainer(
+            state = pullToRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
         }
         if (showDeleteConfirm) {
             AlertDialog(

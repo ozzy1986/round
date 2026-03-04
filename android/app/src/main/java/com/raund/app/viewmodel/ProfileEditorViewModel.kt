@@ -42,23 +42,46 @@ class ProfileEditorViewModel(
     private val _state = MutableStateFlow(ProfileEditorState())
     val state: StateFlow<ProfileEditorState> = _state.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
         if (profileId != null && profileId != "new") {
             viewModelScope.launch {
-                val profile = repository.getProfileWithRounds(profileId)
-                if (profile != null) {
-                    _state.value = _state.value.copy(
-                        name = profile.name,
-                        emoji = profile.emoji.ifBlank { "⏱" },
-                        rounds = profile.rounds.map { r ->
-                            RoundEditState(
-                                name = r.name,
-                                duration = r.durationSeconds.toString(),
-                                warn10sec = r.warn10sec
-                            )
-                        }
+                loadProfile()
+            }
+        }
+    }
+
+    private suspend fun loadProfile() {
+        val id = profileId ?: return
+        if (id == "new") return
+        val profile = repository.getProfileWithRounds(id)
+        if (profile != null) {
+            _state.value = _state.value.copy(
+                name = profile.name,
+                emoji = profile.emoji.ifBlank { "⏱" },
+                rounds = profile.rounds.map { r ->
+                    RoundEditState(
+                        name = r.name,
+                        duration = r.durationSeconds.toString(),
+                        warn10sec = r.warn10sec
                     )
                 }
+            )
+        }
+    }
+
+    fun refresh() {
+        val id = profileId ?: return
+        if (id == "new") return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                repository.syncSingleProfile(id)
+                loadProfile()
+            } finally {
+                _isRefreshing.value = false
             }
         }
     }
