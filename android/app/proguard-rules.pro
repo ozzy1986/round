@@ -36,6 +36,9 @@
 -keep class androidx.security.crypto.** { *; }
 -dontwarn com.google.crypto.tink.**
 
+# ViewModels and SaveResult (used by Compose/ViewModelProvider and type checks)
+-keep class com.raund.app.viewmodel.** { *; }
+
 # Sentry
 -keepattributes LineNumberTable,SourceFile
 -dontwarn io.sentry.**

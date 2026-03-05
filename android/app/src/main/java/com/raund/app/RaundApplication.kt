@@ -103,9 +103,14 @@ class RaundApplication : Application() {
         Log.i("PerfFix", "App onCreate start")
         initScope.launch {
             val start = SystemClock.elapsedRealtime()
-            profileRepository.preloadCache()
-            repositoryReady = true
-            _repositoryReadyFlow.value = true
+            try {
+                profileRepository.preloadCache()
+            } catch (e: Exception) {
+                Log.e("PerfFix", "preloadCache failed", e)
+            } finally {
+                repositoryReady = true
+                _repositoryReadyFlow.value = true
+            }
             val preloadMs = SystemClock.elapsedRealtime() - start
             val totalMs = SystemClock.elapsedRealtime() - appStartMs
             Log.i("PerfFix", "App ready in ${totalMs}ms (preload=${preloadMs}ms)")

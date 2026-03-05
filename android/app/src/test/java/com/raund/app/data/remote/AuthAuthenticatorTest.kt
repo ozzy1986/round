@@ -48,6 +48,7 @@ class AuthAuthenticatorTest {
 
     @Test
     fun `returns null when no refresh token stored`() {
+        every { tokenStore.getToken() } returns null
         every { tokenStore.getRefreshToken() } returns null
         val response = build401Response(requestHasAuth = false)
         val result = authenticator.authenticate(null, response)
@@ -56,6 +57,7 @@ class AuthAuthenticatorTest {
 
     @Test
     fun `refreshes token and retries when no prior auth header`() {
+        every { tokenStore.getToken() } returns null
         every { tokenStore.getRefreshToken() } returns "refresh_abc"
         val refreshResp = RefreshResponse(
             token = "new_access",
@@ -77,6 +79,7 @@ class AuthAuthenticatorTest {
 
     @Test
     fun `returns null when refresh call fails`() {
+        every { tokenStore.getToken() } returns null
         every { tokenStore.getRefreshToken() } returns "refresh_abc"
         val call = mockk<Call<RefreshResponse>>()
         every { authService.refreshCall(any()) } returns call
@@ -89,6 +92,7 @@ class AuthAuthenticatorTest {
 
     @Test
     fun `returns null when refresh returns non-successful response`() {
+        every { tokenStore.getToken() } returns null
         every { tokenStore.getRefreshToken() } returns "refresh_abc"
         val call = mockk<Call<RefreshResponse>>()
         every { authService.refreshCall(any()) } returns call

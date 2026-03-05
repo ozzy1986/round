@@ -38,9 +38,7 @@ class AuthAuthenticator(
             val call = authService.refreshCall(RefreshRequest(refreshToken))
             val refreshed = try {
                 val resp = call.execute()
-                resp.raw().use {
-                    if (resp.isSuccessful) resp.body() else null
-                }
+                if (resp.isSuccessful) resp.body() else null
             } catch (_: Exception) {
                 null
             } ?: return null

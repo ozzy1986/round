@@ -29,18 +29,31 @@ class TokenStore(context: Context) {
     fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
 
     fun setToken(token: String) {
-        prefs.edit().putString(KEY_TOKEN, token).commit()
+        safeCommit { prefs.edit().putString(KEY_TOKEN, token) }
     }
 
     fun setTokens(token: String, refreshToken: String) {
-        prefs.edit()
-            .putString(KEY_TOKEN, token)
-            .putString(KEY_REFRESH_TOKEN, refreshToken)
-            .commit()
+        safeCommit {
+            prefs.edit()
+                .putString(KEY_TOKEN, token)
+                .putString(KEY_REFRESH_TOKEN, refreshToken)
+        }
     }
 
     fun clearToken() {
-        prefs.edit().remove(KEY_TOKEN).remove(KEY_REFRESH_TOKEN).commit()
+        safeCommit { prefs.edit().remove(KEY_TOKEN).remove(KEY_REFRESH_TOKEN) }
+    }
+
+    private inline fun safeCommit(edit: () -> SharedPreferences.Editor) {
+        try {
+            if (!edit().commit()) {
+                Log.w("TokenStore", "commit() returned false; using apply()")
+                edit().apply()
+            }
+        } catch (e: Exception) {
+            Log.w("TokenStore", "commit() failed; using apply()", e)
+            edit().apply()
+        }
     }
 
     companion object {
