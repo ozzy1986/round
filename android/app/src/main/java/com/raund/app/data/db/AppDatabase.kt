@@ -12,7 +12,7 @@ import com.raund.app.data.entity.Round
 @Database(
     entities = [Profile::class, Round::class],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun profileDao(): ProfileDao

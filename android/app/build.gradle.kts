@@ -18,11 +18,25 @@ android {
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "API_BASE_URL", "\"https://round.ozzy1986.com/\"")
+        buildConfigField("String", "SENTRY_DSN", "\"\"")
     }
 
     signingConfigs {
         getByName("debug") {
             // default debug keystore
+        }
+        // For production: create a keystore and set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD (e.g. in local.properties or CI secrets).
+        create("release") {
+            val storeFile = project.findProperty("RELEASE_STORE_FILE") as String?
+            val storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String?
+            val keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
+            val keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+            if (storeFile != null && storePassword != null && keyAlias != null && keyPassword != null) {
+                this.storeFile = file(storeFile)
+                this.storePassword = storePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            }
         }
     }
 
@@ -34,7 +48,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (signingConfigs.getByName("release").storeFile?.exists() == true) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            val sentryDsn = project.findProperty("SENTRY_DSN") as String? ?: ""
+            buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         }
     }
 
@@ -54,6 +74,12 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -83,7 +109,19 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("androidx.media:media:1.7.0")
+    implementation("io.sentry:sentry-android:8.34.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.test.ext:junit:1.2.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }

@@ -3,6 +3,7 @@ package com.raund.app
 import android.app.Application
 import android.os.SystemClock
 import android.util.Log
+import io.sentry.android.core.SentryAndroid
 import com.raund.app.data.db.AppDatabase
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.local.TokenStore
@@ -92,6 +93,12 @@ class RaundApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.SENTRY_DSN.isNotEmpty()) {
+            SentryAndroid.init(this) { options ->
+                options.dsn = BuildConfig.SENTRY_DSN
+                options.isDebug = false
+            }
+        }
         val appStartMs = SystemClock.elapsedRealtime()
         Log.i("PerfFix", "App onCreate start")
         initScope.launch {

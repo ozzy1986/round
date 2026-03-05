@@ -162,7 +162,6 @@ class ProfileRepository(
             if (safeName.isBlank()) null
             else Triple(safeName, durationSeconds.coerceAtLeast(5), warn10sec)
         }
-        roundDao.deleteByProfileId(profileId)
         val entities = sanitizedRounds.mapIndexed { index, (name, durationSeconds, warn10sec) ->
             Round(
                 id = UUID.randomUUID().toString(),
@@ -173,7 +172,10 @@ class ProfileRepository(
                 position = index
             )
         }
-        roundDao.insertAll(entities)
+        database.withTransaction {
+            roundDao.deleteByProfileId(profileId)
+            roundDao.insertAll(entities)
+        }
         Log.i(PERF, "saveRounds: Room save took ${SystemClock.elapsedRealtime() - start}ms (${entities.size} rounds)")
 
         bgScope.launch {

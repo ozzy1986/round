@@ -35,3 +35,8 @@
 # EncryptedSharedPreferences
 -keep class androidx.security.crypto.** { *; }
 -dontwarn com.google.crypto.tink.**
+
+# Sentry
+-keepattributes LineNumberTable,SourceFile
+-dontwarn io.sentry.**
+-keep class io.sentry.** { *; }

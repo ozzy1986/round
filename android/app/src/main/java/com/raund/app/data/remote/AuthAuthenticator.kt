@@ -15,6 +15,7 @@ class AuthAuthenticator(
     private val authService: AuthService
 ) : Authenticator {
     override fun authenticate(route: Route?, response: Response): Request? {
+        if (response.request.header("Authorization") != null) return null
         val refreshToken = tokenStore.getRefreshToken() ?: return null
         val call = authService.refreshCall(RefreshRequest(refreshToken))
         val refreshed = try {

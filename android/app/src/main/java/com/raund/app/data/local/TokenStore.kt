@@ -2,6 +2,7 @@ package com.raund.app.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -17,8 +18,11 @@ class TokenStore(context: Context) {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-    } catch (_: Exception) {
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    } catch (e: Exception) {
+        Log.e("TokenStore", "EncryptedSharedPreferences failed; using plain prefs", e)
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).also { plain ->
+            plain.edit().remove(KEY_TOKEN).remove(KEY_REFRESH_TOKEN).apply()
+        }
     }
 
     fun getToken(): String? = prefs.getString(KEY_TOKEN, null)

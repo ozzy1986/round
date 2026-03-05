@@ -61,6 +61,7 @@ class TimerService : Service() {
     private var langTag = "en"
     private val mainHandler = Handler(Looper.getMainLooper())
     private val audioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-audio").apply { isDaemon = true } }
+    private val stopTimerExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-stop-timer").apply { isDaemon = true } }
 
     private val leaveAppCheckRunnable = object : Runnable {
         override fun run() {
@@ -192,11 +193,17 @@ class TimerService : Service() {
             }
         }
 
-        stopPreviousTimer()
+        stopTimerExecutor.execute {
+            stopPreviousTimer()
+            mainHandler.post { startTimerAfterStop(intent) }
+        }
+        return START_NOT_STICKY
+    }
 
+    private fun startTimerAfterStop(intent: Intent?) {
         if (!(wakeLock?.isHeld == true)) {
-            wakeLock?.acquire()
-            Log.i(TAG, "wakeLock.acquire() -> isHeld=${wakeLock?.isHeld}")
+            wakeLock?.acquire(MAX_WAKE_LOCK_MS)
+            Log.i(TAG, "wakeLock.acquire($MAX_WAKE_LOCK_MS) -> isHeld=${wakeLock?.isHeld}")
         } else {
             Log.i(TAG, "wakeLock already held, skip acquire")
         }
@@ -210,7 +217,7 @@ class TimerService : Service() {
         } ?: run {
             currentProfileId = null
             doStartForeground(buildBasicNotification())
-            return START_NOT_STICKY
+            return
         }
 
         currentProfileId = intent?.getStringExtra(EXTRA_PROFILE_ID)
@@ -261,8 +268,6 @@ class TimerService : Service() {
             start()
             Log.i(TAG, "timerThread started")
         }
-
-        return START_NOT_STICKY
     }
 
     private fun runTimer(profile: TimerProfile, useCacheOnly: Boolean, langTag: String, finishedText: String) {
@@ -714,6 +719,7 @@ class TimerService : Service() {
             prolongedToneTrack = null
         }
         audioExecutor.shutdown()
+        stopTimerExecutor.shutdown()
         stopMediaSession()
         if (wakeLock?.isHeld == true) {
             wakeLock?.release()
@@ -734,6 +740,8 @@ class TimerService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        /** Safety timeout for WakeLock if process is killed without onDestroy (avoids battery leak). */
+        private const val MAX_WAKE_LOCK_MS = 4L * 60 * 60 * 1000
         private const val TAG = "RaundTimer"
         private const val CHANNEL_ID = "raund_timer_v3"
         private const val NOTIFICATION_ID = 1
