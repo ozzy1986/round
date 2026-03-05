@@ -51,4 +51,8 @@
     <string name="leave_app_setting_hint">Барои таваққуф ҳангоми баромадан аз барнома хомӯш кунед</string>
     <string name="timer_running">Таймер кор мекунад</string>
     <string name="loading">Бор шуда истодааст…</string>
+    <string name="consent_title">Коркарди маълумот</string>
+    <string name="consent_message">Барнома ҳисоби анонимӣ месозад ва машқҳоро барои истифода дар дастгоҳҳои дигар бо сервер ҳамоҳангсозӣ мекунад. Ном, email ё телефон гиремон. Тугмаи «Қабул»-ро пахш кунед. Муфассал: сиёсати махфият.</string>
+    <string name="consent_accept">Қабул</string>
+    <string name="consent_privacy_policy">Сиёсати махфият</string>
 </resources>

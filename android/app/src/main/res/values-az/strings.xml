@@ -51,4 +51,8 @@
     <string name="leave_app_setting_hint">Tətbiqdən çıxanda fasilə üçün söndürün</string>
     <string name="timer_running">Taymer işləyir</string>
     <string name="loading">Yüklənir…</string>
+    <string name="consent_title">Məlumatların işlənməsi</string>
+    <string name="consent_message">Tətbiq anonim hesab yaradır və məşqlərinizi digər cihazlarda istifadə üçün serverə sinxronlaşdırır. Ad, e-poçt və ya telefon toplamırıq. Qəbul et düyməsinə basmaqla razılaşırsınız. Ətraflı: məxfilik siyasəti.</string>
+    <string name="consent_accept">Qəbul et</string>
+    <string name="consent_privacy_policy">Məxfilik siyasəti</string>
 </resources>

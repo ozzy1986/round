@@ -51,4 +51,8 @@
     <string name="leave_app_setting_hint">Выключите, чтобы ставить на паузу при выходе</string>
     <string name="timer_running">Таймер работает</string>
     <string name="loading">Загрузка…</string>
+    <string name="consent_title">Обработка данных</string>
+    <string name="consent_message">Приложение создаёт анонимный аккаунт и синхронизирует ваши тренировки и раунды с сервером для использования на других устройствах. Мы не собираем имя, email, телефон или геолокацию. Нажимая «Принять», вы соглашаетесь с обработкой данных. Подробности в политике конфиденциальности.</string>
+    <string name="consent_accept">Принять</string>
+    <string name="consent_privacy_policy">Политика конфиденциальности</string>
 </resources>

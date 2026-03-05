@@ -51,4 +51,8 @@
     <string name="leave_app_setting_hint">Кушымтадан чыкканда тукталу өчен сүндерү</string>
     <string name="timer_running">Таймер эшли</string>
     <string name="loading">Йөкләнә…</string>
+    <string name="consent_title">Мәгълүматны эшкәртү</string>
+    <string name="consent_message">Кушымта аноним аккаунт булдыра һәм күнегүләрегезне башка җиһазларда куллану өчен сервер белән синхронлаштыра. Исем, email яки телефон җыямыйбыз. «Кабул итү» басыгыз. Тулырак: яшеренлек сәясәте.</string>
+    <string name="consent_accept">Кабул итү</string>
+    <string name="consent_privacy_policy">Яшеренлек сәясәте</string>
 </resources>

@@ -51,4 +51,8 @@
     <string name="leave_app_setting_hint">关闭此选项可在离开应用时暂停</string>
     <string name="timer_running">计时器运行中</string>
     <string name="loading">加载中…</string>
+    <string name="consent_title">数据处理</string>
+    <string name="consent_message">应用会创建匿名账号并将您的训练和回合同步到服务器，以便在其他设备上使用。我们不收集姓名、邮箱或手机号。点击「接受」即表示您同意此处理。详见隐私政策。</string>
+    <string name="consent_accept">接受</string>
+    <string name="consent_privacy_policy">隐私政策</string>
 </resources>

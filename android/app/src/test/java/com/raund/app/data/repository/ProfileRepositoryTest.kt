@@ -2,6 +2,7 @@ package com.raund.app.data.repository
 
 import com.raund.app.data.dao.ProfileDao
 import com.raund.app.data.dao.RoundDao
+import com.raund.app.data.local.DataConsentPrefs
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.local.TokenStore
 import com.raund.app.data.remote.AuthService
@@ -25,11 +26,13 @@ class ProfileRepositoryTest {
     private val tokenStore = mockk<TokenStore>(relaxed = true)
     private val authService = mockk<AuthService>(relaxed = true)
     private val syncPrefs = mockk<SyncPrefs>(relaxed = true)
+    private val dataConsentPrefs = mockk<DataConsentPrefs>(relaxed = true)
     private val database = mockk<RoomDatabase>(relaxed = true)
     private lateinit var repository: ProfileRepository
 
     @Before
     fun setup() {
+        every { dataConsentPrefs.isConsentGranted() } returns true
         repository = ProfileRepository(
             profileDao = profileDao,
             roundDao = roundDao,
@@ -37,6 +40,7 @@ class ProfileRepositoryTest {
             tokenStore = tokenStore,
             authService = authService,
             syncPrefs = syncPrefs,
+            dataConsentPrefs = dataConsentPrefs,
             database = database
         )
 

@@ -51,4 +51,8 @@
     <string name="leave_app_setting_hint">Ilovadan chiqqanda pauza qilish uchun oʻchiring</string>
     <string name="timer_running">Taymer ishlayapti</string>
     <string name="loading">Yuklanmoqda…</string>
+    <string name="consent_title">Ma\'lumotlarni qayta ishlash</string>
+    <string name="consent_message">Ilova anonim hisob yaratadi va mashg\'ulotlaringizni boshqa qurilmalarda ishlatish uchun serverga sinxronlashtiradi. Ism, email yoki telefon to\'plamaymiz. «Qabul qilish»ni bosish orqali siz buni qabul qilasiz. Batafsil: maxfiylik siyosati.</string>
+    <string name="consent_accept">Qabul qilish</string>
+    <string name="consent_privacy_policy">Maxfiylik siyosati</string>
 </resources>

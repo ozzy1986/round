@@ -10,6 +10,7 @@ import { getPool } from './db/pool.js';
 import { getRedis } from './redis.js';
 import { authRoutes } from './auth/register.js';
 import { authVerify } from './auth/middleware.js';
+import { privacyRoutes } from './routes/privacy.js';
 import { profilesRoutes } from './routes/profiles.js';
 import { roundsRoutes } from './routes/rounds.js';
 
@@ -75,6 +76,8 @@ export async function buildApp() {
       return reply.status(503).send({ status: 'unavailable' });
     }
   });
+
+  await app.register(privacyRoutes);
 
   await app.register(
     async (instance) => {

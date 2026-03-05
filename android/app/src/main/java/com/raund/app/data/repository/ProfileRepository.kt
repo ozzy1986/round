@@ -9,6 +9,7 @@ import com.raund.app.data.dao.RoundDao
 import com.raund.app.data.dao.RoundStats
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.entity.Round
+import com.raund.app.data.local.DataConsentPrefs
 import com.raund.app.data.local.TokenStore
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.remote.ApiService
@@ -42,6 +43,7 @@ class ProfileRepository(
     private val tokenStore: TokenStore,
     private val authService: AuthService,
     private val syncPrefs: SyncPrefs,
+    private val dataConsentPrefs: DataConsentPrefs,
     private val database: RoomDatabase
 ) {
 
@@ -83,6 +85,7 @@ class ProfileRepository(
     }
 
     private suspend fun ensureToken() {
+        if (!dataConsentPrefs.isConsentGranted()) return
         if (tokenStore.getToken() != null) return
         try {
             val r = authService.register()

@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import io.sentry.android.core.SentryAndroid
 import com.raund.app.data.db.AppDatabase
+import com.raund.app.data.local.DataConsentPrefs
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.local.TokenStore
 import com.raund.app.data.remote.ApiService
@@ -29,6 +30,7 @@ class RaundApplication : Application() {
     val database by lazy { AppDatabase.get(this) }
     val tokenStore by lazy { TokenStore(this) }
     private val syncPrefs by lazy { SyncPrefs(this) }
+    val dataConsentPrefs by lazy { DataConsentPrefs(this) }
 
     @Volatile
     var repositoryReady = false
@@ -87,6 +89,7 @@ class RaundApplication : Application() {
             tokenStore = tokenStore,
             authService = authService,
             syncPrefs = syncPrefs,
+            dataConsentPrefs = dataConsentPrefs,
             database = database
         )
     }

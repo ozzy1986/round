@@ -1,0 +1,8 @@
+# Copy these lines into android/local.properties after generating the release keystore.
+# To generate the keystore: from repo root run (with JAVA_HOME set):
+#   powershell -ExecutionPolicy Bypass -File scripts\generate-release-keystore.ps1
+# Path is relative to the app module (android/app).
+RELEASE_STORE_FILE=../keystore/raund-release.jks
+RELEASE_STORE_PASSWORD=your_store_password
+RELEASE_KEY_ALIAS=raund
+RELEASE_KEY_PASSWORD=your_key_password

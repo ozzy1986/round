@@ -51,4 +51,8 @@
     <string name="leave_app_setting_hint">Turn off to pause when you leave the app</string>
     <string name="timer_running">Timer running</string>
     <string name="loading">Loading…</string>
+    <string name="consent_title">Data processing</string>
+    <string name="consent_message">The app creates an anonymous account and syncs your training profiles and rounds to the server so you can use them on other devices. We do not collect your name, email, phone, or location. By tapping Accept you agree to this processing. See the privacy policy for details.</string>
+    <string name="consent_accept">Accept</string>
+    <string name="consent_privacy_policy">Privacy policy</string>
 </resources>
