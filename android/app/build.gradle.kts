@@ -50,9 +50,9 @@ android {
             signingConfig = signingConfigs.getByName("release").let { releaseSigning ->
                 if (releaseSigning.storeFile?.exists() == true) releaseSigning
                 else {
-                    logger.warn("WARN: Release keystore not configured. " +
-                        "Set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD.")
-                    null
+                    logger.warn("WARN: Release keystore not set — using debug keystore for signing. " +
+                        "Set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD for production.")
+                    signingConfigs.getByName("debug")
                 }
             }
             val sentryDsn = project.findProperty("SENTRY_DSN") as String? ?: ""
