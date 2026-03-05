@@ -10,7 +10,8 @@ import android.media.AudioManager
 import android.os.Build
 import android.util.Log
 import android.view.WindowManager
-import androidx.core.app.ActivityCompat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -132,12 +133,16 @@ fun TimerScreen(
         viewModel.setCacheReady(true)
     }
 
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ -> }
+
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.volumeControlStream = AudioManager.STREAM_ALARM
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && activity != null) {
             if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1001)
+                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
         onDispose {

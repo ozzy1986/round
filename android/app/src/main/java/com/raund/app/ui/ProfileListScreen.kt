@@ -98,8 +98,8 @@ fun ProfileListScreen(
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
     var showSettings by remember { mutableStateOf(false) }
-    var keepRunning by remember { mutableStateOf(SettingsManager.isKeepRunningOnScreenOff(context)) }
-    var keepRunningLeaveApp by remember { mutableStateOf(SettingsManager.isKeepRunningWhenLeavingApp(context)) }
+    var keepRunning by remember(showSettings) { mutableStateOf(SettingsManager.isKeepRunningOnScreenOff(context)) }
+    var keepRunningLeaveApp by remember(showSettings) { mutableStateOf(SettingsManager.isKeepRunningWhenLeavingApp(context)) }
 
     Scaffold(
         topBar = {

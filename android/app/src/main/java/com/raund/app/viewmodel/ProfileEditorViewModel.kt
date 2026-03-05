@@ -1,8 +1,11 @@
 package com.raund.app.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.raund.app.LocaleManager
+import com.raund.app.R
 import com.raund.app.RaundApplication
 import com.raund.app.data.repository.ProfileRepository
 import com.raund.app.timer.TimerProfile
@@ -10,7 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 data class RoundEditState(
     val name: String,
@@ -192,5 +194,58 @@ class ProfileEditorViewModel(
         _state.value = _state.value.copy(selectedRoundIndices = emptySet())
     }
 
-    fun getRepository(): ProfileRepository = repository
+    private val _saveResult = MutableStateFlow<SaveResult?>(null)
+    val saveResult: StateFlow<SaveResult?> = _saveResult.asStateFlow()
+
+    fun saveProfile(context: Context, existingId: String?, onSuccess: () -> Unit) {
+        val s = _state.value
+        val safeName = s.name.trim()
+        if (safeName.isBlank()) {
+            _state.value = s.copy(showNameError = true)
+            return
+        }
+        val safeEmoji = s.emoji.trim().ifBlank { "⏱" }
+        viewModelScope.launch {
+            try {
+                val id = if (existingId == null || existingId == "new") {
+                    repository.insertProfile(safeName, safeEmoji)
+                } else {
+                    repository.updateProfile(existingId, safeName, safeEmoji)
+                    existingId
+                }
+                val roundsToSave = s.rounds.map { r ->
+                    val durInt = r.duration.toIntOrNull()?.coerceAtLeast(5) ?: 5
+                    Triple(r.name.take(20), durInt, r.warn10sec)
+                }
+                repository.saveRounds(id, roundsToSave)
+                val phrases = roundsToSave.map { it.first } + safeName + context.getString(R.string.timer_finished)
+                repository.prefillTtsInBackground(context, LocaleManager.currentLanguageTag(context), phrases)
+                _saveResult.value = SaveResult.Success
+                onSuccess()
+            } catch (e: Exception) {
+                _saveResult.value = SaveResult.Error(e.message ?: "Save failed")
+            }
+        }
+    }
+
+    fun deleteProfile(id: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                repository.deleteProfile(id)
+                _saveResult.value = SaveResult.Success
+                onSuccess()
+            } catch (e: Exception) {
+                _saveResult.value = SaveResult.Error(e.message ?: "Delete failed")
+            }
+        }
+    }
+
+    fun clearSaveResult() {
+        _saveResult.value = null
+    }
+}
+
+sealed class SaveResult {
+    data object Success : SaveResult()
+    data class Error(val message: String) : SaveResult()
 }

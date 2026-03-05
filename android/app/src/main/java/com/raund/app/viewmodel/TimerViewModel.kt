@@ -65,6 +65,4 @@ class TimerViewModel(
     fun setFinished(finished: Boolean) {
         _finished.value = finished
     }
-
-    fun getRepository(): ProfileRepository = repository
 }

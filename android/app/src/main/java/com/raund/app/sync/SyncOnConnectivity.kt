@@ -3,7 +3,6 @@ package com.raund.app.sync
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Composable
@@ -39,10 +38,8 @@ fun SyncOnConnectivityEffect(repository: ProfileRepository) {
         var pendingSyncJob: Job? = null
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    val caps = cm.getNetworkCapabilities(network) ?: return
-                    if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return
-                }
+                val caps = cm.getNetworkCapabilities(network) ?: return
+                if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return
                 mainHandler.post {
                     pendingSyncJob?.cancel()
                     pendingSyncJob = scope.launch {

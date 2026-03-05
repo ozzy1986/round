@@ -5,6 +5,8 @@ import kotlinx.parcelize.Parcelize
 
 /**
  * Same event contract as backend timer engine: round_start, tick, warn10, round_end, training_end.
+ *
+ * NOT thread-safe: [advance] and all mutable state must be called from a single thread only.
  */
 class TimerEngine(
     private val profile: TimerProfile,

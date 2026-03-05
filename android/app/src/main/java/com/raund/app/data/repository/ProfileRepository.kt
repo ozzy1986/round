@@ -24,10 +24,13 @@ import com.raund.app.tts.TtsCache
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -44,6 +47,8 @@ class ProfileRepository(
 
     private val bgScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val pendingProfileCreate = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
+    private val syncMutex = Mutex()
+    private var activeSyncJob: Job? = null
 
     @Volatile
     var cachedProfiles: List<Profile> = emptyList()
@@ -219,11 +224,17 @@ class ProfileRepository(
         if (last != null && (System.currentTimeMillis() - last) < SyncPrefs.SYNC_THROTTLE_MS) {
             return@withContext
         }
-        syncFromApi()
+        syncGuarded()
     }
 
     suspend fun forceSync() = withContext(Dispatchers.IO) {
-        syncFromApi()
+        syncGuarded()
+    }
+
+    private suspend fun syncGuarded() {
+        syncMutex.withLock {
+            syncFromApi()
+        }
     }
 
     suspend fun syncSingleProfile(profileId: String) = withContext(Dispatchers.IO) {

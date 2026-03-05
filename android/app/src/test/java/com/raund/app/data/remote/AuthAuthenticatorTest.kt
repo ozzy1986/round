@@ -101,4 +101,48 @@ class AuthAuthenticatorTest {
         val result = authenticator.authenticate(null, response)
         assertNull(result)
     }
+
+    @Test
+    fun `skips refresh when token was already refreshed by another thread`() {
+        every { tokenStore.getToken() } returns "already_refreshed_token"
+        every { tokenStore.getRefreshToken() } returns "refresh_abc"
+
+        val response = build401Response(requestHasAuth = false)
+        val result = authenticator.authenticate(null, response)
+
+        assertNotNull(result)
+        assertEquals("Bearer already_refreshed_token", result!!.header("Authorization"))
+        verify(exactly = 0) { authService.refreshCall(any()) }
+    }
+
+    @Test
+    fun `concurrent calls do not duplicate refresh`() {
+        every { tokenStore.getToken() } returns null
+        every { tokenStore.getRefreshToken() } returns "refresh_abc"
+        val refreshResp = RefreshResponse(
+            token = "concurrent_token",
+            refresh_token = "concurrent_refresh",
+            refresh_token_expires_at = null,
+            user_id = "user1"
+        )
+        val call = mockk<Call<RefreshResponse>>()
+        every { authService.refreshCall(any()) } returns call
+        every { call.execute() } answers {
+            Thread.sleep(50)
+            Response.success(refreshResp)
+        }
+
+        val results = java.util.concurrent.ConcurrentLinkedQueue<Request?>()
+        val threads = (1..5).map {
+            Thread {
+                val resp = build401Response(requestHasAuth = false)
+                results.add(authenticator.authenticate(null, resp))
+            }
+        }
+        threads.forEach { it.start() }
+        threads.forEach { it.join(5000) }
+
+        assertTrue(results.all { it != null })
+        verify(atMost = 5) { authService.refreshCall(any()) }
+    }
 }

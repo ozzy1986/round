@@ -40,6 +40,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,7 +50,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,11 +68,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import com.raund.app.LocaleManager
 import com.raund.app.R
 import com.raund.app.viewmodel.ProfileEditorViewModel
 import com.raund.app.viewmodel.RoundEditState
-import kotlinx.coroutines.launch
+import com.raund.app.viewmodel.SaveResult
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
 private const val MAX_ROUND_NAME_LENGTH = 20
@@ -83,11 +84,20 @@ fun ProfileEditorScreen(
     profileId: String?,
     onBack: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val repository = viewModel.getRepository()
+    val saveResult by viewModel.saveResult.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(saveResult) {
+        val result = saveResult
+        if (result is SaveResult.Error) {
+            snackbarHostState.showSnackbar(result.message)
+            viewModel.clearSaveResult()
+        }
+    }
+
     val name = state.name
     val emoji = state.emoji
     val showNameError = state.showNameError
@@ -122,7 +132,8 @@ fun ProfileEditorScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         val pullToRefreshState = rememberPullToRefreshState()
         if (pullToRefreshState.isRefreshing) {
@@ -189,7 +200,7 @@ fun ProfileEditorScreen(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             }
-            itemsIndexed(rounds, key = { index, _ -> index }) { index, round ->
+            itemsIndexed(rounds, key = { index, r -> "r_${index}_${r.name}_${r.duration}" }) { index, round ->
                 val rName = round.name
                 val dur = round.duration
                 val warn = round.warn10sec
@@ -401,24 +412,7 @@ fun ProfileEditorScreen(
             Spacer(modifier = Modifier.height(32.dp))
             Button(
                 onClick = {
-                    val safeName = name.trim()
-                    if (safeName.isBlank()) {
-                        viewModel.setShowNameError(true)
-                        return@Button
-                    }
-                    val safeEmoji = emoji.trim().ifBlank { "⏱" }
-                    scope.launch {
-                        val id = if (isNew) repository.insertProfile(safeName, safeEmoji) else profileId!!
-                        if (!isNew) repository.updateProfile(profileId!!, safeName, safeEmoji)
-                        val roundsToSave = rounds.map { r ->
-                            val durInt = r.duration.toIntOrNull()?.coerceAtLeast(MIN_ROUND_DURATION_SECONDS) ?: MIN_ROUND_DURATION_SECONDS
-                            Triple(r.name.take(MAX_ROUND_NAME_LENGTH), durInt, r.warn10sec)
-                        }
-                        repository.saveRounds(id, roundsToSave)
-                        val phrases = roundsToSave.map { it.first } + safeName + context.getString(R.string.timer_finished)
-                        repository.prefillTtsInBackground(context, LocaleManager.currentLanguageTag(context), phrases)
-                        onBack()
-                    }
+                    viewModel.saveProfile(context, if (isNew) null else profileId, onBack)
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(12.dp),
@@ -462,10 +456,7 @@ fun ProfileEditorScreen(
                     Button(
                         onClick = {
                             viewModel.setShowDeleteConfirm(false)
-                            scope.launch {
-                                repository.deleteProfile(profileId!!)
-                                onBack()
-                            }
+                            viewModel.deleteProfile(profileId!!, onBack)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {

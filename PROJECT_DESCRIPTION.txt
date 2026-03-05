@@ -17,7 +17,7 @@ Do NOT rebuild the APK unless code in android/ was changed in this session.
 The app is likely already installed on the phone.
 
 Steps (in order):
-1. Verify VPS API:  GET http://round.ozzy1986.com:8080/profiles  (expect 200).
+1. Verify VPS API:  GET https://round.ozzy1986.com/profiles  (expect 200).
 2. Verify phone:    adb devices  (see ANDROID_TESTING.txt for full ADB path).
 3. Launch app:      adb shell am start -n com.raund.app/.MainActivity
 4. Screenshot:      adb shell screencap + adb pull  (see ANDROID_TESTING.txt).
@@ -79,6 +79,8 @@ Android:
   - Build: Gradle 8.9
   - Baseline Profile: plugin (androidx.baselineprofile 1.2.3) + profileinstaller on :app; :baselineprofile module (com.android.test) with BaselineProfileGenerator. Generate profile: run :app:generateBaselineProfile on device/emulator (see android/COLD_START_ANALYSIS.txt).
   - Cold start: MainActivity uses deferred composition (first frame = RaundTheme + Box(background); full UI after withFrameMillis) so TTD ~1.9s (was ~2.6s). See android/COLD_START_ANALYSIS.txt.
+  - Unit tests: JUnit 4, MockK, Robolectric, kotlinx-coroutines-test (testImplementation in app/build.gradle.kts). Run: ./gradlew testDebugUnitTest. Schema: Room exportSchema=true, KSP room.schemaLocation=$projectDir/schemas.
+  - Crash reporting: Sentry Android SDK (io.sentry:sentry-android:8.34.0); auto-init disabled; manual init in RaundApplication when BuildConfig.SENTRY_DSN non-empty (set via SENTRY_DSN in release buildType).
 
 
 5. REPOSITORY LAYOUT
@@ -98,7 +100,7 @@ raund/
   tests/                - Vitest: db/, routes/, auth/, timer-engine/, bot/, i18n/, cache.test.ts
   scripts/              - deploy-vps.sh (run on VPS; PM2 -i max for API), deploy.ps1, setup-vps-services.sh (one-time: Redis, PgBouncer), health-check.sh (cron), purge-tokens.ts (cron: purge expired/revoked refresh tokens), build-apk.ps1
   deploy/               - nginx-round.ozzy1986.com.conf, pgbouncer.ini.sample
-  android/              - Android app (TokenStore: token + refresh_token; AuthInterceptor: 401 -> refresh retry)
+  android/              - Android app (TokenStore: token + refresh_token; AuthInterceptor + AuthAuthenticator: 401 -> refresh retry). Unit tests in app/src/test/ (JUnit4, MockK, Robolectric). Room schema export in app/schemas/.
   package.json, tsconfig.json, vitest.config.ts, .env.example, .gitignore (.env, dist/, coverage/)
 
 
@@ -186,13 +188,13 @@ Performance optimizations: (1) App load — three-stage pipeline for fastest pos
 
 Settings: gear icon on profile list top bar opens a dialog with two Switches (SettingsManager, SharedPreferences): (1) "Keep running when screen off" (default ON); when OFF, timer auto-pauses on ACTION_SCREEN_OFF, stays paused through lock screen, and auto-resumes only when the timer screen becomes visible (TIMER_VISIBLE). (2) "Keep running when leaving the app" (default ON); when OFF, timer auto-pauses when user navigates away (home/another app) while screen is still on, auto-resumes on TIMER_VISIBLE. A 300ms delay in TIMER_HIDDEN distinguishes screen-off from leaving-app (SCREEN_OFF cancels the delayed check); leaveAppCheckRunnable also checks PowerManager.isInteractive() directly so delayed ACTION_SCREEN_OFF broadcasts (TECNO HiOS) do not cause false leave-app detection. Manual pause/resume clears all auto-pause flags. Pause stores remaining ms; resume reconstructs roundStartRealtimeMs = now - (duration - remaining) so the countdown continues from the exact paused position. When the timer is running, TimerService is started as a foreground service (foregroundServiceType=mediaPlayback) and holds PARTIAL_WAKE_LOCK so the timer and audio (TTS, tones) continue with screen off; service stops when the timer ends or the user goes back. TimerService runs in the main process (no separate :timer process). Tick scheduling: background Thread loop with Thread.sleep(1000); PARTIAL_WAKE_LOCK keeps the CPU awake. For OEMs that freeze background threads (e.g. TECNO HiOS), the service uses a real continuous audio playback pipeline so the system treats the app like a music player (exempt from freeze): (1) AudioFocus AUDIOFOCUS_GAIN with USAGE_MEDIA/CONTENT_TYPE_MUSIC; (2) MediaSession active with PlaybackStateCompat.STATE_PLAYING; (3) a keep-alive AudioTrack in MODE_STREAM (USAGE_MEDIA) that runs for the whole timer duration, writing a low-amplitude sine wave in a dedicated thread so the audio pipeline is actively playing (like Spotify); foreground is kept while the timer runs (no stopForeground when the timer screen is visible). POST_NOTIFICATIONS is declared and requested at runtime on Android 13+; notification channel raund_timer_v3 (IMPORTANCE_DEFAULT) shows round name and countdown. Tapping the notification navigates to the running timer. onTaskRemoved stops the service when the user removes the app from recents. Permission: FOREGROUND_SERVICE_MEDIA_PLAYBACK.
 
-Package: com.raund.app. API base URL in RaundApplication points to the VPS: http://round.ozzy1986.com:8080/ (for real device / phone). For Android emulator only use http://10.0.2.2:3001/.
+Package: com.raund.app. API base URL in RaundApplication (BuildConfig.API_BASE_URL) is https://round.ozzy1986.com/ for real device; for Android emulator use http://10.0.2.2:3001/ (override in build variant if needed).
 
 Testing on phone: the app is usually already installed. Just launch it via ADB
 (see ANDROID_TESTING.txt). Only rebuild the APK if android/ code was changed.
-  - Rebuild (only when needed): from project root run "scripts\build-apk.ps1" (or "cd android && .\gradlew.bat assembleDebug"). The script copies the APK to android/Round-debug.apk.
-  - Android Studio: open the android/ folder as project, then Build > Build Bundle(s) / APK(s) > Build APK(s). Output: android/app/build/outputs/apk/debug/app-debug.apk.
-  - APK for transfer: android/Round-debug.apk (or app-debug.apk from the path above). Copy to the phone via USB, cloud, or email; open on the phone to install (enable "Install from unknown sources" if prompted). No app store required.
+  - Rebuild (only when needed): from project root run "scripts\build-apk.ps1" or "cd android && .\gradlew.bat assembleRelease" (release preferred for phone; debug for development). Release output: android/app/build/outputs/apk/release/app-release.apk.
+  - Android Studio: open the android/ folder as project, then Build > Build Bundle(s) / APK(s) > Build APK(s). Debug: app/build/outputs/apk/debug/app-debug.apk; release: app/build/outputs/apk/release/app-release.apk.
+  - APK for transfer: use app-release.apk for phone (smaller, faster). Copy via USB, cloud, or email; open on the phone to install (enable "Install from unknown sources" if prompted). No app store required.
   - Build from PC when Google is blocked: gradle.properties has systemProp.http.proxyHost/Port and https equivalents pointing at the project's proxy (VPS Squid). Use proxy for Gradle only; the app on the phone needs no proxy and connects directly to the VPS API.
 
 

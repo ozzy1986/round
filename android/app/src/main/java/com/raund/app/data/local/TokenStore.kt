@@ -29,18 +29,18 @@ class TokenStore(context: Context) {
     fun getRefreshToken(): String? = prefs.getString(KEY_REFRESH_TOKEN, null)
 
     fun setToken(token: String) {
-        prefs.edit().putString(KEY_TOKEN, token).apply()
+        prefs.edit().putString(KEY_TOKEN, token).commit()
     }
 
     fun setTokens(token: String, refreshToken: String) {
         prefs.edit()
             .putString(KEY_TOKEN, token)
             .putString(KEY_REFRESH_TOKEN, refreshToken)
-            .apply()
+            .commit()
     }
 
     fun clearToken() {
-        prefs.edit().remove(KEY_TOKEN).remove(KEY_REFRESH_TOKEN).apply()
+        prefs.edit().remove(KEY_TOKEN).remove(KEY_REFRESH_TOKEN).commit()
     }
 
     companion object {

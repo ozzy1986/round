@@ -9,14 +9,13 @@ plugins {
 android {
     namespace = "com.raund.app"
     compileSdk = 36
-    buildToolsVersion = "36.1.0"
 
     defaultConfig {
         applicationId = "com.raund.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (project.findProperty("VERSION_CODE") as String?)?.toIntOrNull() ?: 1
+        versionName = (project.findProperty("VERSION_NAME") as String?) ?: "1.0"
         buildConfigField("String", "API_BASE_URL", "\"https://round.ozzy1986.com/\"")
         buildConfigField("String", "SENTRY_DSN", "\"\"")
     }
@@ -48,10 +47,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = if (signingConfigs.getByName("release").storeFile?.exists() == true) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release").let { releaseSigning ->
+                if (releaseSigning.storeFile?.exists() == true) releaseSigning
+                else {
+                    logger.warn("WARN: Release keystore not configured. " +
+                        "Set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD.")
+                    null
+                }
             }
             val sentryDsn = project.findProperty("SENTRY_DSN") as String? ?: ""
             buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
@@ -117,6 +119,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

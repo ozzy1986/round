@@ -93,11 +93,14 @@ object TtsCache {
     ): Boolean = withContext(Dispatchers.Main) {
         suspendCancellableCoroutine { cont ->
             var ttsRef: TextToSpeech? = null
+            cont.invokeOnCancellation {
+                try { ttsRef?.shutdown() } catch (_: Exception) {}
+            }
             ttsRef = TextToSpeech(context) { status ->
                 if (status != TextToSpeech.SUCCESS) {
                     Log.w(PERF, "TTS instance #$instanceIndex init failed")
                     ttsRef?.shutdown()
-                    cont.resume(false)
+                    if (cont.isActive) cont.resume(false)
                     return@TextToSpeech
                 }
                 val tts = ttsRef ?: return@TextToSpeech

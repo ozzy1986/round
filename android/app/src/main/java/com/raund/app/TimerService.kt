@@ -54,11 +54,12 @@ class TimerService : Service() {
     @Volatile private var running = false
     @Volatile private var timerScreenVisible = false
     @Volatile private var currentProfileId: String? = null
-    @Volatile private var lastNotifText: String = ""
+    @Volatile private var useCacheOnly = false
+    @Volatile private var langTag = "en"
 
+    private var lastNotifText: String = ""
     private var timerThread: Thread? = null
-    private var useCacheOnly = false
-    private var langTag = "en"
+    private var pendingStartIntent: Intent? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val audioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-audio").apply { isDaemon = true } }
     private val stopTimerExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-stop-timer").apply { isDaemon = true } }
@@ -154,7 +155,11 @@ class TimerService : Service() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
         }
-        registerReceiver(screenStateReceiver, screenFilter)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenStateReceiver, screenFilter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(screenStateReceiver, screenFilter)
+        }
     }
 
     private fun stopPreviousTimer() {
@@ -193,9 +198,14 @@ class TimerService : Service() {
             }
         }
 
+        pendingStartIntent = intent
         stopTimerExecutor.execute {
             stopPreviousTimer()
-            mainHandler.post { startTimerAfterStop(intent) }
+            mainHandler.post {
+                val startIntent = pendingStartIntent
+                pendingStartIntent = null
+                startTimerAfterStop(startIntent)
+            }
         }
         return START_NOT_STICKY
     }
@@ -282,6 +292,7 @@ class TimerService : Service() {
         val rounds = profile.rounds
         if (rounds.isEmpty()) {
             running = false
+            mainHandler.post { cleanupTimerResources() }
             return
         }
 
@@ -350,6 +361,7 @@ class TimerService : Service() {
                 if (roundIndex >= totalRounds) {
                     updateStateAndNotification("", 0, 0, 0, 0, isRunning = false)
                     running = false
+                    mainHandler.post { cleanupTimerResources() }
                     if (useCacheOnly) {
                         playCacheFile(profile.name, langTag) {
                             playCacheFile(finishedText, langTag) {
@@ -397,7 +409,7 @@ class TimerService : Service() {
             Thread.sleep(sleepMs)
         }
         Log.i(TAG, "runTimer loop exited running=$running")
-
+        mainHandler.post { cleanupTimerResources() }
         try { alarmTone?.release() } catch (_: Exception) {}
     }
 
@@ -500,11 +512,19 @@ class TimerService : Service() {
             paused = paused
         )
         val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
-        lastNotifText = text
-        showNotification(text, forceStartForeground = !isRunning)
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            lastNotifText = text
+            showNotification(text, forceStartForeground = !isRunning)
+        } else {
+            mainHandler.post {
+                lastNotifText = text
+                showNotification(text, forceStartForeground = !isRunning)
+            }
+        }
     }
 
     private fun showNotification(text: String, forceStartForeground: Boolean = false) {
+        check(Looper.myLooper() == Looper.getMainLooper()) { "showNotification must run on main thread" }
         if (timerScreenVisible && !forceStartForeground) return
         val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.app_name))
@@ -672,6 +692,14 @@ class TimerService : Service() {
         keepAliveThread = null
     }
 
+    private fun cleanupTimerResources() {
+        stopMediaSession()
+        if (wakeLock?.isHeld == true) {
+            wakeLock?.release()
+            Log.i(TAG, "cleanupTimerResources: wakeLock.release()")
+        }
+    }
+
     private fun stopMediaSession() {
         stopKeepAliveAudio()
 
@@ -720,11 +748,7 @@ class TimerService : Service() {
         }
         audioExecutor.shutdown()
         stopTimerExecutor.shutdown()
-        stopMediaSession()
-        if (wakeLock?.isHeld == true) {
-            wakeLock?.release()
-            Log.i(TAG, "wakeLock.release()")
-        }
+        cleanupTimerResources()
         wakeLock = null
         TimerStateHolder.reset()
         super.onDestroy()
