@@ -81,7 +81,7 @@ Android:
   - Cold start: MainActivity uses deferred composition (first frame = RaundTheme + Box(background); full UI after withFrameMillis) so TTD ~1.9s (was ~2.6s). See android/COLD_START_ANALYSIS.txt.
   - Unit tests: JUnit 4, MockK, Robolectric, kotlinx-coroutines-test (testImplementation in app/build.gradle.kts). Run: ./gradlew testDebugUnitTest. Schema: Room exportSchema=true, KSP room.schemaLocation=$projectDir/schemas.
   - Crash reporting: Sentry Android SDK (io.sentry:sentry-android:8.34.0); auto-init disabled; manual init in RaundApplication when BuildConfig.SENTRY_DSN non-empty (set via SENTRY_DSN in release buildType).
-  - Launcher icon and splash: custom image (icon1.png) — stopwatch with "3", orange glow, red boxing glove on dark background. Used as ic_launcher_foreground (drawable-nodpi), transparent adaptive background; same image as ic_splash for system splash and in-app loading screen.
+  - Launcher icon: icon3.jpg — robotic hand holding stopwatch with neon orange glow on purple-orange gradient. Splash/loading: icon4.jpg — silhouette hand holding stopwatch with purple neon glow. Both converted to PNG in drawable-nodpi; adaptive icon with transparent background.
 
 
 5. REPOSITORY LAYOUT
