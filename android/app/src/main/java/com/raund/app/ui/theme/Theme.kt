@@ -14,39 +14,39 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFF8A65),
-    onPrimary = Color(0xFF3E1500),
-    primaryContainer = Color(0xFF5C2200),
-    onPrimaryContainer = Color(0xFFFFDBCE),
-    secondary = Color(0xFF78DAD4),
-    onSecondary = Color(0xFF003735),
-    secondaryContainer = Color(0xFF1E4E4C),
-    onSecondaryContainer = Color(0xFFA4F1EB),
+    primary = Color(0xFFFF8A00),
+    onPrimary = Color(0xFF462A00),
+    primaryContainer = Color(0xFF5C3000),
+    onPrimaryContainer = Color(0xFFFFD6A8),
+    secondary = Color(0xFFCE93D8),
+    onSecondary = Color(0xFF38004A),
+    secondaryContainer = Color(0xFF4A1462),
+    onSecondaryContainer = Color(0xFFF3E0F5),
     tertiary = Color(0xFFFFB74D),
     onTertiary = Color(0xFF462A00),
-    background = Color(0xFF1A1110),
-    surface = Color(0xFF1A1110),
-    surfaceVariant = Color(0xFF2D2220),
-    onSurfaceVariant = Color(0xFFD8C2BC),
+    background = Color(0xFF1A0F1E),
+    surface = Color(0xFF1A0F1E),
+    surfaceVariant = Color(0xFF2D1B35),
+    onSurfaceVariant = Color(0xFFD4BFD8),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFFE53935),
+    primary = Color(0xFFE65100),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFDAD5),
-    onPrimaryContainer = Color(0xFF410001),
-    secondary = Color(0xFF00897B),
+    primaryContainer = Color(0xFFFFDFCE),
+    onPrimaryContainer = Color(0xFF3E1500),
+    secondary = Color(0xFF7B1FA2),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFB2DFDB),
-    onSecondaryContainer = Color(0xFF00251E),
+    secondaryContainer = Color(0xFFE8D0F0),
+    onSecondaryContainer = Color(0xFF38003E),
     tertiary = Color(0xFFFF9800),
     onTertiary = Color(0xFFFFFFFF),
-    background = Color(0xFFFFFBFF),
-    surface = Color(0xFFFFFBFF),
-    surfaceVariant = Color(0xFFF5EDEA),
-    onSurfaceVariant = Color(0xFF534341),
+    background = Color(0xFFFFF8F5),
+    surface = Color(0xFFFFF8F5),
+    surfaceVariant = Color(0xFFF0E4F5),
+    onSurfaceVariant = Color(0xFF4A3850),
     error = Color(0xFFBA1A1A),
     onError = Color(0xFFFFFFFF),
 )
@@ -65,7 +65,7 @@ private val RaundTypography = Typography().let { base ->
 @Composable
 fun RaundTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

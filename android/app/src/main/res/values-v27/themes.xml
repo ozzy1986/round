@@ -4,10 +4,6 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">#1A0F1E</item>
         <item name="android:windowLightStatusBar">true</item>
-    </style>
-    <style name="Theme.Round.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#1A0F1E</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
-        <item name="postSplashScreenTheme">@style/Theme.Round</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

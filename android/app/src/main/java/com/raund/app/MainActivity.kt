@@ -131,7 +131,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         pendingOpenTimerId.value = intent?.getStringExtra(EXTRA_OPEN_TIMER_PROFILE_ID)
         val placeholder = FrameLayout(this)
-        placeholder.setBackgroundColor(android.graphics.Color.parseColor("#1A1110"))
+        placeholder.setBackgroundColor(android.graphics.Color.parseColor("#1A0F1E"))
         setContentView(placeholder)
         placeholder.post {
             setupComposeContent(app)

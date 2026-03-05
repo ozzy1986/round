@@ -186,7 +186,7 @@ fun TimerScreen(
     val defaultBgColor = MaterialTheme.colorScheme.background
     val progressRatioForBg = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
     val targetBgColor = if (running && !finished) {
-        lerp(Color(0xFF8B0000), Color(0xFF006400), progressRatioForBg)
+        lerp(Color(0xFF4A148C), Color(0xFFE65100), progressRatioForBg)
     } else {
         defaultBgColor
     }
