@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -93,6 +94,7 @@ class MainActivity : ComponentActivity() {
                         }
                         NavHost(navController = navController, startDestination = "profiles") {
                             composable("profiles") {
+                                BackHandler(enabled = true) { /* consume back so activity does not finish */ }
                                 val listViewModel: ProfileListViewModel = viewModel()
                                 ProfileListScreen(
                                     viewModel = listViewModel,

@@ -57,6 +57,7 @@ class TimerService : Service() {
     @Volatile private var useCacheOnly = false
     @Volatile private var langTag = "en"
 
+    private var lastNotifTitle: String = ""
     private var lastNotifText: String = ""
     private var timerThread: Thread? = null
     private var pendingStartIntent: Intent? = null
@@ -100,6 +101,7 @@ class TimerService : Service() {
                     }
                     if (running) {
                         showNotification(
+                            lastNotifTitle.ifEmpty { getString(R.string.app_name) },
                             lastNotifText.ifEmpty { getString(R.string.timer_running) },
                             forceStartForeground = true
                         )
@@ -242,7 +244,7 @@ class TimerService : Service() {
 
         Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
 
-        doStartForeground(buildContentNotification(getString(R.string.timer_running)))
+        doStartForeground(buildContentNotification(profile.name, getString(R.string.timer_running)))
 
         if (!useCacheOnly) {
             var ttsHolder: TextToSpeech? = null
@@ -301,7 +303,7 @@ class TimerService : Service() {
         var alarmTone: ToneGenerator? = null
         try { alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100) } catch (_: Exception) {}
         val tickTone = ToneGenerator.TONE_CDMA_PIP
-        val tickMs = 200
+        val tickMs = 150
         val prolongedMs = 1200
         val totalRounds = rounds.size
 
@@ -312,7 +314,7 @@ class TimerService : Service() {
         var wasPaused = false
         var remainingMsWhenPaused = 0L
 
-        updateStateAndNotification(round.name, round.durationSeconds, round.durationSeconds, 1, totalRounds)
+        updateStateAndNotification(profile.name, round.name, round.durationSeconds, round.durationSeconds, 1, totalRounds)
         if (roundIndex == 0) {
             playProlongedTone(prolongedMs)
         }
@@ -359,7 +361,7 @@ class TimerService : Service() {
                 }
                 playProlongedTone(prolongedMs)
                 if (roundIndex >= totalRounds) {
-                    updateStateAndNotification("", 0, 0, 0, 0, isRunning = false)
+                    updateStateAndNotification(profile.name, "", 0, 0, 0, 0, isRunning = false)
                     running = false
                     mainHandler.post { cleanupTimerResources() }
                     if (useCacheOnly) {
@@ -379,7 +381,7 @@ class TimerService : Service() {
                 val currentRemainingMs = roundStartRealtimeMs + roundDurationMs - now
                 val currentRemaining = if (currentRemainingMs > 0) ((currentRemainingMs + 999) / 1000).toInt() else 0
                 lastBroadcastRemainingSeconds = currentRemaining
-                updateStateAndNotification(round.name, currentRemaining, round.durationSeconds, roundIndex + 1, totalRounds)
+                updateStateAndNotification(profile.name, round.name, currentRemaining, round.durationSeconds, roundIndex + 1, totalRounds)
                 if (useCacheOnly) {
                     playCacheFile(round.name, langTag, null)
                 } else {
@@ -397,7 +399,11 @@ class TimerService : Service() {
                     Log.w(TAG, "JUMP ${lastBroadcastRemainingSeconds}->${remainingSeconds} round=${roundIndex+1}")
                 }
                 lastBroadcastRemainingSeconds = remainingSeconds
-                updateStateAndNotification(round.name, remainingSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
+                updateStateAndNotification(profile.name, round.name, remainingSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
+                if (round.warn10sec && round.durationSeconds >= 10 && remainingSeconds == 10) {
+                    val warn10Phrase = TtsCache.getWarn10Phrase(applicationContext, langTag, round.name)
+                    if (useCacheOnly) playCacheFile(warn10Phrase, langTag, null) else tts?.speak(warn10Phrase, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
+                }
                 if (round.warn10sec && round.durationSeconds >= 10 && remainingSeconds in 1..10) {
                     try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
                 }
@@ -501,7 +507,7 @@ class TimerService : Service() {
     private var cachedNotifBuilder: Notification.Builder? = null
     private var lastForegroundMs = 0L
 
-    private fun updateStateAndNotification(roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
+    private fun updateStateAndNotification(profileName: String, roundName: String, remaining: Int, roundTotal: Int, roundIndex: Int, totalRounds: Int, isRunning: Boolean = true) {
         TimerStateHolder.update(
             remaining = remaining,
             roundName = roundName,
@@ -511,23 +517,26 @@ class TimerService : Service() {
             isRunning = isRunning,
             paused = paused
         )
-        val text = if (isRunning) "${roundName.take(10)} ${formatDuration(remaining)}" else getString(R.string.timer_finished)
+        val title = profileName.ifBlank { getString(R.string.app_name) }
+        val contentText = if (isRunning) "$roundName ${formatDuration(remaining)}" else getString(R.string.timer_finished)
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            lastNotifText = text
-            showNotification(text, forceStartForeground = !isRunning)
+            lastNotifTitle = title
+            lastNotifText = contentText
+            showNotification(title, contentText, forceStartForeground = !isRunning)
         } else {
             mainHandler.post {
-                lastNotifText = text
-                showNotification(text, forceStartForeground = !isRunning)
+                lastNotifTitle = title
+                lastNotifText = contentText
+                showNotification(title, contentText, forceStartForeground = !isRunning)
             }
         }
     }
 
-    private fun showNotification(text: String, forceStartForeground: Boolean = false) {
+    private fun showNotification(title: String, contentText: String, forceStartForeground: Boolean = false) {
         check(Looper.myLooper() == Looper.getMainLooper()) { "showNotification must run on main thread" }
         if (timerScreenVisible && !forceStartForeground) return
         val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
+            .setContentTitle(title)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -545,8 +554,8 @@ class TimerService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             ))
         }
-        builder.setContentText(text)
-        builder.setStyle(Notification.BigTextStyle().bigText(text))
+        builder.setContentText(contentText)
+        builder.setStyle(Notification.BigTextStyle().bigText(contentText))
         val notification = builder.build()
 
         val now = SystemClock.elapsedRealtime()
@@ -567,10 +576,10 @@ class TimerService : Service() {
             .setOngoing(true)
             .build()
 
-    private fun buildContentNotification(text: String): Notification {
+    private fun buildContentNotification(title: String, contentText: String): Notification {
         val builder = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(text)
+            .setContentTitle(title.ifBlank { getString(R.string.app_name) })
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

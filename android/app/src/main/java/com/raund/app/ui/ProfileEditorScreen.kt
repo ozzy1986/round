@@ -325,7 +325,7 @@ fun ProfileEditorScreen(
                                 },
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 visualTransformation = VisualTransformation.None,
                                 modifier = Modifier
                                     .weight(1f)

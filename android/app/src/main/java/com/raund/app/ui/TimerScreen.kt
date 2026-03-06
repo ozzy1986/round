@@ -119,7 +119,7 @@ fun TimerScreen(
         if (p.rounds.isEmpty()) return@LaunchedEffect
         val locale = LocaleManager.currentLanguageTag(context)
         val finishedText = context.getString(R.string.timer_finished)
-        val phrases = TtsCache.buildPhraseList(p, finishedText)
+        val phrases = TtsCache.buildPhraseList(p, finishedText) + TtsCache.buildWarn10Phrases(context, locale, p)
         Log.d("TimerScreen", "cache check profile=${p.name} locale=$locale phrases=${phrases.size}")
         val allExist = TtsCache.allExist(context, locale, phrases)
         if (allExist) {
@@ -218,7 +218,8 @@ fun TimerScreen(
     ) {
         val maxW = maxWidth.value
         val maxH = maxHeight.value
-        val timerFontSize = minOf(maxW / 3.5f, maxH / 8f).coerceIn(48f, 120f).sp
+        val baseFontSize = minOf(maxW / 3.5f, maxH / 8f).coerceIn(48f, 120f)
+        val timerFontSize = if (remaining >= 3600) (baseFontSize * 0.55f).coerceAtLeast(28f).sp else baseFontSize.sp
         val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
         val primaryColor = MaterialTheme.colorScheme.primary
         val onBgColor = MaterialTheme.colorScheme.onBackground

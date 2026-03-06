@@ -105,6 +105,9 @@ fun ProfileListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.profiles), fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    Box(modifier = Modifier.size(48.dp)) { /* fill slot so tap does not trigger system back */ }
+                },
                 actions = {
                     IconButton(onClick = { showSettings = true }) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
