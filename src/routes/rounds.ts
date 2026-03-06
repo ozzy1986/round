@@ -9,7 +9,7 @@ const roundBodySchema = {
   required: ['name', 'duration_seconds', 'position'],
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 255 },
-    duration_seconds: { type: 'integer', minimum: 0, maximum: 86400 },
+    duration_seconds: { type: 'integer', minimum: 0, maximum: 7200 },
     warn10sec: { type: 'boolean' },
     position: { type: 'integer', minimum: 0 },
   },
@@ -115,7 +115,7 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
           type: 'object',
           properties: {
             name: { type: 'string', minLength: 1, maxLength: 255 },
-            duration_seconds: { type: 'integer', minimum: 0, maximum: 86400 },
+            duration_seconds: { type: 'integer', minimum: 0, maximum: 7200 },
             warn10sec: { type: 'boolean' },
             position: { type: 'integer', minimum: 0 },
           },
@@ -178,13 +178,13 @@ export async function roundsRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             rounds: {
               type: 'array',
-              maxItems: 500,
+              maxItems: 30,
               items: {
                 type: 'object',
                 required: ['name', 'duration_seconds', 'position'],
                 properties: {
                   name: { type: 'string', minLength: 1, maxLength: 255 },
-                  duration_seconds: { type: 'integer', minimum: 5, maximum: 86400 },
+                  duration_seconds: { type: 'integer', minimum: 5, maximum: 7200 },
                   warn10sec: { type: 'boolean' },
                   position: { type: 'integer', minimum: 0 },
                 },

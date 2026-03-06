@@ -5,6 +5,9 @@ import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.raund.app.LocaleManager
+import com.raund.app.MAX_ROUNDS_PER_PROFILE
+import com.raund.app.MAX_ROUND_DURATION_SECONDS
+import com.raund.app.MIN_ROUND_DURATION_SECONDS
 import com.raund.app.R
 import com.raund.app.RaundApplication
 import com.raund.app.data.repository.ProfileRepository
@@ -13,11 +16,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 data class RoundEditState(
     val name: String,
     val duration: String,
-    val warn10sec: Boolean
+    val warn10sec: Boolean,
+    val stableId: String = UUID.randomUUID().toString()
 )
 
 data class ProfileEditorState(
@@ -134,6 +139,7 @@ class ProfileEditorViewModel(
     }
 
     fun addRound() {
+        if (_state.value.rounds.size >= MAX_ROUNDS_PER_PROFILE) return
         _state.value = _state.value.copy(
             rounds = _state.value.rounds + RoundEditState("", "60", false)
         )
@@ -214,7 +220,7 @@ class ProfileEditorViewModel(
                     existingId
                 }
                 val roundsToSave = s.rounds.map { r ->
-                    val durInt = r.duration.toIntOrNull()?.coerceAtLeast(5) ?: 5
+                    val durInt = r.duration.toIntOrNull()?.coerceIn(MIN_ROUND_DURATION_SECONDS, MAX_ROUND_DURATION_SECONDS) ?: MIN_ROUND_DURATION_SECONDS
                     Triple(r.name.take(20), durInt, r.warn10sec)
                 }
                 repository.saveRounds(id, roundsToSave)

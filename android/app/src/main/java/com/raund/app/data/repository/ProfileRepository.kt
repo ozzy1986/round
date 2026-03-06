@@ -168,7 +168,7 @@ class ProfileRepository(
         val sanitizedRounds = rounds.mapNotNull { (name, durationSeconds, warn10sec) ->
             val safeName = name.trim().take(20)
             if (safeName.isBlank()) null
-            else Triple(safeName, durationSeconds.coerceAtLeast(5), warn10sec)
+            else Triple(safeName, durationSeconds.coerceIn(com.raund.app.MIN_ROUND_DURATION_SECONDS, com.raund.app.MAX_ROUND_DURATION_SECONDS), warn10sec)
         }
         val entities = sanitizedRounds.mapIndexed { index, (name, durationSeconds, warn10sec) ->
             Round(

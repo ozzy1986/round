@@ -511,7 +511,7 @@ class TimerService : Service() {
             isRunning = isRunning,
             paused = paused
         )
-        val text = if (isRunning) "${roundName.take(10)} %02d:%02d".format(remaining / 60, remaining % 60) else getString(R.string.timer_finished)
+        val text = if (isRunning) "${roundName.take(10)} ${formatDuration(remaining)}" else getString(R.string.timer_finished)
         if (Looper.myLooper() == Looper.getMainLooper()) {
             lastNotifText = text
             showNotification(text, forceStartForeground = !isRunning)

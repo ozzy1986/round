@@ -118,4 +118,24 @@ class ProfileRepositoryTest {
             })
         }
     }
+
+    @Test
+    fun `saveRounds enforces maximum duration of 7200 seconds`() = runTest {
+        val rounds = listOf(
+            Triple("TooLong", 9000, false),
+            Triple("AtMax", 7200, true),
+            Triple("Normal", 300, false)
+        )
+
+        repository.saveRounds("p-1", rounds)
+
+        coVerify {
+            roundDao.insertAll(match { entities ->
+                entities.size == 3 &&
+                entities[0].durationSeconds == 7200 &&
+                entities[1].durationSeconds == 7200 &&
+                entities[2].durationSeconds == 300
+            })
+        }
+    }
 }

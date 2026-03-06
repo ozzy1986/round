@@ -68,6 +68,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.raund.app.MAX_ROUNDS_PER_PROFILE
+import com.raund.app.MAX_ROUND_DURATION_SECONDS
+import com.raund.app.MIN_ROUND_DURATION_SECONDS
 import com.raund.app.R
 import com.raund.app.viewmodel.ProfileEditorViewModel
 import com.raund.app.viewmodel.RoundEditState
@@ -75,7 +78,6 @@ import com.raund.app.viewmodel.SaveResult
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
 private const val MAX_ROUND_NAME_LENGTH = 20
-private const val MIN_ROUND_DURATION_SECONDS = 5
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -200,7 +202,7 @@ fun ProfileEditorScreen(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             }
-            itemsIndexed(rounds, key = { index, r -> "r_${index}_${r.name}_${r.duration}" }) { index, round ->
+            itemsIndexed(rounds, key = { _, r -> r.stableId }) { index, round ->
                 val rName = round.name
                 val dur = round.duration
                 val warn = round.warn10sec
@@ -331,10 +333,14 @@ fun ProfileEditorScreen(
                                     .onFocusChanged { focusState ->
                                         if (!focusState.isFocused) {
                                             val parsed = dur.toIntOrNull() ?: 0
-                                            if (parsed < MIN_ROUND_DURATION_SECONDS) {
+                                            val clamped = parsed.coerceIn(MIN_ROUND_DURATION_SECONDS, MAX_ROUND_DURATION_SECONDS)
+                                            if (clamped != parsed) {
                                                 viewModel.updateRoundAt(
                                                     index,
-                                                    round.copy(duration = MIN_ROUND_DURATION_SECONDS.toString(), warn10sec = false)
+                                                    round.copy(
+                                                        duration = clamped.toString(),
+                                                        warn10sec = if (clamped <= 10) false else warn
+                                                    )
                                                 )
                                             }
                                         }
@@ -401,7 +407,8 @@ fun ProfileEditorScreen(
             OutlinedButton(
                 onClick = { viewModel.addRound() },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = rounds.size < MAX_ROUNDS_PER_PROFILE
             ) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add_round))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -495,7 +502,9 @@ fun ProfileEditorScreen(
                         onClick = {
                             viewModel.setShowCopyNDialog(false)
                             val copies = copyNValue.toIntOrNull()?.coerceIn(1, 99) ?: 1
-                            val newRounds = state.rounds + (1 until copies).flatMap { block }
+                            val newRounds = (state.rounds + (1 until copies).flatMap {
+                                block.map { r -> RoundEditState(r.name, r.duration, r.warn10sec) }
+                            }).take(MAX_ROUNDS_PER_PROFILE)
                             viewModel.setRounds(newRounds)
                             viewModel.clearSelection()
                         }

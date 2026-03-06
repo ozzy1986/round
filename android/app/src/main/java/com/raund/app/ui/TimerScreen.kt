@@ -414,7 +414,7 @@ private fun TimerCountdownRing(
             modifier = Modifier.graphicsLayer { alpha = 0.5f }
         )
         Text(
-            "%02d:%02d".format(remaining / 60, remaining % 60),
+            com.raund.app.formatDuration(remaining),
             fontSize = timerFontSize,
             fontWeight = FontWeight.Black,
             color = onBgColor,

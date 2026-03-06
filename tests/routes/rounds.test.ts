@@ -93,6 +93,26 @@ describe('rounds routes', () => {
       expect(body.position).toBe(0);
       await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
+
+    it('rejects duration_seconds above 7200 (2 hours)', async () => {
+      const profile = await profilesDb.createProfile(pool, {
+        name: 'Duration Limit',
+        emoji: '⏱',
+        user_id: testUserId,
+      });
+      const res = await app.inject({
+        method: 'POST',
+        url: `/profiles/${profile.id}/rounds`,
+        headers: authHeaders,
+        payload: {
+          name: 'TooLong',
+          duration_seconds: 7201,
+          position: 0,
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
+    });
   });
 
   describe('PATCH /rounds/:roundId', () => {
@@ -127,6 +147,70 @@ describe('rounds routes', () => {
       const body = res.json();
       expect(body.name).toBe('New');
       expect(body.duration_seconds).toBe(120);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
+    });
+  });
+
+  describe('PUT /profiles/:id/rounds', () => {
+    it('rejects more than 30 rounds', async () => {
+      const profile = await profilesDb.createProfile(pool, {
+        name: 'Too Many Rounds',
+        emoji: '🔢',
+        user_id: testUserId,
+      });
+      const rounds = Array.from({ length: 31 }, (_, i) => ({
+        name: `R${i}`,
+        duration_seconds: 60,
+        position: i,
+      }));
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/profiles/${profile.id}/rounds`,
+        headers: authHeaders,
+        payload: { rounds },
+      });
+      expect(res.statusCode).toBe(400);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
+    });
+
+    it('rejects duration_seconds above 7200 in PUT', async () => {
+      const profile = await profilesDb.createProfile(pool, {
+        name: 'PUT Duration Limit',
+        emoji: '⏱',
+        user_id: testUserId,
+      });
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/profiles/${profile.id}/rounds`,
+        headers: authHeaders,
+        payload: {
+          rounds: [{ name: 'TooLong', duration_seconds: 7201, position: 0 }],
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      await profilesDb.deleteProfile(pool, profile.id, testUserId);
+    });
+
+    it('accepts exactly 30 rounds with max duration 7200', async () => {
+      const profile = await profilesDb.createProfile(pool, {
+        name: 'Max Rounds',
+        emoji: '✅',
+        user_id: testUserId,
+      });
+      const rounds = Array.from({ length: 30 }, (_, i) => ({
+        name: `R${i}`,
+        duration_seconds: 7200,
+        position: i,
+      }));
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/profiles/${profile.id}/rounds`,
+        headers: authHeaders,
+        payload: { rounds },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body).toHaveLength(30);
       await profilesDb.deleteProfile(pool, profile.id, testUserId);
     });
   });

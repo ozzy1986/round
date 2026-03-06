@@ -401,9 +401,4 @@ fun ProfileListScreen(
     }
 }
 
-private fun formatDurationShort(totalSeconds: Int): String {
-    val safeSeconds = totalSeconds.coerceAtLeast(0)
-    val minutes = safeSeconds / 60
-    val seconds = safeSeconds % 60
-    return "%02d:%02d".format(minutes, seconds)
-}
+private fun formatDurationShort(totalSeconds: Int): String = com.raund.app.formatDuration(totalSeconds)
