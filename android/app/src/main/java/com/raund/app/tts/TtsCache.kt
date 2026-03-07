@@ -1,9 +1,7 @@
 package com.raund.app.tts
 
 import android.content.Context
-import android.content.res.Configuration
 import android.os.SystemClock
-import com.raund.app.R
 import android.util.Log
 import com.raund.app.timer.TimerProfile
 import android.speech.tts.TextToSpeech
@@ -52,22 +50,6 @@ object TtsCache {
 
     fun buildPhraseList(profile: TimerProfile, finishedText: String): List<String> =
         profile.rounds.map { it.name } + profile.name + finishedText
-
-    fun buildWarn10Phrases(context: Context, locale: String, profile: TimerProfile): List<String> {
-        val config = Configuration(context.resources.configuration)
-        config.setLocale(ttsLocale(locale))
-        val localizedContext = context.createConfigurationContext(config)
-        return profile.rounds
-            .filter { it.warn10sec && it.durationSeconds >= 10 }
-            .map { localizedContext.getString(R.string.timer_warn10, it.name) }
-    }
-
-    fun getWarn10Phrase(context: Context, locale: String, roundName: String): String {
-        val config = Configuration(context.resources.configuration)
-        config.setLocale(ttsLocale(locale))
-        val localizedContext = context.createConfigurationContext(config)
-        return localizedContext.getString(R.string.timer_warn10, roundName)
-    }
 
     private fun ttsLocale(locale: String): Locale = when (locale) {
         "ru", "kk", "tg", "tt" -> Locale.forLanguageTag("ru")

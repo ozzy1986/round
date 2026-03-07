@@ -1,5 +1,6 @@
 package com.raund.app
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,7 +17,6 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.MediaPlayer
-import android.media.ToneGenerator
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.os.Build
@@ -35,6 +35,17 @@ import kotlin.math.PI
 import kotlin.math.sin
 import java.util.Locale
 import java.util.concurrent.Executors
+
+private data class ToneSpec(
+    val durationMs: Int,
+    val frequencyHz: Double,
+    val volume: Float
+)
+
+private class StaticTonePlayer {
+    val lock = Any()
+    var track: AudioTrack? = null
+}
 
 class TimerService : Service() {
 
@@ -64,6 +75,53 @@ class TimerService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val audioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-audio").apply { isDaemon = true } }
     private val stopTimerExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-stop-timer").apply { isDaemon = true } }
+    private val toneBufferCache = mutableMapOf<ToneSpec, ShortArray>()
+    private val prolongedTonePlayer = StaticTonePlayer()
+    private val tickTonePlayer = StaticTonePlayer()
+
+    private fun updatePauseState(
+        paused: Boolean,
+        pausedByScreenOff: Boolean = false,
+        pausedByLeavingApp: Boolean = false
+    ) {
+        this.paused = paused
+        autoPausedByScreenOff = pausedByScreenOff
+        autoPausedByLeavingApp = pausedByLeavingApp
+        TimerStateHolder.update(paused = paused)
+    }
+
+    private fun resumeFromAutoPause(reason: String) {
+        Log.i(TAG, "$reason -> auto-resume")
+        updatePauseState(paused = false)
+    }
+
+    private fun maybeResumeAfterScreenOn(reason: String) {
+        val keyguardManager = getSystemService(KEYGUARD_SERVICE) as KeyguardManager
+        if (!shouldResumeAfterScreenOn(
+                running = running,
+                autoPausedByScreenOff = autoPausedByScreenOff,
+                keepRunningOnScreenOff = SettingsManager.isKeepRunningOnScreenOff(this),
+                keepRunningWhenLeavingApp = SettingsManager.isKeepRunningWhenLeavingApp(this),
+                keyguardLocked = keyguardManager.isKeyguardLocked
+            )
+        ) {
+            return
+        }
+        resumeFromAutoPause(reason)
+    }
+
+    private fun maybeResumeAfterUnlock(reason: String) {
+        if (!shouldResumeAfterUnlock(
+                running = running,
+                autoPausedByScreenOff = autoPausedByScreenOff,
+                keepRunningOnScreenOff = SettingsManager.isKeepRunningOnScreenOff(this),
+                keepRunningWhenLeavingApp = SettingsManager.isKeepRunningWhenLeavingApp(this)
+            )
+        ) {
+            return
+        }
+        resumeFromAutoPause(reason)
+    }
 
     private val leaveAppCheckRunnable = object : Runnable {
         override fun run() {
@@ -72,8 +130,7 @@ class TimerService : Service() {
             if (!pm.isInteractive || screenIsOff) return
             if (!SettingsManager.isKeepRunningWhenLeavingApp(this@TimerService)) {
                 Log.i(TAG, "leaveAppCheck: user left app -> auto-pause")
-                paused = true
-                autoPausedByLeavingApp = true
+                updatePauseState(paused = true, pausedByLeavingApp = true)
             }
         }
     }
@@ -86,10 +143,7 @@ class TimerService : Service() {
                     timerScreenVisible = true
                     mainHandler.removeCallbacks(leaveAppCheckRunnable)
                     if (autoPausedByScreenOff || autoPausedByLeavingApp) {
-                        Log.i(TAG, "visibilityReceiver: auto-resume (screenOff=$autoPausedByScreenOff leaveApp=$autoPausedByLeavingApp)")
-                        paused = false
-                        autoPausedByScreenOff = false
-                        autoPausedByLeavingApp = false
+                        resumeFromAutoPause("visibilityReceiver: TIMER_VISIBLE (screenOff=$autoPausedByScreenOff leaveApp=$autoPausedByLeavingApp)")
                     }
                 }
                 ACTION_TIMER_HIDDEN -> {
@@ -119,12 +173,16 @@ class TimerService : Service() {
                     mainHandler.removeCallbacks(leaveAppCheckRunnable)
                     if (running && !paused && !SettingsManager.isKeepRunningOnScreenOff(this@TimerService)) {
                         Log.i(TAG, "screenStateReceiver: SCREEN_OFF -> auto-pause")
-                        paused = true
-                        autoPausedByScreenOff = true
+                        updatePauseState(paused = true, pausedByScreenOff = true)
                     }
                 }
                 Intent.ACTION_SCREEN_ON -> {
                     screenIsOff = false
+                    maybeResumeAfterScreenOn("screenStateReceiver: SCREEN_ON")
+                }
+                Intent.ACTION_USER_PRESENT -> {
+                    screenIsOff = false
+                    maybeResumeAfterUnlock("screenStateReceiver: USER_PRESENT")
                 }
             }
         }
@@ -156,6 +214,7 @@ class TimerService : Service() {
         val screenFilter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(screenStateReceiver, screenFilter, RECEIVER_NOT_EXPORTED)
@@ -185,17 +244,11 @@ class TimerService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_PAUSE -> {
-                paused = true
-                autoPausedByScreenOff = false
-                autoPausedByLeavingApp = false
-                TimerStateHolder.update(paused = true)
+                updatePauseState(paused = true)
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
-                paused = false
-                autoPausedByScreenOff = false
-                autoPausedByLeavingApp = false
-                TimerStateHolder.update(paused = false)
+                updatePauseState(paused = false)
                 return START_NOT_STICKY
             }
         }
@@ -238,9 +291,7 @@ class TimerService : Service() {
         useCacheOnly = TtsCache.allExist(applicationContext, langTag, TtsCache.buildPhraseList(profile, finishedText))
 
         running = true
-        paused = false
-        autoPausedByScreenOff = false
-        autoPausedByLeavingApp = false
+        updatePauseState(paused = false)
 
         Log.i(TAG, "Starting timer: ${profile.name}, rounds=${profile.rounds.size}, useCacheOnly=$useCacheOnly")
 
@@ -300,11 +351,6 @@ class TimerService : Service() {
 
         val ttsParams = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
         val tts = ttsRef
-        var alarmTone: ToneGenerator? = null
-        try { alarmTone = ToneGenerator(AudioManager.STREAM_ALARM, 100) } catch (_: Exception) {}
-        val tickTone = ToneGenerator.TONE_CDMA_PIP
-        val tickMs = 150
-        val prolongedMs = 1200
         val totalRounds = rounds.size
 
         var roundIndex = 0
@@ -316,7 +362,7 @@ class TimerService : Service() {
 
         updateStateAndNotification(profile.name, round.name, round.durationSeconds, round.durationSeconds, 1, totalRounds)
         if (roundIndex == 0) {
-            playProlongedTone(prolongedMs)
+            playProlongedTone()
         }
         if (useCacheOnly) {
             playCacheFile(round.name, langTag, null)
@@ -359,7 +405,7 @@ class TimerService : Service() {
                 if (skippedRounds > 1) {
                     Log.w(TAG, "freeze skip: jumped $skippedRounds rounds at once")
                 }
-                playProlongedTone(prolongedMs)
+                playProlongedTone()
                 if (roundIndex >= totalRounds) {
                     updateStateAndNotification(profile.name, "", 0, 0, 0, 0, isRunning = false)
                     running = false
@@ -375,7 +421,6 @@ class TimerService : Service() {
                         tts?.speak(finishedText, TextToSpeech.QUEUE_ADD, ttsParams, null)
                         mainHandler.postDelayed({ stopSelf() }, 6000)
                     }
-                    try { alarmTone?.release() } catch (_: Exception) {}
                     return
                 }
                 val currentRemainingMs = roundStartRealtimeMs + roundDurationMs - now
@@ -400,12 +445,8 @@ class TimerService : Service() {
                 }
                 lastBroadcastRemainingSeconds = remainingSeconds
                 updateStateAndNotification(profile.name, round.name, remainingSeconds, round.durationSeconds, roundIndex + 1, totalRounds)
-                if (round.warn10sec && round.durationSeconds >= 10 && remainingSeconds == 10) {
-                    val warn10Phrase = TtsCache.getWarn10Phrase(applicationContext, langTag, round.name)
-                    if (useCacheOnly) playCacheFile(warn10Phrase, langTag, null) else tts?.speak(warn10Phrase, TextToSpeech.QUEUE_FLUSH, ttsParams, null)
-                }
                 if (round.warn10sec && round.durationSeconds >= 10 && remainingSeconds in 1..10) {
-                    try { alarmTone?.startTone(tickTone, tickMs) } catch (_: Exception) {}
+                    playTickTone()
                 }
             }
 
@@ -416,15 +457,10 @@ class TimerService : Service() {
         }
         Log.i(TAG, "runTimer loop exited running=$running")
         mainHandler.post { cleanupTimerResources() }
-        try { alarmTone?.release() } catch (_: Exception) {}
     }
 
     private var cachedMediaPlayer: MediaPlayer? = null
     private val cachePlayerLock = Object()
-    private var cachedToneBuffer: ShortArray? = null
-    private var cachedToneDurationMs: Int = 0
-    private var prolongedToneTrack: AudioTrack? = null
-    private val prolongedToneLock = Object()
 
     private fun playCacheFile(text: String, langTag: String, onDone: (() -> Unit)? = null) {
         audioExecutor.execute {
@@ -458,30 +494,26 @@ class TimerService : Service() {
         }
     }
 
-    private fun getToneBuffer(durationMs: Int): ShortArray {
-        if (cachedToneBuffer != null && cachedToneDurationMs == durationMs) return cachedToneBuffer!!
+    private fun getToneBuffer(spec: ToneSpec): ShortArray {
+        toneBufferCache[spec]?.let { return it }
         val sampleRate = 44100
-        val numSamples = sampleRate * durationMs / 1000
+        val numSamples = sampleRate * spec.durationMs / 1000
         val buffer = ShortArray(numSamples)
-        val freq = 880.0
-        val vol = 0.55f
         for (i in 0 until numSamples) {
-            buffer[i] = (sin(2.0 * PI * freq * i / sampleRate) * 32767 * vol).toInt().toShort()
+            buffer[i] = (sin(2.0 * PI * spec.frequencyHz * i / sampleRate) * 32767 * spec.volume).toInt().toShort()
         }
-        cachedToneBuffer = buffer
-        cachedToneDurationMs = durationMs
+        toneBufferCache[spec] = buffer
         return buffer
     }
 
-    private fun playProlongedTone(durationMs: Int) {
+    private fun playStaticTone(player: StaticTonePlayer, spec: ToneSpec, label: String) {
         audioExecutor.execute {
             try {
-                synchronized(prolongedToneLock) {
-                    var track = prolongedToneTrack
+                synchronized(player.lock) {
+                    var track = player.track
                     if (track == null) {
-                        val buffer = getToneBuffer(durationMs)
+                        val buffer = getToneBuffer(spec)
                         val sampleRate = 44100
-                        val vol = 0.55f
                         val minBuf = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
                         track = AudioTrack.Builder()
                             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
@@ -489,19 +521,43 @@ class TimerService : Service() {
                             .setBufferSizeInBytes((buffer.size * 2).coerceAtLeast(minBuf))
                             .setTransferMode(AudioTrack.MODE_STATIC)
                             .build()
-                        track.setVolume(vol)
                         track.write(buffer, 0, buffer.size)
-                        prolongedToneTrack = track
+                        player.track = track
                     }
+                    track.setVolume(spec.volume)
                     track.stop()
                     track.reloadStaticData()
                     track.setPlaybackHeadPosition(0)
                     track.play()
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "playProlongedTone failed", e)
+                Log.w(TAG, "$label failed", e)
             }
         }
+    }
+
+    private fun playProlongedTone() {
+        playStaticTone(
+            player = prolongedTonePlayer,
+            spec = ToneSpec(
+                durationMs = PROLONGED_TONE_DURATION_MS,
+                frequencyHz = PROLONGED_TONE_FREQUENCY_HZ,
+                volume = PROLONGED_TONE_VOLUME
+            ),
+            label = "playProlongedTone"
+        )
+    }
+
+    private fun playTickTone() {
+        playStaticTone(
+            player = tickTonePlayer,
+            spec = ToneSpec(
+                durationMs = TICK_TONE_DURATION_MS,
+                frequencyHz = TICK_TONE_FREQUENCY_HZ,
+                volume = TICK_TONE_VOLUME
+            ),
+            label = "playTickTone"
+        )
     }
 
     private var cachedNotifBuilder: Notification.Builder? = null
@@ -750,11 +806,11 @@ class TimerService : Service() {
             try { cachedMediaPlayer?.release() } catch (_: Exception) {}
             cachedMediaPlayer = null
         }
-        cachedToneBuffer = null
-        synchronized(prolongedToneLock) {
-            try { prolongedToneTrack?.release() } catch (_: Exception) {}
-            prolongedToneTrack = null
-        }
+        toneBufferCache.clear()
+        try { prolongedTonePlayer.track?.release() } catch (_: Exception) {}
+        prolongedTonePlayer.track = null
+        try { tickTonePlayer.track?.release() } catch (_: Exception) {}
+        tickTonePlayer.track = null
         audioExecutor.shutdown()
         stopTimerExecutor.shutdown()
         cleanupTimerResources()
@@ -778,6 +834,12 @@ class TimerService : Service() {
         private const val TAG = "RaundTimer"
         private const val CHANNEL_ID = "raund_timer_v3"
         private const val NOTIFICATION_ID = 1
+        private const val PROLONGED_TONE_DURATION_MS = 1200
+        private const val PROLONGED_TONE_FREQUENCY_HZ = 880.0
+        private const val PROLONGED_TONE_VOLUME = 0.55f
+        private const val TICK_TONE_DURATION_MS = 150
+        private const val TICK_TONE_FREQUENCY_HZ = 1760.0
+        private const val TICK_TONE_VOLUME = 0.9f
         const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"
         const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"

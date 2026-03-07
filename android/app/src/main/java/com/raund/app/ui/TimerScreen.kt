@@ -131,7 +131,7 @@ fun TimerScreen(
         if (p.rounds.isEmpty()) return@LaunchedEffect
         val locale = LocaleManager.currentLanguageTag(context)
         val finishedText = context.getString(R.string.timer_finished)
-        val phrases = TtsCache.buildPhraseList(p, finishedText) + TtsCache.buildWarn10Phrases(context, locale, p)
+        val phrases = TtsCache.buildPhraseList(p, finishedText)
         Log.d("TimerScreen", "cache check profile=${p.name} locale=$locale phrases=${phrases.size}")
         val allExist = TtsCache.allExist(context, locale, phrases)
         if (allExist) {
@@ -318,8 +318,7 @@ fun TimerScreen(
                         maxRingSize = minOf(this@BoxWithConstraints.maxWidth, 320.dp),
                         timerFontSize = timerFontSize,
                         onBgColor = onBgColor,
-                        emoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱",
-                        modifier = Modifier.offset { IntOffset(0, -10) }
+                        emoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱"
                     )
                 }
             }
@@ -339,7 +338,8 @@ fun TimerScreen(
                 onPause = { TimerService.pause(context) },
                 onResume = { TimerService.resume(context) },
                 onStop = { viewModel.setFinished(true); TimerService.stop(context) },
-                onRestart = { viewModel.setFinished(false) }
+                onRestart = { viewModel.setFinished(false) },
+                modifier = Modifier.offset { IntOffset(0, 10) }
             )
         }
     }
@@ -387,8 +387,7 @@ private fun TimerCountdownRing(
     maxRingSize: Dp,
     timerFontSize: androidx.compose.ui.unit.TextUnit,
     onBgColor: Color,
-    emoji: String,
-    modifier: Modifier = Modifier
+    emoji: String
 ) {
     val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -411,7 +410,7 @@ private fun TimerCountdownRing(
     )
     val warningColor = MaterialTheme.colorScheme.tertiary
     val ringColor = if (inWarningZone) warningColor else primaryColor
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    Box(contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
             progress = { animatedProgress },
             modifier = Modifier
@@ -458,11 +457,12 @@ private fun TimerControls(
     onPause: () -> Unit,
     onResume: () -> Unit,
     onStop: () -> Unit,
-    onRestart: () -> Unit
+    onRestart: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val errorColor = MaterialTheme.colorScheme.error
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(24.dp)
     ) {

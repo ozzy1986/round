@@ -59,6 +59,15 @@ fun AppLoadingScreen() {
         ),
         label = "scale"
     )
+    val imageScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "imageScale"
+    )
 
     val gradientOverlay = Brush.verticalGradient(
         colors = listOf(
@@ -72,7 +81,12 @@ fun AppLoadingScreen() {
         Image(
             painter = painterResource(R.drawable.ic_splash),
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = imageScale
+                    scaleY = imageScale
+                },
             contentScale = ContentScale.Crop
         )
         Box(

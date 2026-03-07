@@ -171,9 +171,9 @@ C. PROFILE EDITOR UX + VALIDATION
 
 D. TIMER UX / STATE MACHINE
 23) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.
-23a) Timer countdown ring is slightly higher on the screen, with no overlap/regression in the title, step chip, or Start button.
+23a) Timer countdown ring/title stay in their original position; only the bottom button cluster is slightly lower on the screen, with no overlap/regression.
 24) Start begins countdown and transitions between rounds correctly.
-25) Warn-10: ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No ticks for short rounds (e.g. 5 sec). TTS says "%s через 10 секунд" when remainingSeconds hits 10 (for rounds >= 10 sec with warn enabled).
+25) Warn-10: louder ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No voice warning at 10 sec. No ticks for short rounds (e.g. 5 sec).
 24) Pause button freezes the countdown; Resume continues from the same round/seconds. "Пауза" / "Продолжить" (or EN Pause/Resume). Paused state shows "Пауза" chip next to step indicator.
 25) Natural completion shows "Тренировка завершена" (or EN equivalent).
 26) Restart button returns to initial timer state (shown only after training finishes).
@@ -184,10 +184,11 @@ D. TIMER UX / STATE MACHINE
 29a) Screen-off behavior: start timer, press power button to turn screen off. Timer, sounds, and TTS must continue. Notification appears with round name and countdown. Turn screen on: notification disappears, timer screen shows current state.
 29b) Swiping app from recents while timer is running: timer continues, notification stays visible.
 29c) Tapping notification while timer is running opens the app on the active timer screen.
+29d) Mixed settings regression: set "Keep running when screen off" = OFF and "Keep running when leaving the app" = ON. Start timer, press Home, turn screen off, wait 3-5 seconds, turn screen on/unlock, wait 3-5 seconds more. Timer must auto-resume after unlock even while app stays in background; when reopened, countdown must have advanced accordingly.
 
-E. SOUND SIGNALS (piercing high-pitched tone, STREAM_ALARM at max; verify with device volume up)
+E. SOUND SIGNALS (piercing high-pitched tone, USAGE_ALARM; verify with device volume up)
 30) Start of training (first round only): one continuous prolonged tone (1200 ms), then TTS speaks round name. Subsequent round starts: TTS only (no tone).
-31) Last 10 seconds: one short tick (150 ms, TONE_CDMA_PIP) per second only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. TTS "X через 10 секунд" at 10 sec remaining (TTS uses USAGE_ALARM stream to prevent ducking).
+31) Last 10 seconds: one louder short tick (150 ms custom high-pitched AudioTrack tone) per second only when "Предупредить за 10 сек" is ON and round duration >= 10 sec. No TTS warning at 10 sec.
 32) End of round: one continuous prolonged tone (1200 ms) when round ends.
 33) End of training: TTS "Тренировка [название] завершена" (no tone). Round names longer than 10 chars are truncated to 10 + "…" on the timer display (TTS still speaks full name).
 34) No ticks for rounds with duration < 10 sec even if "Предупредить за 10 сек" is ON.
@@ -248,7 +249,7 @@ Run in order. After any code change, re-run from scenario 1.
 
  8. TIMER — LONG ROUND WITH WARN10
     8.1 Profile: one round 15 sec, "Предупредить за 10 сек" ON. Start timer.
-    8.2 Expect: one prolonged tone, TTS round name. Countdown 15→11 no ticks. At 10 sec: TTS "X через 10 секунд", then one beep per second for 10,9,8,7,6,5,4,3,2,1.
+    8.2 Expect: one prolonged tone, TTS round name. Countdown 15→11 no ticks. At 10 sec: no TTS warning, then one louder beep per second for 10,9,8,7,6,5,4,3,2,1.
     8.3 At 0: one prolonged tone (end of round). Then one prolonged tone + "Тренировка завершена".
 
  9. TIMER — MULTIPLE ROUNDS

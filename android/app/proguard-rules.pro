@@ -4,7 +4,6 @@
 -keep,allowobfuscation interface retrofit2.Call
 -keep,allowobfuscation interface retrofit2.Callback
 -dontwarn retrofit2.**
--keep class retrofit2.** { *; }
 -keepclassmembers,allowobfuscation interface * {
     @retrofit2.http.* <methods>;
 }
@@ -23,7 +22,6 @@
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**
--keep class okhttp3.** { *; }
 
 # Room entities
 -keep class com.raund.app.data.entity.** { *; }
