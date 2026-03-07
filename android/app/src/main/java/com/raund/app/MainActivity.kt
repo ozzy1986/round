@@ -85,15 +85,15 @@ class MainActivity : ComponentActivity() {
                                         currentEntry.arguments?.getString("profileId") == id
                                 if (!alreadyOnTimer) {
                                     navController.navigate("timer/$id") {
-                                        popUpTo("profiles") { inclusive = false }
+                                        popUpTo(PROFILES_ROUTE) { inclusive = false }
                                         launchSingleTop = true
                                     }
                                 }
                                 openTimerId.value = null
                             }
                         }
-                        NavHost(navController = navController, startDestination = "profiles") {
-                            composable("profiles") {
+                        NavHost(navController = navController, startDestination = PROFILES_ROUTE) {
+                            composable(PROFILES_ROUTE) {
                                 BackHandler(enabled = true) { /* consume back so activity does not finish */ }
                                 val listViewModel: ProfileListViewModel = viewModel()
                                 ProfileListScreen(
@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
                                 ProfileEditorScreen(
                                     viewModel = editorViewModel,
                                     profileId = if (id == "new") null else id,
-                                    onBack = { navController.popBackStack() }
+                                    onBack = { navController.navigateToProfiles() }
                                 )
                             }
                             composable("timer/{profileId}") { backStackEntry ->
@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 TimerScreen(
                                     viewModel = timerViewModel,
-                                    onBack = { navController.popBackStack() }
+                                    onBack = { navController.navigateToProfiles() }
                                 )
                             }
                         }

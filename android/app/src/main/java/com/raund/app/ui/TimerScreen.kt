@@ -10,6 +10,7 @@ import android.media.AudioManager
 import android.os.Build
 import android.util.Log
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -109,6 +110,15 @@ fun TimerScreen(
     val pauseTimerText = stringResource(R.string.pause_timer)
     val resumeTimerText = stringResource(R.string.resume_timer)
     val timerPausedText = stringResource(R.string.timer_paused)
+    var isLeaving by remember { mutableStateOf(false) }
+    fun handleBack() {
+        if (isLeaving) return
+        isLeaving = true
+        TimerService.stop(context)
+        onBack()
+    }
+
+    BackHandler(enabled = !isLeaving, onBack = ::handleBack)
 
     LaunchedEffect(profileId) {
         TimerService.warmup(context)
@@ -233,7 +243,8 @@ fun TimerScreen(
         ) {
             TimerTopBar(
                 profileName = profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
-                onBack = { TimerService.stop(context); onBack() }
+                backEnabled = !isLeaving,
+                onBack = ::handleBack
             )
 
             Column(
@@ -341,6 +352,7 @@ fun TimerScreen(
 @Composable
 private fun TimerTopBar(
     profileName: String,
+    backEnabled: Boolean,
     onBack: () -> Unit
 ) {
     val onBgColor = MaterialTheme.colorScheme.onBackground
@@ -350,7 +362,7 @@ private fun TimerTopBar(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) {
+        IconButton(onClick = onBack, enabled = backEnabled) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
         }
         Spacer(modifier = Modifier.width(8.dp))

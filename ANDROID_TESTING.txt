@@ -177,6 +177,7 @@ D. TIMER UX / STATE MACHINE
 25) Natural completion shows "Тренировка завершена" (or EN equivalent).
 26) Restart button returns to initial timer state (shown only after training finishes).
 27) Back from timer returns to profile list and stops active speech playback.
+27a) Rapid repeated taps on the timer Back button still leave the app on the profile list; no black screen or blank NavHost.
 28) Profiles without rounds: timer start remains disabled and helper text is shown.
 29) Device screen remains ON (FLAG_KEEP_SCREEN_ON) while the timer is running.
 29a) Screen-off behavior: start timer, press power button to turn screen off. Timer, sounds, and TTS must continue. Notification appears with round name and countdown. Turn screen on: notification disappears, timer screen shows current state.
@@ -268,6 +269,7 @@ Run in order. After any code change, re-run from scenario 1.
 
 11. TIMER — BACK
     11.1 Start timer, tap Back. Return to profile list, TTS/beeps stop.
+    11.2 Start timer, rapidly tap Back several times in the same top-left area. App must stay on the profile list (no black screen).
 
 12. RUSSIAN LOCALE
     12.1 Device language RU. All labels: Профили, Старт, Пауза, Продолжить, Стоп, Повторить, Тренировка завершена, "X через 10 секунд", Предупредить за 10 сек, etc.
