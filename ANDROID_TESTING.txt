@@ -164,13 +164,14 @@ C. PROFILE EDITOR UX + VALIDATION
 18) Round selection and copy: each round shows a numbered circle on the left. Tap the circle to toggle selection (highlighted card with primary border). When rounds are selected, "Copy × N" and Cancel buttons appear. Tapping "Copy × N" opens a dialog for number of copies (1–99). On confirm, the selected block (in order) is appended (N−1) times. Selection is cleared after copy, move, or delete.
 19) Round reordering: long press on the round number circle OR on non-interactive card area (padding/spacing) to pick up a round; drag vertically to move it; release to drop. Short tap on the number = select only; long press = drag. Card lifts visually during drag (scale, shadow). Scroll is disabled while dragging.
 20) Emoji field is limited to a single emoji/character (uses BreakIterator grapheme cluster detection).
-21) Round duration input accepts digits and allows easy editing while typing (preserves digits correctly).
+21) Round duration input opens a numeric keypad only and allows easy digit editing while typing (preserves digits correctly).
 22) Save persists profile and returns to list.
 23) Delete profile: tapping "Delete profile" shows confirmation dialog (title + message in RU/EN); Cancel dismisses; Confirm deletes and returns to list.
 24) Back navigation from editor returns to list without crash.
 
 D. TIMER UX / STATE MACHINE
 23) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.
+23a) Timer countdown ring is slightly higher on the screen, with no overlap/regression in the title, step chip, or Start button.
 24) Start begins countdown and transitions between rounds correctly.
 25) Warn-10: ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No ticks for short rounds (e.g. 5 sec). TTS says "%s через 10 секунд" when remainingSeconds hits 10 (for rounds >= 10 sec with warn enabled).
 24) Pause button freezes the countdown; Resume continues from the same round/seconds. "Пауза" / "Продолжить" (or EN Pause/Resume). Paused state shows "Пауза" chip next to step indicator.

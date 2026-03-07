@@ -78,6 +78,7 @@ import com.raund.app.viewmodel.SaveResult
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
 private const val MAX_ROUND_NAME_LENGTH = 20
+private val positiveIntegerKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -325,7 +326,7 @@ fun ProfileEditorScreen(
                                 },
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = positiveIntegerKeyboardOptions,
                                 visualTransformation = VisualTransformation.None,
                                 modifier = Modifier
                                     .weight(1f)
@@ -492,7 +493,7 @@ fun ProfileEditorScreen(
                             onValueChange = { viewModel.setCopyNValue(it.filter { c -> c.isDigit() }.take(2)) },
                             label = { Text(stringResource(R.string.number_of_copies)) },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = positiveIntegerKeyboardOptions,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

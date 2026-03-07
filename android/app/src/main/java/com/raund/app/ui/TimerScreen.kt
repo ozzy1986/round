@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +77,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
@@ -316,7 +318,8 @@ fun TimerScreen(
                         maxRingSize = minOf(this@BoxWithConstraints.maxWidth, 320.dp),
                         timerFontSize = timerFontSize,
                         onBgColor = onBgColor,
-                        emoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱"
+                        emoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱",
+                        modifier = Modifier.offset { IntOffset(0, -10) }
                     )
                 }
             }
@@ -384,7 +387,8 @@ private fun TimerCountdownRing(
     maxRingSize: Dp,
     timerFontSize: androidx.compose.ui.unit.TextUnit,
     onBgColor: Color,
-    emoji: String
+    emoji: String,
+    modifier: Modifier = Modifier
 ) {
     val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -407,7 +411,7 @@ private fun TimerCountdownRing(
     )
     val warningColor = MaterialTheme.colorScheme.tertiary
     val ringColor = if (inWarningZone) warningColor else primaryColor
-    Box(contentAlignment = Alignment.Center) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
             progress = { animatedProgress },
             modifier = Modifier
