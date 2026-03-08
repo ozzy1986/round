@@ -9,6 +9,8 @@ import androidx.security.crypto.MasterKey
 class TokenStore(context: Context) {
     private val prefs: SharedPreferences?
     private val lock = Any()
+    @Volatile
+    private var memoryLoaded = false
 
     @Volatile
     private var memoryToken: String? = null
@@ -37,14 +39,26 @@ class TokenStore(context: Context) {
                 .apply()
             null
         }
+        if (prefs == null) {
+            memoryLoaded = true
+        }
     }
 
-    fun getToken(): String? = prefs?.getString(KEY_TOKEN, null) ?: synchronized(lock) { memoryToken }
+    fun getToken(): String? {
+        ensureLoaded()
+        return synchronized(lock) { memoryToken }
+    }
 
-    fun getRefreshToken(): String? =
-        prefs?.getString(KEY_REFRESH_TOKEN, null) ?: synchronized(lock) { memoryRefreshToken }
+    fun getRefreshToken(): String? {
+        ensureLoaded()
+        return synchronized(lock) { memoryRefreshToken }
+    }
 
     fun setToken(token: String) {
+        synchronized(lock) {
+            memoryToken = token
+            memoryLoaded = true
+        }
         val storedPrefs = prefs
         if (storedPrefs != null) {
             safeCommit(storedPrefs) {
@@ -52,13 +66,14 @@ class TokenStore(context: Context) {
             }
             return
         }
-
-        synchronized(lock) {
-            memoryToken = token
-        }
     }
 
     fun setTokens(token: String, refreshToken: String) {
+        synchronized(lock) {
+            memoryToken = token
+            memoryRefreshToken = refreshToken
+            memoryLoaded = true
+        }
         val storedPrefs = prefs
         if (storedPrefs != null) {
             safeCommit(storedPrefs) {
@@ -67,14 +82,14 @@ class TokenStore(context: Context) {
             }
             return
         }
-
-        synchronized(lock) {
-            memoryToken = token
-            memoryRefreshToken = refreshToken
-        }
     }
 
     fun clearToken() {
+        synchronized(lock) {
+            memoryToken = null
+            memoryRefreshToken = null
+            memoryLoaded = true
+        }
         val storedPrefs = prefs
         if (storedPrefs != null) {
             safeCommit(storedPrefs) {
@@ -83,10 +98,18 @@ class TokenStore(context: Context) {
             }
             return
         }
+    }
 
+    private fun ensureLoaded() {
+        if (memoryLoaded) return
         synchronized(lock) {
-            memoryToken = null
-            memoryRefreshToken = null
+            if (memoryLoaded) return
+            val storedPrefs = prefs
+            if (storedPrefs != null) {
+                memoryToken = storedPrefs.getString(KEY_TOKEN, null)
+                memoryRefreshToken = storedPrefs.getString(KEY_REFRESH_TOKEN, null)
+            }
+            memoryLoaded = true
         }
     }
 

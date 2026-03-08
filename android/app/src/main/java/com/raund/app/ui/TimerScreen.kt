@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
-import android.util.Log
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -85,7 +84,6 @@ import com.raund.app.R
 import com.raund.app.TimerService
 import com.raund.app.TimerStateHolder
 import com.raund.app.timer.TimerProfile
-import com.raund.app.tts.TtsCache
 import com.raund.app.viewmodel.TimerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,16 +94,16 @@ fun TimerScreen(
 ) {
     val profileId = viewModel.profileId
     val profile by viewModel.profile.collectAsState()
-    val cacheReady by viewModel.cacheReady.collectAsState()
+    val startReady by viewModel.startReady.collectAsState()
     val finished by viewModel.finished.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val timerState by viewModel.timerState.collectAsState()
-    val running = timerState.isRunning
-    val remaining = if (running) timerState.remaining else (profile?.rounds?.firstOrNull()?.durationSeconds ?: 0)
-    val roundTotal = if (running) timerState.roundTotal else (profile?.rounds?.firstOrNull()?.durationSeconds ?: 1)
-    val currentRound = if (running) timerState.roundName else (profile?.rounds?.firstOrNull()?.name ?: "")
-    val roundInfo = if (running) "${timerState.roundIndex} / ${timerState.totalRounds}" else (if ((profile?.rounds?.size ?: 0) > 0) "1 / ${profile!!.rounds.size}" else "")
-    val paused = timerState.paused
+    val running by viewModel.isRunning.collectAsState()
+    val paused by viewModel.isPaused.collectAsState()
+    val displayState by viewModel.displayState.collectAsState()
+    val remaining = displayState.remaining
+    val roundTotal = displayState.roundTotal
+    val currentRound = displayState.currentRound
+    val roundInfo = displayState.roundInfo
     val context = LocalContext.current
     val timerFinishedText = stringResource(R.string.timer_finished)
     val restartTimerText = stringResource(R.string.restart_timer)
@@ -129,20 +127,7 @@ fun TimerScreen(
     LaunchedEffect(profile) {
         val p = profile ?: return@LaunchedEffect
         if (p.rounds.isEmpty()) return@LaunchedEffect
-        val locale = LocaleManager.currentLanguageTag(context)
-        val finishedText = context.getString(R.string.timer_finished)
-        val phrases = TtsCache.buildPhraseList(p, finishedText)
-        Log.d("TimerScreen", "cache check profile=${p.name} locale=$locale phrases=${phrases.size}")
-        val allExist = TtsCache.allExist(context, locale, phrases)
-        if (allExist) {
-            Log.d("TimerScreen", "cache full, skip ensureCache")
-            viewModel.setCacheReady(true)
-            return@LaunchedEffect
-        }
-        Log.d("TimerScreen", "cache missing, calling ensureCache")
-        TtsCache.ensureCache(context, locale, phrases)
-        Log.d("TimerScreen", "ensureCache returned")
-        viewModel.setCacheReady(true)
+        viewModel.prefillTts(context)
     }
 
     val notifPermissionLauncher = rememberLauncherForActivityResult(
@@ -326,8 +311,8 @@ fun TimerScreen(
             TimerControls(
                 hasRounds = profile?.rounds?.isNotEmpty() == true,
                 profile = profile,
-                cacheReady = cacheReady,
-                syncing = isRefreshing || profile == null,
+                startReady = startReady,
+                syncing = isRefreshing || profile == null || !startReady,
                 running = running,
                 paused = paused,
                 finished = finished,
@@ -445,7 +430,7 @@ private fun TimerCountdownRing(
 private fun TimerControls(
     hasRounds: Boolean,
     profile: TimerProfile?,
-    cacheReady: Boolean,
+    startReady: Boolean,
     syncing: Boolean,
     running: Boolean,
     paused: Boolean,
@@ -558,8 +543,8 @@ private fun TimerControls(
                             .padding(bottom = 16.dp)
                     )
                 }
-                val startEnabled = hasRounds && cacheReady && !syncing
-                val showLoading = syncing || (hasRounds && !cacheReady)
+                val startEnabled = hasRounds && startReady && !syncing
+                val showLoading = syncing
                 Button(
                     onClick = onStart,
                     modifier = Modifier

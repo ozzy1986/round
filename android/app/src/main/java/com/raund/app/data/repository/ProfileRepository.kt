@@ -22,11 +22,12 @@ import android.content.Context
 import com.raund.app.timer.TimerProfile
 import com.raund.app.timer.TimerRound
 import com.raund.app.tts.TtsCache
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -39,9 +40,9 @@ import java.util.concurrent.ConcurrentHashMap
 class ProfileRepository(
     private val profileDao: ProfileDao,
     private val roundDao: RoundDao,
-    private val api: ApiService?,
-    private val tokenStore: TokenStore,
-    private val authService: AuthService,
+    private val apiProvider: () -> ApiService?,
+    private val tokenStoreProvider: () -> TokenStore,
+    private val authServiceProvider: () -> AuthService,
     private val syncPrefs: SyncPrefs,
     private val dataConsentPrefs: DataConsentPrefs,
     private val database: RoomDatabase
@@ -50,7 +51,12 @@ class ProfileRepository(
     private val bgScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val pendingProfileCreate = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
     private val syncMutex = Mutex()
-    private var activeSyncJob: Job? = null
+    private val api: ApiService?
+        get() = apiProvider()
+    private val tokenStore: TokenStore
+        get() = tokenStoreProvider()
+    private val authService: AuthService
+        get() = authServiceProvider()
 
     @Volatile
     var cachedProfiles: List<Profile> = emptyList()
@@ -67,8 +73,12 @@ class ProfileRepository(
 
     suspend fun preloadCache() {
         val start = SystemClock.elapsedRealtime()
-        cachedProfiles = profileDao.getAllOnce()
-        cachedRoundStats = roundDao.getStatsByProfileOnce().associateBy { it.profileId }
+        coroutineScope {
+            val profilesDeferred = async { profileDao.getAllOnce() }
+            val roundStatsDeferred = async { roundDao.getStatsByProfileOnce() }
+            cachedProfiles = profilesDeferred.await()
+            cachedRoundStats = roundStatsDeferred.await().associateBy { it.profileId }
+        }
         Log.i(PERF, "preloadCache: ${cachedProfiles.size} profiles in ${SystemClock.elapsedRealtime() - start}ms")
     }
 
@@ -222,20 +232,16 @@ class ProfileRepository(
         }
     }
 
-    suspend fun requestSync() = withContext(Dispatchers.IO) {
-        val last = syncPrefs.getLastSyncedAtMillis()
-        if (last != null && (System.currentTimeMillis() - last) < SyncPrefs.SYNC_THROTTLE_MS) {
-            return@withContext
-        }
-        syncGuarded()
-    }
+    suspend fun requestSync() = withContext(Dispatchers.IO) { syncGuarded(force = false) }
 
-    suspend fun forceSync() = withContext(Dispatchers.IO) {
-        syncGuarded()
-    }
+    suspend fun forceSync() = withContext(Dispatchers.IO) { syncGuarded(force = true) }
 
-    private suspend fun syncGuarded() {
+    private suspend fun syncGuarded(force: Boolean) {
         syncMutex.withLock {
+            val last = syncPrefs.getLastSyncedAtMillis()
+            if (!force && last != null && (System.currentTimeMillis() - last) < SyncPrefs.SYNC_THROTTLE_MS) {
+                return@withLock
+            }
             syncFromApi()
         }
     }

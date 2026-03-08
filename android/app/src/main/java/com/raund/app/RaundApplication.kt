@@ -86,9 +86,9 @@ class RaundApplication : Application() {
         ProfileRepository(
             profileDao = database.profileDao(),
             roundDao = database.roundDao(),
-            api = api,
-            tokenStore = tokenStore,
-            authService = authService,
+            apiProvider = { api },
+            tokenStoreProvider = { tokenStore },
+            authServiceProvider = { authService },
             syncPrefs = syncPrefs,
             dataConsentPrefs = dataConsentPrefs,
             database = database
@@ -126,7 +126,9 @@ class RaundApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        initSentryIfConfigured()
+        initScope.launch {
+            initSentryIfConfigured()
+        }
         val appStartMs = SystemClock.elapsedRealtime()
         Log.i("PerfFix", "App onCreate start")
         initScope.launch {
@@ -142,9 +144,11 @@ class RaundApplication : Application() {
             val preloadMs = SystemClock.elapsedRealtime() - start
             val totalMs = SystemClock.elapsedRealtime() - appStartMs
             Log.i("PerfFix", "App ready in ${totalMs}ms (preload=${preloadMs}ms)")
-        }
-        initScope.launch {
-            try { profileRepository.requestSync() } catch (_: Exception) {}
+            try {
+                profileRepository.requestSync()
+            } catch (e: Exception) {
+                Log.w("PerfFix", "initial requestSync failed", e)
+            }
         }
     }
 }

@@ -163,8 +163,14 @@ class AuthAuthenticatorTest {
 
     @Test
     fun `concurrent calls do not duplicate refresh`() {
-        every { tokenStore.getToken() } returns null
-        every { tokenStore.getRefreshToken() } returns "refresh_abc"
+        val currentToken = java.util.concurrent.atomic.AtomicReference<String?>(null)
+        val currentRefreshToken = java.util.concurrent.atomic.AtomicReference("refresh_abc")
+        every { tokenStore.getToken() } answers { currentToken.get() }
+        every { tokenStore.getRefreshToken() } answers { currentRefreshToken.get() }
+        every { tokenStore.setTokens(any(), any()) } answers {
+            currentToken.set(firstArg())
+            currentRefreshToken.set(secondArg())
+        }
         val refreshResp = RefreshResponse(
             token = "concurrent_token",
             refresh_token = "concurrent_refresh",
@@ -189,6 +195,7 @@ class AuthAuthenticatorTest {
         threads.forEach { it.join(5000) }
 
         assertTrue(results.all { it != null })
-        verify(atMost = 5) { authService.refreshCall(any()) }
+        verify(exactly = 1) { authService.refreshCall(RefreshRequest("refresh_abc")) }
+        verify(exactly = 1) { tokenStore.setTokens("concurrent_token", "concurrent_refresh") }
     }
 }

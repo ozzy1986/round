@@ -1,6 +1,8 @@
 package com.raund.app.tts
 
 import android.content.Context
+import android.os.Handler
+import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Log
 import com.raund.app.timer.TimerProfile
@@ -58,13 +60,13 @@ object TtsCache {
         else -> Locale.forLanguageTag(locale)
     }
 
-    suspend fun ensureCache(context: Context, locale: String, phrases: List<String>): Boolean {
+    suspend fun ensureCache(context: Context, locale: String, phrases: List<String>): Boolean = withContext(Dispatchers.IO) {
         val startMs = SystemClock.elapsedRealtime()
         val missing = phrases.filter { !exists(context, locale, it) }
         Log.i(PERF, "ensureCache START: ${missing.size} missing out of ${phrases.size} phrases")
         if (missing.isEmpty()) {
             Log.i(PERF, "ensureCache DONE: 0ms (all cached)")
-            return true
+            return@withContext true
         }
 
         val instanceCount = minOf(PARALLEL_INSTANCES, missing.size)
@@ -81,7 +83,7 @@ object TtsCache {
         val totalMs = SystemClock.elapsedRealtime() - startMs
         val allOk = results.all { it }
         Log.i(PERF, "ensureCache DONE: ${totalMs}ms, ${successCount.get()}/${missing.size} synthesized, ok=$allOk")
-        return allOk
+        allOk
     }
 
     private suspend fun synthesizeChunk(
@@ -90,59 +92,123 @@ object TtsCache {
         chunk: List<String>,
         instanceIndex: Int,
         successCount: AtomicInteger
-    ): Boolean = withContext(Dispatchers.Main) {
-        suspendCancellableCoroutine { cont ->
-            var ttsRef: TextToSpeech? = null
-            cont.invokeOnCancellation {
-                try { ttsRef?.shutdown() } catch (_: Exception) {}
+    ): Boolean = suspendCancellableCoroutine { cont ->
+        val appContext = context.applicationContext
+        val thread = HandlerThread("raund-tts-cache-$instanceIndex").apply { start() }
+        val handler = Handler(thread.looper)
+        var ttsRef: TextToSpeech? = null
+        var currentText: String? = null
+        var phraseStartMs = 0L
+
+        fun shutdownTts() {
+            try { ttsRef?.shutdown() } catch (_: Exception) {}
+            ttsRef = null
+        }
+
+        fun finish(result: Boolean) {
+            shutdownTts()
+            thread.quitSafely()
+            if (cont.isActive) cont.resume(result)
+        }
+
+        cont.invokeOnCancellation {
+            handler.post {
+                shutdownTts()
+                thread.quitSafely()
             }
-            ttsRef = TextToSpeech(context) { status ->
-                if (status != TextToSpeech.SUCCESS) {
-                    Log.w(PERF, "TTS instance #$instanceIndex init failed")
-                    ttsRef?.shutdown()
-                    if (cont.isActive) cont.resume(false)
+        }
+
+        handler.post {
+            val queue = ArrayDeque(chunk)
+            ttsRef = TextToSpeech(appContext) { status ->
+                if (!cont.isActive) {
+                    shutdownTts()
+                    thread.quitSafely()
                     return@TextToSpeech
                 }
-                val tts = ttsRef ?: return@TextToSpeech
-                tts.setLanguage(ttsLocale(locale))
+                if (status != TextToSpeech.SUCCESS) {
+                    Log.w(PERF, "TTS instance #$instanceIndex init failed")
+                    finish(false)
+                    return@TextToSpeech
+                }
+                val tts = ttsRef ?: run {
+                    finish(false)
+                    return@TextToSpeech
+                }
+                tts.language = ttsLocale(locale)
+                tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) = Unit
 
-                val queue = ArrayDeque(chunk)
-                fun doNext() {
-                    if (queue.isEmpty()) {
-                        tts.shutdown()
-                        cont.resume(true)
-                        return
-                    }
-                    val text = queue.removeFirst()
-                    val phraseStart = SystemClock.elapsedRealtime()
-                    val file = cacheFile(context, locale, text)
-                    file.parentFile?.mkdirs()
-                    tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                        override fun onStart(utteranceId: String?) {}
-                        override fun onDone(utteranceId: String?) {
-                            val elapsed = SystemClock.elapsedRealtime() - phraseStart
+                    override fun onDone(utteranceId: String?) {
+                        handler.post(object : Runnable {
+                            override fun run() {
+                            val text = currentText
+                            if (text == null) {
+                                    return
+                            }
+                            val elapsed = SystemClock.elapsedRealtime() - phraseStartMs
                             Log.i(PERF, "synthesize '${text.take(15)}' took ${elapsed}ms on instance #$instanceIndex")
                             successCount.incrementAndGet()
-                            doNext()
-                        }
-                        @Deprecated("Deprecated in Java")
-                        override fun onError(utteranceId: String?) {
-                            Log.w(PERF, "synthesize error '${text.take(15)}' on instance #$instanceIndex")
-                            doNext()
-                        }
-                        override fun onError(utteranceId: String?, errorCode: Int) {
-                            Log.w(PERF, "synthesize error '${text.take(15)}' code=$errorCode on instance #$instanceIndex")
-                            doNext()
-                        }
-                    })
-                    val result = tts.synthesizeToFile(text, null, file, "gen_${instanceIndex}_${text.hashCode()}")
-                    if (result != TextToSpeech.SUCCESS) {
-                        Log.w(PERF, "synthesizeToFile failed '${text.take(15)}' result=$result on instance #$instanceIndex")
-                        doNext()
+                            synthesizeNext(context, locale, queue, tts, instanceIndex, ::finish) { textInFlight ->
+                                currentText = textInFlight
+                                phraseStartMs = SystemClock.elapsedRealtime()
+                            }
+                            }
+                        })
                     }
+
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        handler.post {
+                            val text = currentText ?: ""
+                            Log.w(PERF, "synthesize error '${text.take(15)}' on instance #$instanceIndex")
+                            synthesizeNext(context, locale, queue, tts, instanceIndex, ::finish) { textInFlight ->
+                                currentText = textInFlight
+                                phraseStartMs = SystemClock.elapsedRealtime()
+                            }
+                        }
+                    }
+
+                    override fun onError(utteranceId: String?, errorCode: Int) {
+                        handler.post {
+                            val text = currentText ?: ""
+                            Log.w(PERF, "synthesize error '${text.take(15)}' code=$errorCode on instance #$instanceIndex")
+                            synthesizeNext(context, locale, queue, tts, instanceIndex, ::finish) { textInFlight ->
+                                currentText = textInFlight
+                                phraseStartMs = SystemClock.elapsedRealtime()
+                            }
+                        }
+                    }
+                })
+                synthesizeNext(context, locale, queue, tts, instanceIndex, ::finish) { textInFlight ->
+                    currentText = textInFlight
+                    phraseStartMs = SystemClock.elapsedRealtime()
                 }
-                doNext()
             }
+        }
+    }
+
+    private fun synthesizeNext(
+        context: Context,
+        locale: String,
+        queue: ArrayDeque<String>,
+        tts: TextToSpeech,
+        instanceIndex: Int,
+        onComplete: (Boolean) -> Unit,
+        onPhraseStarted: (String) -> Unit
+    ) {
+        if (queue.isEmpty()) {
+            onComplete(true)
+            return
+        }
+        val text = queue.removeFirst()
+        val file = cacheFile(context, locale, text)
+        file.parentFile?.mkdirs()
+        onPhraseStarted(text)
+        val result = tts.synthesizeToFile(text, null, file, "gen_${instanceIndex}_${text.hashCode()}")
+        if (result != TextToSpeech.SUCCESS) {
+            Log.w(PERF, "synthesizeToFile failed '${text.take(15)}' result=$result on instance #$instanceIndex")
+            synthesizeNext(context, locale, queue, tts, instanceIndex, onComplete, onPhraseStarted)
         }
     }
 

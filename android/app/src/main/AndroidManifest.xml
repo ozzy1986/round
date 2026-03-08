@@ -32,7 +32,8 @@
         <provider
             android:name="io.sentry.android.core.SentryInitProvider"
             android:authorities="${applicationId}.SentryInitProvider"
-            tools:node="remove" />
+            tools:node="remove"
+            tools:ignore="MissingClass" />
         <service
             android:name=".TimerService"
             android:foregroundServiceType="mediaPlayback"

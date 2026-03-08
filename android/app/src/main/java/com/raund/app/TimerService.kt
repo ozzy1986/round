@@ -10,6 +10,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -42,6 +43,15 @@ private data class ToneSpec(
     val volume: Float
 )
 
+private data class NotificationSnapshot(
+    val title: String,
+    val contentText: String,
+    val remaining: Int,
+    val roundName: String,
+    val isRunning: Boolean,
+    val paused: Boolean
+)
+
 private class StaticTonePlayer {
     val lock = Any()
     var track: AudioTrack? = null
@@ -67,11 +77,16 @@ class TimerService : Service() {
     @Volatile private var currentProfileId: String? = null
     @Volatile private var useCacheOnly = false
     @Volatile private var langTag = "en"
+    @Volatile private var keepRunningOnScreenOffSetting = true
+    @Volatile private var keepRunningWhenLeavingAppSetting = true
 
     private var lastNotifTitle: String = ""
     private var lastNotifText: String = ""
+    private var lastNotificationSnapshot: NotificationSnapshot? = null
+    private var lastDispatchedNotification: NotificationSnapshot? = null
     private var timerThread: Thread? = null
     private var pendingStartIntent: Intent? = null
+    private var settingsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val audioExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-audio").apply { isDaemon = true } }
     private val stopTimerExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "raund-stop-timer").apply { isDaemon = true } }
@@ -100,8 +115,8 @@ class TimerService : Service() {
         if (!shouldResumeAfterScreenOn(
                 running = running,
                 autoPausedByScreenOff = autoPausedByScreenOff,
-                keepRunningOnScreenOff = SettingsManager.isKeepRunningOnScreenOff(this),
-                keepRunningWhenLeavingApp = SettingsManager.isKeepRunningWhenLeavingApp(this),
+                keepRunningOnScreenOff = keepRunningOnScreenOffSetting,
+                keepRunningWhenLeavingApp = keepRunningWhenLeavingAppSetting,
                 keyguardLocked = keyguardManager.isKeyguardLocked
             )
         ) {
@@ -114,8 +129,8 @@ class TimerService : Service() {
         if (!shouldResumeAfterUnlock(
                 running = running,
                 autoPausedByScreenOff = autoPausedByScreenOff,
-                keepRunningOnScreenOff = SettingsManager.isKeepRunningOnScreenOff(this),
-                keepRunningWhenLeavingApp = SettingsManager.isKeepRunningWhenLeavingApp(this)
+                keepRunningOnScreenOff = keepRunningOnScreenOffSetting,
+                keepRunningWhenLeavingApp = keepRunningWhenLeavingAppSetting
             )
         ) {
             return
@@ -128,7 +143,7 @@ class TimerService : Service() {
             if (!running || paused) return
             val pm = getSystemService(POWER_SERVICE) as PowerManager
             if (!pm.isInteractive || screenIsOff) return
-            if (!SettingsManager.isKeepRunningWhenLeavingApp(this@TimerService)) {
+            if (!keepRunningWhenLeavingAppSetting) {
                 Log.i(TAG, "leaveAppCheck: user left app -> auto-pause")
                 updatePauseState(paused = true, pausedByLeavingApp = true)
             }
@@ -155,8 +170,14 @@ class TimerService : Service() {
                     }
                     if (running) {
                         showNotification(
-                            lastNotifTitle.ifEmpty { getString(R.string.app_name) },
-                            lastNotifText.ifEmpty { getString(R.string.timer_running) },
+                            snapshot = lastNotificationSnapshot ?: NotificationSnapshot(
+                                title = lastNotifTitle.ifEmpty { getString(R.string.app_name) },
+                                contentText = lastNotifText.ifEmpty { getString(R.string.timer_running) },
+                                remaining = TimerStateHolder.state.value.remaining,
+                                roundName = TimerStateHolder.state.value.roundName,
+                                isRunning = TimerStateHolder.state.value.isRunning,
+                                paused = TimerStateHolder.state.value.paused
+                            ),
                             forceStartForeground = true
                         )
                     }
@@ -171,7 +192,7 @@ class TimerService : Service() {
                 Intent.ACTION_SCREEN_OFF -> {
                     screenIsOff = true
                     mainHandler.removeCallbacks(leaveAppCheckRunnable)
-                    if (running && !paused && !SettingsManager.isKeepRunningOnScreenOff(this@TimerService)) {
+                    if (running && !paused && !keepRunningOnScreenOffSetting) {
                         Log.i(TAG, "screenStateReceiver: SCREEN_OFF -> auto-pause")
                         updatePauseState(paused = true, pausedByScreenOff = true)
                     }
@@ -191,6 +212,13 @@ class TimerService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "onCreate")
+        applyRuntimeSettings(SettingsManager.timerRuntimeSettings(this))
+        settingsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (SettingsManager.isTimerRuntimeSetting(key)) {
+                applyRuntimeSettings(SettingsManager.timerRuntimeSettings(this))
+            }
+        }
+        settingsListener?.let { SettingsManager.registerListener(this, it) }
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "raund:timer").apply {
             setReferenceCounted(false)
@@ -225,10 +253,16 @@ class TimerService : Service() {
         }
     }
 
+    private fun applyRuntimeSettings(settings: TimerRuntimeSettings) {
+        keepRunningOnScreenOffSetting = settings.keepRunningOnScreenOff
+        keepRunningWhenLeavingAppSetting = settings.keepRunningWhenLeavingApp
+    }
+
     private fun stopPreviousTimer() {
         running = false
         timerThread?.let { t ->
-            t.join(3000)
+            t.interrupt()
+            t.join(1000)
             if (t.isAlive) t.interrupt()
         }
         timerThread = null
@@ -327,7 +361,14 @@ class TimerService : Service() {
         }
 
         timerThread = Thread {
-            runTimer(profile, useCacheOnly, langTag, finishedText)
+            try {
+                runTimer(profile, useCacheOnly, langTag, finishedText)
+            } catch (_: InterruptedException) {
+                Log.i(TAG, "timerThread interrupted")
+            } catch (e: Exception) {
+                Log.e(TAG, "runTimer failed", e)
+                mainHandler.post { cleanupTimerResources() }
+            }
         }.apply {
             name = "raund-timer"
             start()
@@ -577,30 +618,38 @@ class TimerService : Service() {
         )
         val title = profileName.ifBlank { getString(R.string.app_name) }
         val contentText = if (isRunning) "$roundName ${formatDuration(remaining)}" else getString(R.string.timer_finished)
+        val snapshot = NotificationSnapshot(
+            title = title,
+            contentText = contentText,
+            remaining = remaining,
+            roundName = roundName,
+            isRunning = isRunning,
+            paused = paused
+        )
+        lastNotifTitle = title
+        lastNotifText = contentText
+        lastNotificationSnapshot = snapshot
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            lastNotifTitle = title
-            lastNotifText = contentText
-            showNotification(title, contentText, forceStartForeground = !isRunning)
+            showNotification(snapshot, forceStartForeground = !isRunning)
         } else {
             mainHandler.post {
-                lastNotifTitle = title
-                lastNotifText = contentText
-                showNotification(title, contentText, forceStartForeground = !isRunning)
+                showNotification(snapshot, forceStartForeground = !isRunning)
             }
         }
     }
 
-    private fun showNotification(title: String, contentText: String, forceStartForeground: Boolean = false) {
+    private fun showNotification(snapshot: NotificationSnapshot, forceStartForeground: Boolean = false) {
         check(Looper.myLooper() == Looper.getMainLooper()) { "showNotification must run on main thread" }
         if (timerScreenVisible && !forceStartForeground) return
+        if (!shouldDispatchNotification(snapshot, forceStartForeground)) return
         val builder = cachedNotifBuilder ?: Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setOngoing(true)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setCategory(Notification.CATEGORY_PROGRESS)
             .setOnlyAlertOnce(true)
             .also { cachedNotifBuilder = it }
+        builder.setContentTitle(snapshot.title)
         val profileId = currentProfileId
         if (profileId != null) {
             builder.setContentIntent(PendingIntent.getActivity(
@@ -612,8 +661,8 @@ class TimerService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             ))
         }
-        builder.setContentText(contentText)
-        builder.setStyle(Notification.BigTextStyle().bigText(contentText))
+        builder.setContentText(snapshot.contentText)
+        builder.setStyle(Notification.BigTextStyle().bigText(snapshot.contentText))
         val notification = builder.build()
 
         val now = SystemClock.elapsedRealtime()
@@ -624,6 +673,22 @@ class TimerService : Service() {
         } else {
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIFICATION_ID, notification)
         }
+        lastDispatchedNotification = snapshot
+    }
+
+    private fun shouldDispatchNotification(
+        snapshot: NotificationSnapshot,
+        forceStartForeground: Boolean
+    ): Boolean {
+        if (forceStartForeground) return true
+        val previous = lastDispatchedNotification ?: return true
+        if (previous.title != snapshot.title) return true
+        if (previous.roundName != snapshot.roundName) return true
+        if (previous.isRunning != snapshot.isRunning) return true
+        if (previous.paused != snapshot.paused) return true
+        if (snapshot.remaining in 1..10) return true
+        return snapshot.remaining != previous.remaining &&
+            snapshot.remaining % NOTIFICATION_UPDATE_INTERVAL_SECONDS == 0
     }
 
     private fun buildBasicNotification(): Notification =
@@ -752,11 +817,11 @@ class TimerService : Service() {
 
     private fun stopKeepAliveAudio() {
         keepAliveRunning = false
+        keepAliveThread?.interrupt()
+        keepAliveThread = null
         try { keepAliveTrack?.stop() } catch (_: Exception) {}
         try { keepAliveTrack?.release() } catch (_: Exception) {}
         keepAliveTrack = null
-        keepAliveThread?.join(2000)
-        keepAliveThread = null
     }
 
     private fun cleanupTimerResources() {
@@ -790,17 +855,15 @@ class TimerService : Service() {
         Log.i(TAG, "onDestroy running=$running timerThread.alive=${timerThread?.isAlive} wakeLock.isHeld=${wakeLock?.isHeld}")
         try { unregisterReceiver(visibilityReceiver) } catch (_: Exception) {}
         try { unregisterReceiver(screenStateReceiver) } catch (_: Exception) {}
+        settingsListener?.let {
+            try { SettingsManager.unregisterListener(this, it) } catch (_: Exception) {}
+        }
+        settingsListener = null
         mainHandler.removeCallbacks(leaveAppCheckRunnable)
         running = false
         autoPausedByScreenOff = false
         autoPausedByLeavingApp = false
-        timerThread?.let { t ->
-            t.join(3000)
-            if (t.isAlive) {
-                Log.i(TAG, "onDestroy: timerThread still alive after 3s, interrupting")
-                t.interrupt()
-            }
-        }
+        timerThread?.interrupt()
         timerThread = null
         try { ttsRef?.stop(); ttsRef?.shutdown() } catch (_: Exception) {}
         ttsRef = null
@@ -842,6 +905,7 @@ class TimerService : Service() {
         private const val TICK_TONE_DURATION_MS = 150
         private const val TICK_TONE_FREQUENCY_HZ = 1568.0
         private const val TICK_TONE_VOLUME = 0.9f
+        private const val NOTIFICATION_UPDATE_INTERVAL_SECONDS = 5
         const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"
         const val ACTION_PAUSE = "com.raund.app.TimerService.PAUSE"

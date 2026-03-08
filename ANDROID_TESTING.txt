@@ -175,6 +175,7 @@ C. PROFILE EDITOR UX + VALIDATION
 D. TIMER UX / STATE MACHINE
 23) Pre-start timer shows current round name, step indicator (badge/chip "1 / N"), and countdown.
 23a) Timer countdown ring/title stay in their original position; only the bottom button cluster is slightly lower on the screen, with no overlap/regression.
+23b) Start becomes enabled as soon as profile data is ready; background TTS cache prefill must not hold the timer on "Loading…". If cache is cold, the workout still starts normally and round names/training-finished speech must still work via live TTS.
 24) Start begins countdown and transitions between rounds correctly.
 25) Warn-10: louder ticks only in the LAST 10 seconds of a round, and only if round has "Предупредить за 10 сек" AND round duration >= 10 sec. No voice warning at 10 sec. No ticks for short rounds (e.g. 5 sec).
 24) Pause button freezes the countdown; Resume continues from the same round/seconds. "Пауза" / "Продолжить" (or EN Pause/Resume). Paused state shows "Пауза" chip next to step indicator.

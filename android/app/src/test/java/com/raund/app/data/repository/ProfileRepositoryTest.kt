@@ -5,8 +5,12 @@ import com.raund.app.data.dao.RoundDao
 import com.raund.app.data.local.DataConsentPrefs
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.local.TokenStore
+import com.raund.app.data.remote.ApiService
 import com.raund.app.data.remote.AuthService
+import com.raund.app.data.remote.ProfilesWithRoundsPageDto
 import io.mockk.*
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Before
@@ -23,6 +27,7 @@ class ProfileRepositoryTest {
 
     private val profileDao = mockk<ProfileDao>(relaxed = true)
     private val roundDao = mockk<RoundDao>(relaxed = true)
+    private val api = mockk<ApiService>(relaxed = true)
     private val tokenStore = mockk<TokenStore>(relaxed = true)
     private val authService = mockk<AuthService>(relaxed = true)
     private val syncPrefs = mockk<SyncPrefs>(relaxed = true)
@@ -33,21 +38,26 @@ class ProfileRepositoryTest {
     @Before
     fun setup() {
         every { dataConsentPrefs.isConsentGranted() } returns true
-        repository = ProfileRepository(
-            profileDao = profileDao,
-            roundDao = roundDao,
-            api = null,
-            tokenStore = tokenStore,
-            authService = authService,
-            syncPrefs = syncPrefs,
-            dataConsentPrefs = dataConsentPrefs,
-            database = database
-        )
+        every { tokenStore.getToken() } returns "access_token"
+        repository = createRepository()
 
         mockkStatic("androidx.room.RoomDatabaseKt")
         coEvery { database.withTransaction<Unit>(captureLambda()) } coAnswers {
             lambda<suspend () -> Unit>().captured.invoke()
         }
+    }
+
+    private fun createRepository(apiService: ApiService? = null): ProfileRepository {
+        return ProfileRepository(
+            profileDao = profileDao,
+            roundDao = roundDao,
+            apiProvider = { apiService },
+            tokenStoreProvider = { tokenStore },
+            authServiceProvider = { authService },
+            syncPrefs = syncPrefs,
+            dataConsentPrefs = dataConsentPrefs,
+            database = database
+        )
     }
 
     @Test
@@ -137,5 +147,38 @@ class ProfileRepositoryTest {
                 entities[2].durationSeconds == 300
             })
         }
+    }
+
+    @Test
+    fun `requestSync dedupes concurrent calls inside mutex using throttle`() = runTest {
+        val lastSyncedAt = java.util.concurrent.atomic.AtomicReference<Long?>(null)
+        every { syncPrefs.getLastSyncedAtMillis() } answers { lastSyncedAt.get() }
+        every { syncPrefs.getLastSyncedAtForApi() } returns null
+        every { syncPrefs.setLastSyncedAtNow() } answers { lastSyncedAt.set(System.currentTimeMillis()) }
+        coEvery { api.getProfilesWithRoundsPage(any(), any(), any(), any()) } coAnswers {
+            Thread.sleep(50)
+            ProfilesWithRoundsPageDto(emptyList(), null)
+        }
+        repository = createRepository(api)
+
+        val jobs = listOf(
+            launch { repository.requestSync() },
+            launch { repository.requestSync() }
+        )
+        jobs.joinAll()
+
+        coVerify(exactly = 1) { api.getProfilesWithRoundsPage(100, any(), "rounds", null) }
+    }
+
+    @Test
+    fun `forceSync bypasses throttle`() = runTest {
+        every { syncPrefs.getLastSyncedAtMillis() } returns System.currentTimeMillis()
+        every { syncPrefs.getLastSyncedAtForApi() } returns null
+        coEvery { api.getProfilesWithRoundsPage(any(), any(), any(), any()) } returns ProfilesWithRoundsPageDto(emptyList(), null)
+        repository = createRepository(api)
+
+        repository.forceSync()
+
+        coVerify(exactly = 1) { api.getProfilesWithRoundsPage(100, any(), "rounds", null) }
     }
 }
