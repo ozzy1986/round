@@ -52,6 +52,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,6 +68,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -85,6 +87,12 @@ import kotlinx.coroutines.launch
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
 private const val MAX_ROUND_NAME_LENGTH = 20
+private enum class EditorKeyboardClass { Text, Number }
+private val sentenceTextKeyboardOptions = KeyboardOptions(
+    keyboardType = KeyboardType.Text,
+    capitalization = KeyboardCapitalization.Sentences
+)
+private val textKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
 private val positiveIntegerKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,10 +109,27 @@ fun ProfileEditorScreen(
     val inputMethodManager = remember(context) {
         context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
     }
+    var lastFocusedKeyboardClass by remember { mutableStateOf<EditorKeyboardClass?>(null) }
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    fun refreshImeForKeyboardClass(keyboardClass: EditorKeyboardClass) {
+        val previousKeyboardClass = lastFocusedKeyboardClass
+        lastFocusedKeyboardClass = keyboardClass
+        if (previousKeyboardClass == null || previousKeyboardClass == keyboardClass) {
+            return
+        }
+        coroutineScope.launch {
+            // Some OEM keyboards keep the previous layout until the input
+            // connection is explicitly restarted when focus changes type.
+            keyboardController?.hide()
+            view.post { inputMethodManager.restartInput(view) }
+            delay(75)
+            keyboardController?.show()
+        }
+    }
 
     LaunchedEffect(saveResult) {
         val result = saveResult
@@ -186,8 +211,14 @@ fun ProfileEditorScreen(
                 },
                 label = { Text(stringResource(R.string.profile_name)) },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = sentenceTextKeyboardOptions,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            refreshImeForKeyboardClass(EditorKeyboardClass.Text)
+                        }
+                    },
                 shape = RoundedCornerShape(12.dp),
                 isError = showNameError && !isNameValid
             )
@@ -205,7 +236,14 @@ fun ProfileEditorScreen(
                 onValueChange = { viewModel.updateEmoji(it) },
                 label = { Text(stringResource(R.string.profile_emoji)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = textKeyboardOptions,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            refreshImeForKeyboardClass(EditorKeyboardClass.Text)
+                        }
+                    },
                 shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(24.dp))
@@ -305,8 +343,15 @@ fun ProfileEditorScreen(
                                 },
                                 label = { Text(stringResource(R.string.round_name)) },
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
-                                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                keyboardOptions = sentenceTextKeyboardOptions,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp)
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            refreshImeForKeyboardClass(EditorKeyboardClass.Text)
+                                        }
+                                    },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -346,15 +391,7 @@ fun ProfileEditorScreen(
                                     .padding(end = 16.dp)
                                     .onFocusChanged { focusState ->
                                         if (focusState.isFocused) {
-                                            coroutineScope.launch {
-                                                // Some OEM keyboards keep the previous alphabet layout
-                                                // when focus moves to a numeric field unless the IME
-                                                // connection is restarted explicitly.
-                                                keyboardController?.hide()
-                                                view.post { inputMethodManager.restartInput(view) }
-                                                delay(75)
-                                                keyboardController?.show()
-                                            }
+                                            refreshImeForKeyboardClass(EditorKeyboardClass.Number)
                                         } else {
                                             val parsed = dur.toIntOrNull() ?: 0
                                             val clamped = parsed.coerceIn(MIN_ROUND_DURATION_SECONDS, MAX_ROUND_DURATION_SECONDS)
@@ -517,7 +554,13 @@ fun ProfileEditorScreen(
                             label = { Text(stringResource(R.string.number_of_copies)) },
                             singleLine = true,
                             keyboardOptions = positiveIntegerKeyboardOptions,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (focusState.isFocused) {
+                                        refreshImeForKeyboardClass(EditorKeyboardClass.Number)
+                                    }
+                                }
                         )
                     }
                 },
