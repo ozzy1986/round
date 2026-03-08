@@ -15,8 +15,8 @@
     "test:unit": "vitest run tests/timer-engine tests/bot tests/i18n tests/cache.test.ts tests/auth/rate-limit.test.ts tests/routes/profiles.validation.test.ts tests/server.config.test.ts tests/db/pool.config.test.ts",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "migrate:up": "tsx scripts/run-migrate.ts up",
-    "migrate:down": "tsx scripts/run-migrate.ts down",
+    "migrate:up": "node scripts/run-migrate.cjs up",
+    "migrate:down": "node scripts/run-migrate.cjs down",
     "migrate:create": "node-pg-migrate create",
     "purge:tokens": "tsx scripts/purge-tokens.ts"
   },
@@ -35,13 +35,13 @@
     "ioredis": "^5.9.3",
     "pg": "^8.18.0",
     "telegraf": "^4.16.3",
-    "@sentry/node": "^8.50.0"
+    "@sentry/node": "^8.50.0",
+    "node-pg-migrate": "^6.2.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
     "@types/pg": "^8.11.10",
     "@vitest/coverage-v8": "^2.1.6",
-    "node-pg-migrate": "^6.2.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.6"
