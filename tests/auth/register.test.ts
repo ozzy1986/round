@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/server.js';
 import type { FastifyInstance } from 'fastify';
-import { closePool } from '../../src/db/pool.js';
+import { closeTestApp } from '../helpers/app.js';
 
 describe('POST /auth/telegram', () => {
   let app: FastifyInstance;
@@ -14,8 +14,7 @@ describe('POST /auth/telegram', () => {
 
   afterAll(async () => {
     process.env.BOT_SECRET = savedBotSecret;
-    await app.close();
-    await closePool();
+    await closeTestApp(app);
   });
 
   it('returns 401 when X-Bot-Secret is missing', async () => {
@@ -50,8 +49,7 @@ describe('POST /auth/register', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await closePool();
+    await closeTestApp(app);
   });
 
   it('returns 201 and token + refresh_token + user_id', async () => {
@@ -87,8 +85,7 @@ describe('POST /auth/refresh and /auth/logout', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await closePool();
+    await closeTestApp(app);
   });
 
   it('POST /auth/refresh with valid refresh_token returns 200 and new tokens', async () => {

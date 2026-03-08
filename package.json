@@ -12,7 +12,7 @@
     "dev": "tsx watch src/server.ts",
     "bot": "tsx src/bot/run.ts",
     "test": "vitest run",
-    "test:unit": "vitest run tests/timer-engine tests/bot tests/i18n tests/cache.test.ts tests/auth/rate-limit.test.ts tests/routes/profiles.validation.test.ts",
+    "test:unit": "vitest run tests/timer-engine tests/bot tests/i18n tests/cache.test.ts tests/auth/rate-limit.test.ts tests/routes/profiles.validation.test.ts tests/server.config.test.ts tests/db/pool.config.test.ts",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "migrate:up": "tsx scripts/run-migrate.ts up",

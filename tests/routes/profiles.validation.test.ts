@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/server.js';
-import { closePool } from '../../src/db/pool.js';
-import { closeRedis } from '../../src/redis.js';
+import { closeTestApp } from '../helpers/app.js';
 
 describe('profiles route validation', () => {
   let app: FastifyInstance;
@@ -16,9 +15,7 @@ describe('profiles route validation', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await closePool();
-    await closeRedis();
+    await closeTestApp(app);
   });
 
   it('rejects an invalid cursor before hitting the database', async () => {

@@ -1,25 +1,43 @@
-import { Pool } from 'pg';
+import { Pool, type PoolConfig } from 'pg';
 import { getDbConfig } from './config.js';
 
 let pool: Pool | null = null;
 
 // With PgBouncer use 20–50 per process; without, keep lower to not exhaust DB (e.g. 10).
 const POOL_MAX = Number(process.env.PG_POOL_MAX) || 10;
-const STMT_TIMEOUT_MS = process.env.PG_STMT_TIMEOUT_MS
-  ? Number(process.env.PG_STMT_TIMEOUT_MS)
-  : undefined;
+const DEFAULT_PROD_STATEMENT_TIMEOUT_MS = 10000;
+
+export function getStatementTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env
+): number | undefined {
+  const raw = env.PG_STMT_TIMEOUT_MS?.trim();
+  if (raw) {
+    const value = Number(raw);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return env.NODE_ENV === 'production'
+    ? DEFAULT_PROD_STATEMENT_TIMEOUT_MS
+    : undefined;
+}
+
+function buildPoolConfig(
+  env: NodeJS.ProcessEnv = process.env
+): PoolConfig {
+  const statementTimeoutMs = getStatementTimeoutMs(env);
+  return {
+    ...getDbConfig(),
+    max: POOL_MAX,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    ...(statementTimeoutMs != null
+      ? { statement_timeout: statementTimeoutMs }
+      : {}),
+  };
+}
 
 export function getPool(): Pool {
   if (!pool) {
-    pool = new Pool({
-      ...getDbConfig(),
-      max: POOL_MAX,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-      ...(STMT_TIMEOUT_MS != null && STMT_TIMEOUT_MS > 0
-        ? { statement_timeout: STMT_TIMEOUT_MS }
-        : {}),
-    });
+    pool = new Pool(buildPoolConfig());
     pool.on('error', (err) => {
       console.error('PG pool error:', err.message);
     });

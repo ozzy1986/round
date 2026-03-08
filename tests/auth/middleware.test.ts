@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/server.js';
 import type { FastifyInstance } from 'fastify';
-import { closePool } from '../../src/db/pool.js';
+import { closeTestApp } from '../helpers/app.js';
 
 describe('auth middleware', () => {
   let app: FastifyInstance;
@@ -15,8 +15,7 @@ describe('auth middleware', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await closePool();
+    await closeTestApp(app);
   });
 
   it('GET /profiles without Authorization returns 401', async () => {

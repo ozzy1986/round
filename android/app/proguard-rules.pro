@@ -23,6 +23,13 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
+# Strip verbose logs from release builds while preserving warnings/errors.
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int i(...);
+    public static int v(...);
+}
+
 # Room entities
 -keep class com.raund.app.data.entity.** { *; }
 -keep class com.raund.app.data.dao.RoundStats { *; }

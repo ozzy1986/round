@@ -16,6 +16,7 @@ import { roundsRoutes } from './routes/rounds.js';
 
 const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST ?? '127.0.0.1';
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10000;
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
@@ -24,10 +25,44 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   throw new Error('JWT_SECRET must be set and at least 32 characters');
 }
 
-function getCorsOrigin(): boolean | string | string[] {
-  const raw = process.env.CORS_ORIGINS;
-  if (!raw || raw.trim() === '') return true;
+export function getCorsOrigin(
+  env: NodeJS.ProcessEnv = process.env
+): boolean | string | string[] {
+  const raw = env.CORS_ORIGINS;
+  if (!raw || raw.trim() === '') {
+    return env.NODE_ENV === 'production' ? false : true;
+  }
   return raw.split(',').map((o) => o.trim()).filter(Boolean);
+}
+
+export function getShutdownTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env
+): number {
+  const raw = env.SHUTDOWN_TIMEOUT_MS?.trim();
+  if (raw) {
+    const value = Number(raw);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return DEFAULT_SHUTDOWN_TIMEOUT_MS;
+}
+
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  let timeoutId: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+    timeoutId.unref?.();
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 function getRateLimitKey(app: FastifyInstance, request: FastifyRequest): string {
@@ -62,6 +97,11 @@ export async function buildApp() {
     keyGenerator: (request) => getRateLimitKey(app, request),
     ...(redis ? { redis } : {}),
   });
+  if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL?.trim()) {
+    app.log.warn(
+      'REDIS_URL is not set; rate limits and caches stay per-instance in production'
+    );
+  }
 
   await app.register(authRoutes);
 
@@ -108,13 +148,20 @@ export async function start() {
   const app = await buildApp();
   const { closePool } = await import('./db/pool.js');
   const { closeRedis } = await import('./redis.js');
+  const shutdownTimeoutMs = getShutdownTimeoutMs();
   const shutdown = async (signal: string) => {
-    app.log.info({ signal }, 'shutting down');
+    app.log.info({ signal, shutdownTimeoutMs }, 'shutting down');
     try {
-      await app.close();
-      await closeSentry();
-      await closePool();
-      await closeRedis();
+      await withTimeout(
+        (async () => {
+          await app.close();
+          await closeSentry();
+          await closePool();
+          await closeRedis();
+        })(),
+        shutdownTimeoutMs,
+        `Graceful shutdown timed out after ${shutdownTimeoutMs}ms`
+      );
       process.exit(0);
     } catch (err) {
       app.log.error(err);

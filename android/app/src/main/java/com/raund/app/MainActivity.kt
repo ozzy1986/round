@@ -53,10 +53,20 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(LocaleManager.applyLocale(newBase))
     }
 
-    private fun setupComposeContent(app: RaundApplication) {
+    private fun setupComposeContent(
+        app: RaundApplication,
+        onFirstMeaningfulDraw: () -> Unit
+    ) {
         setContent {
             RaundTheme {
                 val appReady by app.repositoryReadyFlow.collectAsState(initial = app.repositoryReady)
+                var fullyDrawnReported by remember { mutableStateOf(false) }
+                LaunchedEffect(appReady, fullyDrawnReported) {
+                    if (appReady && !fullyDrawnReported) {
+                        fullyDrawnReported = true
+                        onFirstMeaningfulDraw()
+                    }
+                }
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     if (!appReady) {
                         AppLoadingScreen()
@@ -155,8 +165,9 @@ class MainActivity : ComponentActivity() {
         placeholder.setBackgroundColor(android.graphics.Color.parseColor("#1A0F1E"))
         setContentView(placeholder)
         placeholder.post {
-            setupComposeContent(app)
-            reportFullyDrawn()
+            setupComposeContent(app) {
+                reportFullyDrawn()
+            }
         }
     }
 

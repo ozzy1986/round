@@ -39,6 +39,13 @@ android {
         }
     }
 
+    val allowDebugSignedRelease =
+        (project.findProperty("ALLOW_DEBUG_SIGNED_RELEASE") as String?)
+            ?.toBooleanStrictOrNull() == true
+    val releaseBuildRequested = gradle.startParameter.taskNames.any {
+        it.contains("release", ignoreCase = true)
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -49,9 +56,19 @@ android {
             )
             signingConfig = signingConfigs.getByName("release").let { releaseSigning ->
                 if (releaseSigning.storeFile?.exists() == true) releaseSigning
-                else {
-                    logger.warn("WARN: Release keystore not set — using debug keystore for signing. " +
-                        "Set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD for production.")
+                else if (allowDebugSignedRelease) {
+                    logger.warn(
+                        "WARN: Release keystore not set — using debug keystore because " +
+                            "ALLOW_DEBUG_SIGNED_RELEASE=true. Do not use this build for production."
+                    )
+                    signingConfigs.getByName("debug")
+                } else if (releaseBuildRequested) {
+                    throw org.gradle.api.GradleException(
+                        "Release keystore not set. Configure RELEASE_STORE_FILE, " +
+                            "RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD, " +
+                            "or pass -PALLOW_DEBUG_SIGNED_RELEASE=true for non-production builds."
+                    )
+                } else {
                     signingConfigs.getByName("debug")
                 }
             }

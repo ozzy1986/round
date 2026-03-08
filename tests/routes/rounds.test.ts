@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildApp } from '../../src/server.js';
 import type { FastifyInstance } from 'fastify';
-import { getPool, closePool } from '../../src/db/pool.js';
+import { getPool } from '../../src/db/pool.js';
 import * as profilesDb from '../../src/db/profiles.js';
 import * as roundsDb from '../../src/db/rounds.js';
+import { closeTestApp } from '../helpers/app.js';
 
 describe('rounds routes', () => {
   let app: FastifyInstance;
@@ -21,8 +22,7 @@ describe('rounds routes', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await closePool();
+    await closeTestApp(app);
   });
 
   describe('GET /profiles/:id/rounds', () => {

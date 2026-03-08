@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/server.js';
-import { closePool } from '../../src/db/pool.js';
-import { closeRedis } from '../../src/redis.js';
+import { closeTestApp } from '../helpers/app.js';
 
 describe('rate limit key generator', () => {
   let app: FastifyInstance;
@@ -18,9 +17,7 @@ describe('rate limit key generator', () => {
   afterEach(async () => {
     process.env.RATE_LIMIT_MAX = savedRateLimitMax;
     process.env.RATE_LIMIT_WINDOW = savedRateLimitWindow;
-    await app.close();
-    await closePool();
-    await closeRedis();
+    await closeTestApp(app);
   });
 
   it('falls back to IP when bearer tokens are invalid', async () => {
