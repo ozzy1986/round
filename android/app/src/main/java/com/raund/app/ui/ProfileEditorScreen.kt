@@ -1,5 +1,7 @@
 package com.raund.app.ui
 
+import android.content.Context
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +52,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,6 +63,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -75,6 +80,8 @@ import com.raund.app.R
 import com.raund.app.viewmodel.ProfileEditorViewModel
 import com.raund.app.viewmodel.RoundEditState
 import com.raund.app.viewmodel.SaveResult
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val MAX_PROFILE_NAME_LENGTH = 30
 private const val MAX_ROUND_NAME_LENGTH = 20
@@ -88,6 +95,12 @@ fun ProfileEditorScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val view = LocalView.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val coroutineScope = rememberCoroutineScope()
+    val inputMethodManager = remember(context) {
+        context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+    }
     val state by viewModel.state.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val saveResult by viewModel.saveResult.collectAsState()
@@ -332,7 +345,17 @@ fun ProfileEditorScreen(
                                     .weight(1f)
                                     .padding(end = 16.dp)
                                     .onFocusChanged { focusState ->
-                                        if (!focusState.isFocused) {
+                                        if (focusState.isFocused) {
+                                            coroutineScope.launch {
+                                                // Some OEM keyboards keep the previous alphabet layout
+                                                // when focus moves to a numeric field unless the IME
+                                                // connection is restarted explicitly.
+                                                keyboardController?.hide()
+                                                view.post { inputMethodManager.restartInput(view) }
+                                                delay(75)
+                                                keyboardController?.show()
+                                            }
+                                        } else {
                                             val parsed = dur.toIntOrNull() ?: 0
                                             val clamped = parsed.coerceIn(MIN_ROUND_DURATION_SECONDS, MAX_ROUND_DURATION_SECONDS)
                                             if (clamped != parsed) {

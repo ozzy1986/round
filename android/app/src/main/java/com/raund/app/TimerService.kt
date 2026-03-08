@@ -217,7 +217,9 @@ class TimerService : Service() {
             addAction(Intent.ACTION_USER_PRESENT)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(screenStateReceiver, screenFilter, RECEIVER_NOT_EXPORTED)
+            // Android 14 can suppress these system broadcasts for a dynamically
+            // registered receiver when it is marked not exported.
+            registerReceiver(screenStateReceiver, screenFilter, RECEIVER_EXPORTED)
         } else {
             registerReceiver(screenStateReceiver, screenFilter)
         }
