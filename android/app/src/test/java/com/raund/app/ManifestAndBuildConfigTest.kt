@@ -26,4 +26,9 @@ class ManifestAndBuildConfigTest {
         // Just verify the field exists and is a String (empty in debug, set in release)
         assertNotNull(BuildConfig.SENTRY_DSN)
     }
+
+    @Test
+    fun `SENTRY_ENABLED is never true without a DSN`() {
+        assertFalse(BuildConfig.SENTRY_ENABLED && BuildConfig.SENTRY_DSN.isBlank())
+    }
 }

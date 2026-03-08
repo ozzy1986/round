@@ -41,17 +41,20 @@ BUILD THE APK
 -------------
 From project root (d:\laragon\www\raund):
 
-  cd android
-  .\gradlew.bat assembleRelease
+  .\scripts\build-apk.ps1
 
-Output APK: android\app\build\outputs\apk\release\app-release.apk
+Default output APK: android\app\build\outputs\apk\localRelease\app-localRelease.apk
 
-IMPORTANT: Always use release builds for the phone. Debug builds are 3-4x slower
-(no R8, unoptimized DEX, no AOT). Use assembleDebug only for development/debugging.
+IMPORTANT: For phone QA, always use the optimized local release build
+(`assembleLocalRelease` or `scripts\build-apk.ps1`). It is non-debuggable and
+keeps R8/resource shrinking enabled, but uses the debug keystore so local builds
+stay deterministic. Debug builds are 3-4x slower (no R8, unoptimized DEX, no
+AOT) and should be used only for development/debugging. Store/publishing builds
+still use `assembleRelease`.
 
 INSTALL THE APK
 ---------------
-  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\release\app-release.apk
+  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\localRelease\app-localRelease.apk
 
 The -r flag reinstalls, keeping app data.
 
@@ -128,8 +131,8 @@ QUICK TEST (no code changes — app already installed)
 FULL WORKFLOW (after code changes in android/ folder)
 -----------------------------------------------------
 1. Make code changes in android/ folder.
-2. Build:   cd android && .\gradlew.bat assembleDebug
-3. Install: & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\debug\app-debug.apk
+2. Build:   .\scripts\build-apk.ps1
+3. Install: & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\localRelease\app-localRelease.apk
 4. Launch:  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -n com.raund.app/.MainActivity
 5. Screenshot: capture and pull (see above), then view the image.
 6. Logs:    check logcat for errors (see above).
@@ -204,7 +207,7 @@ G. STABILITY / LOGS / QUALITY
 39) `adb logcat --pid=<appPid> -d` contains no app crash stack traces.
 40) No repeated app-specific error loops after 1-2 minute idle.
 41) `cd android && .\gradlew.bat :app:lintDebug` passes (0 errors).
-42) Build + install + launch cycle repeats cleanly.
+42) `assembleLocalRelease`, install, and launch repeat cleanly.
 
 FULL LIST OF TEST SCENARIOS (go through all; restart from top if any fix is made)
 ===============================================================================
@@ -280,7 +283,7 @@ Run in order. After any code change, re-run from scenario 1.
 
 13. LINT AND BUILD
     13.1 :app:lintDebug 0 errors.
-    13.2 assembleDebug, install, launch — no crash.
+    13.2 assembleLocalRelease, install, launch — no crash.
 
 NOTES
 -----

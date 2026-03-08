@@ -28,7 +28,7 @@ After you download the .pom file, open it and look for <dependency> entries whos
 
 If the build still fails with "could not find X", run:
   cd android
-  .\gradlew.bat assembleDebug --refresh-dependencies 2>&1
+  .\gradlew.bat assembleLocalRelease --refresh-dependencies 2>&1
 and note the missing artifact (group:artifact:version). Download that artifact from:
   https://dl.google.com/dl/android/maven2/<groupId with . replaced by />/<artifactId>/<version>/
 and add to local-maven with the same path structure.
@@ -39,6 +39,6 @@ From project root:
   .\scripts\build-apk.ps1
 or
   cd android
-  .\gradlew.bat assembleDebug
+  .\gradlew.bat assembleLocalRelease
 
-APK output: android\app\build\outputs\apk\debug\app-debug.apk (or Round-debug.apk in project root if using the script).
+APK output: android\app\build\outputs\apk\localRelease\app-localRelease.apk (or Round-local-release.apk if using the script). Use assembleDebug only for debugging.

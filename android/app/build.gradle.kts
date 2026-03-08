@@ -6,6 +6,9 @@ plugins {
     id("androidx.baselineprofile")
 }
 
+val sentryDsn = (project.findProperty("SENTRY_DSN") as String?)?.trim().orEmpty()
+val sentryEnabled = sentryDsn.isNotEmpty()
+
 android {
     namespace = "com.raund.app"
     compileSdk = 36
@@ -18,6 +21,7 @@ android {
         versionName = (project.findProperty("VERSION_NAME") as String?) ?: "1.0"
         buildConfigField("String", "API_BASE_URL", "\"https://round.ozzy1986.com/\"")
         buildConfigField("String", "SENTRY_DSN", "\"\"")
+        buildConfigField("boolean", "SENTRY_ENABLED", "false")
     }
 
     signingConfigs {
@@ -42,8 +46,9 @@ android {
     val allowDebugSignedRelease =
         (project.findProperty("ALLOW_DEBUG_SIGNED_RELEASE") as String?)
             ?.toBooleanStrictOrNull() == true
-    val releaseBuildRequested = gradle.startParameter.taskNames.any {
-        it.contains("release", ignoreCase = true)
+    val productionReleaseBuildRequested = gradle.startParameter.taskNames.any {
+        val taskName = it.lowercase()
+        taskName.contains("release") && !taskName.contains("localrelease")
     }
 
     buildTypes {
@@ -62,7 +67,7 @@ android {
                             "ALLOW_DEBUG_SIGNED_RELEASE=true. Do not use this build for production."
                     )
                     signingConfigs.getByName("debug")
-                } else if (releaseBuildRequested) {
+                } else if (productionReleaseBuildRequested) {
                     throw org.gradle.api.GradleException(
                         "Release keystore not set. Configure RELEASE_STORE_FILE, " +
                             "RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD, " +
@@ -72,8 +77,17 @@ android {
                     signingConfigs.getByName("debug")
                 }
             }
-            val sentryDsn = project.findProperty("SENTRY_DSN") as String? ?: ""
             buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
+            buildConfigField("boolean", "SENTRY_ENABLED", sentryEnabled.toString())
+        }
+
+        create("localRelease") {
+            initWith(getByName("release"))
+            matchingFallbacks.add("release")
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("String", "SENTRY_DSN", "\"\"")
+            buildConfigField("boolean", "SENTRY_ENABLED", "false")
         }
     }
 
@@ -128,7 +142,9 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("androidx.media:media:1.7.0")
-    implementation("io.sentry:sentry-android:8.34.0")
+    if (sentryEnabled) {
+        implementation("io.sentry:sentry-android:8.34.0")
+    }
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.12")

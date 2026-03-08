@@ -23,11 +23,14 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
-# Strip verbose logs from release builds while preserving warnings/errors.
+# Strip android.util.Log calls from release builds.
 -assumenosideeffects class android.util.Log {
     public static int d(...);
+    public static int e(...);
     public static int i(...);
     public static int v(...);
+    public static int w(...);
+    public static int wtf(...);
 }
 
 # Room entities

@@ -6,6 +6,8 @@ coverage/
 .DS_Store
 Round-debug.apk
 android/Round-debug.apk
+Round-local-release.apk
+android/Round-local-release.apk
 android/local.properties
 android/keystore/
 android/app/build/
