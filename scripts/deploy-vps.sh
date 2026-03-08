@@ -16,7 +16,7 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 " || exit 1
 git fetch origin
 git reset --hard origin/main
-npm ci
+npm ci --include=dev
 npm run migrate:up
 npm run build
 if pm2 describe round-api >/dev/null 2>&1; then
