@@ -51,9 +51,12 @@ const PRIVACY_HTML = `<!DOCTYPE html>
 </html>
 `;
 
+const PRIVACY_CACHE_MAX_AGE_SEC = 3600;
+
 export async function privacyRoutes(app: FastifyInstance): Promise<void> {
   app.get('/privacy', async (_request, reply) => {
     return reply
+      .header('Cache-Control', `public, max-age=${PRIVACY_CACHE_MAX_AGE_SEC}`)
       .type('text/html; charset=utf-8')
       .send(PRIVACY_HTML);
   });

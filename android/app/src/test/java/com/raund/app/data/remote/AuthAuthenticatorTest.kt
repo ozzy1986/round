@@ -22,25 +22,67 @@ class AuthAuthenticatorTest {
         authenticator = AuthAuthenticator(tokenStore, authService)
     }
 
-    private fun build401Response(requestHasAuth: Boolean): okhttp3.Response {
+    private fun build401Response(
+        requestHasAuth: Boolean,
+        withPriorUnauthorized: Boolean = false
+    ): okhttp3.Response {
         val requestBuilder = Request.Builder().url("https://example.com/profiles")
         if (requestHasAuth) {
             requestBuilder.header("Authorization", "Bearer old_token")
         }
         val request = requestBuilder.build()
-        return okhttp3.Response.Builder()
+        val responseBuilder = okhttp3.Response.Builder()
             .request(request)
             .protocol(Protocol.HTTP_1_1)
             .code(401)
             .message("Unauthorized")
             .body("".toResponseBody("text/plain".toMediaType()))
-            .build()
+
+        if (withPriorUnauthorized) {
+            responseBuilder.priorResponse(
+                okhttp3.Response.Builder()
+                    .request(request)
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(401)
+                    .message("Unauthorized")
+                    .build()
+            )
+        }
+
+        return responseBuilder.build()
     }
 
     @Test
-    fun `returns null when request already had Authorization header - prevents retry loop`() {
+    fun `refreshes token and retries when request already had Authorization header`() {
+        every { tokenStore.getToken() } returns "old_token"
+        every { tokenStore.getRefreshToken() } returns "refresh_abc"
+        val refreshResp = RefreshResponse(
+            token = "new_access",
+            refresh_token = "new_refresh",
+            refresh_token_expires_at = null,
+            user_id = "user1"
+        )
+        val call = mockk<Call<RefreshResponse>>()
+        every { authService.refreshCall(RefreshRequest("refresh_abc")) } returns call
+        every { call.execute() } returns Response.success(refreshResp)
+
         val response = build401Response(requestHasAuth = true)
         val result = authenticator.authenticate(null, response)
+
+        assertNotNull(result)
+        assertEquals("Bearer new_access", result!!.header("Authorization"))
+        verify { tokenStore.setTokens("new_access", "new_refresh") }
+    }
+
+    @Test
+    fun `returns null after one retry to prevent an infinite loop`() {
+        val response = build401Response(
+            requestHasAuth = true,
+            withPriorUnauthorized = true
+        )
+
+        val result = authenticator.authenticate(null, response)
+
         assertNull(result)
         verify(exactly = 0) { tokenStore.getRefreshToken() }
         verify(exactly = 0) { authService.refreshCall(any()) }
@@ -111,7 +153,7 @@ class AuthAuthenticatorTest {
         every { tokenStore.getToken() } returns "already_refreshed_token"
         every { tokenStore.getRefreshToken() } returns "refresh_abc"
 
-        val response = build401Response(requestHasAuth = false)
+        val response = build401Response(requestHasAuth = true)
         val result = authenticator.authenticate(null, response)
 
         assertNotNull(result)
@@ -139,7 +181,7 @@ class AuthAuthenticatorTest {
         val results = java.util.concurrent.ConcurrentLinkedQueue<Request?>()
         val threads = (1..5).map {
             Thread {
-                val resp = build401Response(requestHasAuth = false)
+                val resp = build401Response(requestHasAuth = true)
                 results.add(authenticator.authenticate(null, resp))
             }
         }

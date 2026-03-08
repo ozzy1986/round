@@ -13,6 +13,6 @@ export async function authVerify(
   try {
     await request.jwtVerify();
   } catch {
-    await reply.status(401).send({ message: 'Unauthorized' });
+    return reply.status(401).send({ message: 'Unauthorized' });
   }
 }

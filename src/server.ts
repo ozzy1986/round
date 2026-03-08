@@ -1,7 +1,7 @@
 import './auth/types.js';
 import 'dotenv/config';
-import { initSentry } from './sentry.js';
-import Fastify from 'fastify';
+import { initSentry, closeSentry } from './sentry.js';
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import fjwt from '@fastify/jwt';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -30,8 +30,28 @@ function getCorsOrigin(): boolean | string | string[] {
   return raw.split(',').map((o) => o.trim()).filter(Boolean);
 }
 
+function getRateLimitKey(app: FastifyInstance, request: FastifyRequest): string {
+  const auth = request.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return request.ip;
+
+  try {
+    const decoded = app.jwt.verify<{ sub?: string }>(auth.slice(7));
+    if (decoded?.sub) return `user:${decoded.sub}`;
+  } catch {
+    // fall back to IP when the token is invalid
+  }
+
+  return request.ip;
+}
+
 export async function buildApp() {
   const app = Fastify({ logger: true, trustProxy: true });
+
+  await app.register(fjwt, {
+    secret: JWT_SECRET,
+    sign: { expiresIn: '15m' },
+    formatUser: (payload: { sub: string }) => ({ id: payload.sub }),
+  });
 
   await app.register(cors, { origin: getCorsOrigin() });
   await app.register(helmet, { contentSecurityPolicy: false });
@@ -39,28 +59,8 @@ export async function buildApp() {
   await app.register(rateLimit, {
     max: Number(process.env.RATE_LIMIT_MAX) || 200,
     timeWindow: process.env.RATE_LIMIT_WINDOW ?? '1 minute',
-    keyGenerator: (request: { ip: string; headers: { authorization?: string } }) => {
-      const auth = request.headers.authorization;
-      if (auth?.startsWith('Bearer ')) {
-        try {
-          const payload = auth.slice(7).split('.')[1];
-          if (payload) {
-            const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { sub?: string };
-            if (decoded?.sub) return `user:${decoded.sub}`;
-          }
-        } catch {
-          // fall back to IP
-        }
-      }
-      return request.ip;
-    },
+    keyGenerator: (request) => getRateLimitKey(app, request),
     ...(redis ? { redis } : {}),
-  });
-
-  await app.register(fjwt, {
-    secret: JWT_SECRET,
-    sign: { expiresIn: '15m' },
-    formatUser: (payload: { sub: string }) => ({ id: payload.sub }),
   });
 
   await app.register(authRoutes);
@@ -112,6 +112,7 @@ export async function start() {
     app.log.info({ signal }, 'shutting down');
     try {
       await app.close();
+      await closeSentry();
       await closePool();
       await closeRedis();
       process.exit(0);

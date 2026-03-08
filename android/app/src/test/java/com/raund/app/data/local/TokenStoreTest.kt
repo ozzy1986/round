@@ -68,4 +68,21 @@ class TokenStoreTest {
         assertNull(store.getToken())
         assertNull(store.getRefreshToken())
     }
+
+    @Test
+    fun `fallback keeps tokens only in memory and never persists them to plain prefs`() {
+        val prefs = context.getSharedPreferences("raund_auth", Context.MODE_PRIVATE)
+        val store = TokenStore(context)
+
+        store.setTokens("access_mem", "refresh_mem")
+
+        assertEquals("access_mem", store.getToken())
+        assertEquals("refresh_mem", store.getRefreshToken())
+        assertNull(prefs.getString("token", null))
+        assertNull(prefs.getString("refresh_token", null))
+
+        val reloadedStore = TokenStore(context)
+        assertNull(reloadedStore.getToken())
+        assertNull(reloadedStore.getRefreshToken())
+    }
 }

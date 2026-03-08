@@ -12,8 +12,12 @@ export function getRedis(): Redis | null {
   if (client) return client;
   try {
     client = new Redis(url, { maxRetriesPerRequest: 3 });
+    client.on('error', (error) => {
+      console.error('Redis client error:', error.message);
+    });
     return client;
-  } catch {
+  } catch (error) {
+    console.error('Redis init failed:', error);
     return null;
   }
 }

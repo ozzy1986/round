@@ -9,7 +9,7 @@ export function getDbConfig(): { connectionString: string } {
   const port = process.env.PG_PORT ?? '5432';
   const user = process.env.PG_USER ?? 'postgres';
   const password = String(process.env.PG_PASSWORD ?? '');
-  const database = process.env.PG_DATABASE ?? 'raund';
+  const database = process.env.PG_DATABASE ?? 'round';
   const encoded = encodeURIComponent(password);
   return {
     connectionString: `postgresql://${user}:${encoded}@${host}:${port}/${database}`,

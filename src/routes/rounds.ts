@@ -3,41 +3,12 @@ import { getUserId, type AuthenticatedRequest } from '../auth/middleware.js';
 import { getPool } from '../db/pool.js';
 import * as profilesDb from '../db/profiles.js';
 import * as roundsDb from '../db/rounds.js';
-
-const roundBodySchema = {
-  type: 'object',
-  required: ['name', 'duration_seconds', 'position'],
-  properties: {
-    name: { type: 'string', minLength: 1, maxLength: 255 },
-    duration_seconds: { type: 'integer', minimum: 0, maximum: 7200 },
-    warn10sec: { type: 'boolean' },
-    position: { type: 'integer', minimum: 0 },
-  },
-} as const;
-
-const profileIdParamSchema = {
-  type: 'object',
-  required: ['id'],
-  properties: { id: { type: 'string', format: 'uuid' } },
-} as const;
-
-const roundIdParamSchema = {
-  type: 'object',
-  required: ['roundId'],
-  properties: { roundId: { type: 'string', format: 'uuid' } },
-} as const;
-
-const roundResponseSchema = {
-  type: 'object',
-  properties: {
-    id: { type: 'string' },
-    profile_id: { type: 'string' },
-    name: { type: 'string' },
-    duration_seconds: { type: 'integer' },
-    warn10sec: { type: 'boolean' },
-    position: { type: 'integer' },
-  },
-} as const;
+import {
+  profileIdParamSchema,
+  roundBodySchema,
+  roundIdParamSchema,
+  roundResponseSchema,
+} from './schemas.js';
 
 export async function roundsRoutes(app: FastifyInstance): Promise<void> {
   const pool = getPool();

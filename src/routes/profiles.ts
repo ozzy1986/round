@@ -2,39 +2,14 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { getUserId, type AuthenticatedRequest } from '../auth/middleware.js';
 import { getPool } from '../db/pool.js';
 import * as profilesDb from '../db/profiles.js';
-
-const profileSchema = {
-  type: 'object',
-  required: ['name', 'emoji'],
-  properties: {
-    id: { type: 'string', format: 'uuid' },
-    name: { type: 'string', minLength: 1, maxLength: 255 },
-    emoji: { type: 'string', minLength: 1, maxLength: 10 },
-  },
-} as const;
-
-const profileIdParamSchema = {
-  type: 'object',
-  required: ['id'],
-  properties: {
-    id: { type: 'string', format: 'uuid' },
-  },
-} as const;
+import {
+  profileSchema,
+  profileIdParamSchema,
+  roundItemSchema,
+} from './schemas.js';
 
 export async function profilesRoutes(app: FastifyInstance): Promise<void> {
   const pool = getPool();
-
-  const roundItemSchema = {
-    type: 'object',
-    properties: {
-      id: { type: 'string' },
-      profile_id: { type: 'string' },
-      name: { type: 'string' },
-      duration_seconds: { type: 'integer' },
-      warn10sec: { type: 'boolean' },
-      position: { type: 'integer' },
-    },
-  };
 
   app.get<{ Querystring: { limit?: string; cursor?: string; include?: string; updated_since?: string } }>(
     '/profiles',
@@ -44,9 +19,9 @@ export async function profilesRoutes(app: FastifyInstance): Promise<void> {
           type: 'object',
           properties: {
             limit: { type: 'string', pattern: '^[0-9]+$' },
-            cursor: { type: 'string' },
+            cursor: { type: 'string', format: 'date-time' },
             include: { type: 'string', enum: ['rounds'] },
-            updated_since: { type: 'string' },
+            updated_since: { type: 'string', format: 'date-time' },
           },
         },
         response: {

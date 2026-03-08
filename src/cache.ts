@@ -12,7 +12,8 @@ export async function cacheGet(key: string): Promise<string | null> {
   if (redis) {
     try {
       return await redis.get(key);
-    } catch {
+    } catch (error) {
+      console.warn('Redis cache get failed:', error);
       return null;
     }
   }
@@ -20,6 +21,8 @@ export async function cacheGet(key: string): Promise<string | null> {
   if (!entry) return null;
   if (entry.expiresAt != null && entry.expiresAt < Date.now()) {
     memory.delete(key);
+    const idx = memoryKeys.indexOf(key);
+    if (idx !== -1) memoryKeys.splice(idx, 1);
     return null;
   }
   return entry.value;
@@ -34,8 +37,8 @@ export async function cacheSet(key: string, value: string, ttlSeconds?: number):
     try {
       if (ttlSeconds != null) await redis.setex(key, ttlSeconds, value);
       else await redis.set(key, value);
-    } catch {
-      // ignore
+    } catch (error) {
+      console.warn('Redis cache set failed:', error);
     }
     return;
   }

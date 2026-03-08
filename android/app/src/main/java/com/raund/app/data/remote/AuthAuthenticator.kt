@@ -21,12 +21,12 @@ class AuthAuthenticator(
     private val refreshLock = Any()
 
     override fun authenticate(route: Route?, response: Response): Request? {
-        if (response.request.header("Authorization") != null) return null
+        if (responseCount(response) >= 2) return null
 
         synchronized(refreshLock) {
-            val currentToken = tokenStore.getToken()
             val requestToken = response.request.header("Authorization")
                 ?.removePrefix("Bearer ")
+            val currentToken = tokenStore.getToken()
 
             if (currentToken != null && currentToken != requestToken) {
                 return response.request.newBuilder()
@@ -48,5 +48,15 @@ class AuthAuthenticator(
                 .header("Authorization", "Bearer ${refreshed.token}")
                 .build()
         }
+    }
+
+    private fun responseCount(response: Response): Int {
+        var count = 1
+        var priorResponse = response.priorResponse
+        while (priorResponse != null) {
+            count += 1
+            priorResponse = priorResponse.priorResponse
+        }
+        return count
     }
 }

@@ -1,7 +1,7 @@
 /**
  * Purge expired / long-revoked refresh tokens.
  * Usage: tsx scripts/purge-tokens.ts
- * Cron:  0 3 * * * cd /var/www/round && node dist/scripts/purge-tokens.js
+ * Cron:  0 3 * * * cd /var/www/round.ozzy1986.com && node dist/scripts/purge-tokens.js
  */
 import 'dotenv/config';
 import { getPool, closePool } from '../src/db/pool.js';
