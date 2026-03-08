@@ -63,7 +63,7 @@ fun AppLoadingScreen() {
         initialValue = 1f,
         targetValue = 2f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = LinearEasing),
+            animation = tween(400, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "imageScale"
