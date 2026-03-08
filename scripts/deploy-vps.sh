@@ -4,7 +4,6 @@
 # Requires .env with JWT_SECRET (min 32 chars). Optional: BOT_SECRET for Telegram bot /auth/telegram.
 # SSL: ensure certbot renew runs (e.g. cron: 0 0 * * * certbot renew --quiet --deploy-hook "systemctl reload nginx").
 set -e
-export NODE_ENV=production
 APP_DIR="${APP_DIR:-/var/www/round.ozzy1986.com}"
 cd "$APP_DIR"
 node -e "
@@ -20,6 +19,7 @@ npm ci --include=dev
 npm run migrate:up
 npm run build
 npm prune --omit=dev
+export NODE_ENV=production
 if pm2 describe round-api >/dev/null 2>&1; then
   pm2 restart round-api --update-env -i max
 else
