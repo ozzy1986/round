@@ -837,10 +837,10 @@ class TimerService : Service() {
         private const val CHANNEL_ID = "raund_timer_v3"
         private const val NOTIFICATION_ID = 1
         private const val PROLONGED_TONE_DURATION_MS = 1200
-        private const val PROLONGED_TONE_FREQUENCY_HZ = 880.0
+        private const val PROLONGED_TONE_FREQUENCY_HZ = 1046.5
         private const val PROLONGED_TONE_VOLUME = 0.55f
         private const val TICK_TONE_DURATION_MS = 150
-        private const val TICK_TONE_FREQUENCY_HZ = 1760.0
+        private const val TICK_TONE_FREQUENCY_HZ = 1568.0
         private const val TICK_TONE_VOLUME = 0.9f
         const val ACTION_WARMUP = "com.raund.app.TimerService.WARMUP"
         const val ACTION_START = "com.raund.app.TimerService.START"
