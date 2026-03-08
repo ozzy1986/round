@@ -253,8 +253,8 @@ VPS (production server):
   test          - vitest run
   test:unit     - lightweight non-DB Vitest suite (timer-engine, bot, i18n, cache, rate-limit, profiles query validation)
   test:coverage - vitest run --coverage
-  migrate:up    - tsx scripts/run-migrate.ts up (uses PG_* or DATABASE_URL from .env)
-  migrate:down  - tsx scripts/run-migrate.ts down
+  migrate:up    - node scripts/run-migrate.cjs up (uses PG_* or DATABASE_URL from .env)
+  migrate:down  - node scripts/run-migrate.cjs down
   purge:tokens  - tsx scripts/purge-tokens.ts (purge expired/revoked refresh tokens; for cron)
   bot           - tsx src/bot/run.ts (Telegram bot)
 
