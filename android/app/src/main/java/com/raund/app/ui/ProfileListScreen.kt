@@ -417,11 +417,7 @@ fun ProfileListScreen(
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showSettings = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
+            confirmButton = {}
         )
     }
 
@@ -518,16 +514,6 @@ fun ProfileListScreen(
                     } else {
                         Text(stringResource(R.string.send_bug_report))
                     }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    enabled = !isSubmittingBugReport,
-                    onClick = {
-                        closeBugReportDialog()
-                    }
-                ) {
-                    Text(stringResource(R.string.cancel))
                 }
             }
         )
