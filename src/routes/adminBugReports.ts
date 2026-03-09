@@ -79,9 +79,11 @@ function formatDateDdMmYyyy(date: Date): string {
   const d = date.getDate();
   const m = date.getMonth() + 1;
   const y = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
   const dd = String(d).padStart(2, '0');
   const mm = String(m).padStart(2, '0');
-  return `${dd}.${mm}.${y}`;
+  return `${dd}.${mm}.${y} ${hours}:${minutes}`;
 }
 
 function formatPreview(message: string): string {

@@ -35,7 +35,7 @@ object BugReportPayloadFactory {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
 
-        val fingerprint = Build.FINGERPRINT?.trim()?.take(256).takeIf { it.isNotBlank() }
+        val fingerprint = Build.FINGERPRINT?.trim()?.take(256)?.takeIf { it.isNotBlank() }
         return BugReportRequest(
             message = message.trim(),
             screen = screen.trim(),

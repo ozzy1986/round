@@ -87,6 +87,7 @@ describe('admin bug reports route', () => {
         sdk_int: 35,
         app_version: '1.2.3',
         app_build: '42',
+        build_fingerprint: 'TECNO/BG6/HiOS-15-test',
         created_at: new Date('2026-03-09T10:59:00.000Z'),
       },
       {
@@ -100,6 +101,7 @@ describe('admin bug reports route', () => {
         sdk_int: 34,
         app_version: '1.2.2',
         app_build: '41',
+        build_fingerprint: null,
         created_at: new Date('2026-03-09T10:58:00.000Z'),
       },
     ]);
@@ -128,5 +130,8 @@ describe('admin bug reports route', () => {
     expect(res.body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(res.body).toContain('Load older reports');
     expect(res.body).toContain('11111111-1111-1111-1111-111111111111');
+    expect(res.body).toMatch(/\b\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}\b/);
+    expect(res.body).toContain('Build fingerprint:');
+    expect(res.body).toContain('TECNO/BG6/HiOS-15-test');
   });
 });

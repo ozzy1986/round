@@ -32,5 +32,9 @@ class BugReportPayloadFactoryTest {
         assertFalse(payload.device_manufacturer.isBlank())
         assertFalse(payload.device_model.isBlank())
         assertFalse(payload.os_version.isBlank())
+        payload.build_fingerprint?.let {
+            assertTrue(it.isNotBlank())
+            assertTrue(it.length <= 256)
+        }
     }
 }
