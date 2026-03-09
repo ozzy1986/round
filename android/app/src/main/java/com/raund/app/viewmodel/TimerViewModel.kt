@@ -21,11 +21,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class TimerDisplayState(
-    val remaining: Int = 0,
-    val roundTotal: Int = 1,
+data class TimerRoundDisplayState(
     val currentRound: String = "",
     val roundInfo: String = ""
+)
+
+data class TimerCountdownState(
+    val remaining: Int = 0,
+    val roundTotal: Int = 1
 )
 
 class TimerViewModel(
@@ -54,11 +57,9 @@ class TimerViewModel(
         .map { it.paused }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), timerState.value.paused)
-    val displayState: StateFlow<TimerDisplayState> = combine(profile, timerState) { timerProfile, state ->
+    val roundDisplayState: StateFlow<TimerRoundDisplayState> = combine(profile, timerState) { timerProfile, state ->
         val firstRound = timerProfile?.rounds?.firstOrNull()
         val running = state.isRunning
-        val remaining = if (running) state.remaining else (firstRound?.durationSeconds ?: 0)
-        val roundTotal = if (running) state.roundTotal else (firstRound?.durationSeconds ?: 1)
         val currentRound = if (running) state.roundName else (firstRound?.name ?: "")
         val roundInfo = if (running) {
             "${state.roundIndex} / ${state.totalRounds}"
@@ -67,16 +68,26 @@ class TimerViewModel(
         } else {
             ""
         }
-        TimerDisplayState(
-            remaining = remaining,
-            roundTotal = roundTotal,
+        TimerRoundDisplayState(
             currentRound = currentRound,
             roundInfo = roundInfo
         )
-    }.stateIn(
+    }.distinctUntilChanged().stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        TimerDisplayState()
+        TimerRoundDisplayState()
+    )
+    val countdownState: StateFlow<TimerCountdownState> = combine(profile, timerState) { timerProfile, state ->
+        val firstRound = timerProfile?.rounds?.firstOrNull()
+        val running = state.isRunning
+        TimerCountdownState(
+            remaining = if (running) state.remaining else (firstRound?.durationSeconds ?: 0),
+            roundTotal = if (running) state.roundTotal else (firstRound?.durationSeconds ?: 1)
+        )
+    }.distinctUntilChanged().stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        TimerCountdownState()
     )
 
     init {

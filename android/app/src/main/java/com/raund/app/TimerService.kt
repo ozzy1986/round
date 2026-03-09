@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.ForegroundServiceStartNotAllowedException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -287,6 +288,19 @@ class TimerService : Service() {
                 updatePauseState(paused = false)
                 return START_NOT_STICKY
             }
+            ACTION_START -> {
+                pendingStartIntent = intent
+                doStartForeground(buildBasicNotification())
+                stopTimerExecutor.execute {
+                    stopPreviousTimer()
+                    mainHandler.post {
+                        val startIntent = pendingStartIntent
+                        pendingStartIntent = null
+                        startTimerAfterStop(startIntent)
+                    }
+                }
+                return START_NOT_STICKY
+            }
         }
 
         pendingStartIntent = intent
@@ -379,7 +393,7 @@ class TimerService : Service() {
     private fun runTimer(profile: TimerProfile, useCacheOnly: Boolean, langTag: String, finishedText: String) {
         if (!useCacheOnly) {
             var waited = 0
-            while (!ttsReady && waited < 5000 && running) {
+            while (!ttsReady && waited < MAX_TTS_START_WAIT_MS && running) {
                 Thread.sleep(100)
                 waited += 100
             }
@@ -923,15 +937,30 @@ class TimerService : Service() {
         const val EXTRA_ROUND_INDEX = "roundIndex"
         const val EXTRA_TOTAL_ROUNDS = "totalRounds"
         const val EXTRA_IS_RUNNING = "isRunning"
+        private const val MAX_TTS_START_WAIT_MS = 1000
 
-        fun warmup(context: Context) {
-            context.startForegroundService(Intent(context, TimerService::class.java).apply {
+        private fun startForegroundServiceSafely(context: Context, intent: Intent): Boolean {
+            return try {
+                context.startForegroundService(intent)
+                true
+            } catch (e: Exception) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && e is ForegroundServiceStartNotAllowedException) {
+                    Log.w(TAG, "Foreground service start denied for action=${intent.action}", e)
+                } else {
+                    Log.e(TAG, "Foreground service start failed for action=${intent.action}", e)
+                }
+                false
+            }
+        }
+
+        fun warmup(context: Context): Boolean {
+            return startForegroundServiceSafely(context, Intent(context, TimerService::class.java).apply {
                 action = ACTION_WARMUP
             })
         }
 
-        fun start(context: Context, profileId: String, profile: TimerProfile, languageTag: String, finishedText: String) {
-            context.startForegroundService(Intent(context, TimerService::class.java).apply {
+        fun start(context: Context, profileId: String, profile: TimerProfile, languageTag: String, finishedText: String): Boolean {
+            return startForegroundServiceSafely(context, Intent(context, TimerService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_PROFILE_ID, profileId)
                 putExtra(EXTRA_PROFILE, profile)

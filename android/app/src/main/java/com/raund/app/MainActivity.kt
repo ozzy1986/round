@@ -17,17 +17,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.raund.app.ui.AppLoadingScreen
-import com.raund.app.ui.ConsentDialog
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -71,20 +67,6 @@ class MainActivity : ComponentActivity() {
                     if (!appReady) {
                         AppLoadingScreen()
                     } else {
-                        var showConsentDialog by remember {
-                            mutableStateOf(!app.dataConsentPrefs.isConsentGranted())
-                        }
-                        if (showConsentDialog) {
-                            ConsentDialog(
-                                onAccept = {
-                                    app.dataConsentPrefs.setConsentGranted(true)
-                                    showConsentDialog = false
-                                    CoroutineScope(Dispatchers.IO).launch {
-                                        try { app.profileRepository.requestSync() } catch (_: Exception) {}
-                                    }
-                                }
-                            )
-                        }
                         SyncOnConnectivityEffect(app.profileRepository)
                         val navController = rememberNavController()
                         val openTimerId = remember { pendingOpenTimerId }

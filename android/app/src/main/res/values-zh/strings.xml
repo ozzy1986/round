@@ -51,13 +51,13 @@
     <string name="leave_app_setting_hint">关闭此选项可在离开应用时暂停</string>
     <string name="timer_running">计时器运行中</string>
     <string name="loading">加载中…</string>
-    <string name="report_bug">Report bug</string>
-    <string name="bug_report_hint">Describe what happened and how to reproduce it.</string>
-    <string name="bug_report_placeholder">Example: Open the timer, tap Start, the screen turns black.</string>
-    <string name="bug_report_device_note">Phone model, Android version, and app version are attached automatically.</string>
-    <string name="send_bug_report">Send report</string>
-    <string name="sending_bug_report">Sending…</string>
-    <string name="bug_report_message_required">Please describe the bug and how to reproduce it.</string>
-    <string name="bug_report_success">Bug report sent.</string>
-    <string name="bug_report_failed">Bug report could not be sent. Check your connection and try again.</string>
+    <string name="report_bug">反馈问题</string>
+    <string name="bug_report_hint">请描述发生了什么以及如何复现。</string>
+    <string name="bug_report_placeholder">例如：打开计时器，点击开始，屏幕变黑。</string>
+    <string name="bug_report_device_note">手机型号、Android 和应用版本会自动附带。</string>
+    <string name="send_bug_report">发送</string>
+    <string name="sending_bug_report">发送中…</string>
+    <string name="bug_report_message_required">请描述问题及如何复现。</string>
+    <string name="bug_report_success">已发送。</string>
+    <string name="bug_report_failed">发送失败。请检查网络后重试。</string>
 </resources>

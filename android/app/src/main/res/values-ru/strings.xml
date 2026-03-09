@@ -51,13 +51,13 @@
     <string name="leave_app_setting_hint">Выключите, чтобы ставить на паузу при выходе</string>
     <string name="timer_running">Таймер работает</string>
     <string name="loading">Загрузка…</string>
-    <string name="report_bug">Report bug</string>
-    <string name="bug_report_hint">Describe what happened and how to reproduce it.</string>
-    <string name="bug_report_placeholder">Example: Open the timer, tap Start, the screen turns black.</string>
-    <string name="bug_report_device_note">Phone model, Android version, and app version are attached automatically.</string>
-    <string name="send_bug_report">Send report</string>
-    <string name="sending_bug_report">Sending…</string>
-    <string name="bug_report_message_required">Please describe the bug and how to reproduce it.</string>
-    <string name="bug_report_success">Bug report sent.</string>
-    <string name="bug_report_failed">Bug report could not be sent. Check your connection and try again.</string>
+    <string name="report_bug">Сообщить о косяке</string>
+    <string name="bug_report_hint">Опишите, что произошло и как воспроизвести.</string>
+    <string name="bug_report_placeholder">Например: открываю таймер, нажимаю Старт — экран чернеет.</string>
+    <string name="bug_report_device_note">Модель телефона, Android и версия приложения подставляются автоматически.</string>
+    <string name="send_bug_report">Отправить</string>
+    <string name="sending_bug_report">Отправка…</string>
+    <string name="bug_report_message_required">Опишите, пожалуйста, косяк и как его воспроизвести.</string>
+    <string name="bug_report_success">Сообщение о косяке отправлено.</string>
+    <string name="bug_report_failed">Не удалось отправить. Проверьте интернет и попробуйте снова.</string>
 </resources>

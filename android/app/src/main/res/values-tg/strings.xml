@@ -51,13 +51,13 @@
     <string name="leave_app_setting_hint">Барои таваққуф ҳангоми баромадан аз барнома хомӯш кунед</string>
     <string name="timer_running">Таймер кор мекунад</string>
     <string name="loading">Бор шуда истодааст…</string>
-    <string name="report_bug">Report bug</string>
-    <string name="bug_report_hint">Describe what happened and how to reproduce it.</string>
-    <string name="bug_report_placeholder">Example: Open the timer, tap Start, the screen turns black.</string>
-    <string name="bug_report_device_note">Phone model, Android version, and app version are attached automatically.</string>
-    <string name="send_bug_report">Send report</string>
-    <string name="sending_bug_report">Sending…</string>
-    <string name="bug_report_message_required">Please describe the bug and how to reproduce it.</string>
-    <string name="bug_report_success">Bug report sent.</string>
-    <string name="bug_report_failed">Bug report could not be sent. Check your connection and try again.</string>
+    <string name="report_bug">Хабар додан дар бораи хато</string>
+    <string name="bug_report_hint">Чи рӯй дод ва чӣ гуна такрор кардан мумкин аст нависед.</string>
+    <string name="bug_report_placeholder">Масалан: Таймерро мекушам, Оғоз — экран сиёҳ мешавад.</string>
+    <string name="bug_report_device_note">Модели телефон, Android ва версияи барнома худкор илова мешавад.</string>
+    <string name="send_bug_report">Фиристодан</string>
+    <string name="sending_bug_report">Фиристода истодааст…</string>
+    <string name="bug_report_message_required">Хаторо ва чӣ гуна такрор карданро нависед.</string>
+    <string name="bug_report_success">Хабар фиристода шуд.</string>
+    <string name="bug_report_failed">Фиристода нашуд. Интернетро санҷед ва аз нав кӯшиш кунед.</string>
 </resources>

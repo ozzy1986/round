@@ -84,7 +84,9 @@ import com.raund.app.R
 import com.raund.app.TimerService
 import com.raund.app.TimerStateHolder
 import com.raund.app.timer.TimerProfile
+import com.raund.app.viewmodel.TimerCountdownState
 import com.raund.app.viewmodel.TimerViewModel
+import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,11 +101,9 @@ fun TimerScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val running by viewModel.isRunning.collectAsState()
     val paused by viewModel.isPaused.collectAsState()
-    val displayState by viewModel.displayState.collectAsState()
-    val remaining = displayState.remaining
-    val roundTotal = displayState.roundTotal
-    val currentRound = displayState.currentRound
-    val roundInfo = displayState.roundInfo
+    val roundDisplayState by viewModel.roundDisplayState.collectAsState()
+    val currentRound = roundDisplayState.currentRound
+    val roundInfo = roundDisplayState.roundInfo
     val context = LocalContext.current
     val timerFinishedText = stringResource(R.string.timer_finished)
     val restartTimerText = stringResource(R.string.restart_timer)
@@ -180,19 +180,6 @@ fun TimerScreen(
         }
     }
 
-    val defaultBgColor = MaterialTheme.colorScheme.background
-    val progressRatioForBg = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
-    val targetBgColor = if (running && !finished) {
-        lerp(Color(0xFFE65100), Color(0xFF4A148C), progressRatioForBg)
-    } else {
-        defaultBgColor
-    }
-    val animatedBgColor by animateColorAsState(
-        targetValue = targetBgColor,
-        animationSpec = tween(1000, easing = LinearEasing),
-        label = "bgColor"
-    )
-
     val canRefresh = !running && !finished
     val pullToRefreshState = rememberPullToRefreshState()
     if (pullToRefreshState.isRefreshing && canRefresh) {
@@ -207,11 +194,101 @@ fun TimerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(animatedBgColor)
             .then(if (canRefresh) Modifier.nestedScroll(pullToRefreshState.nestedScrollConnection) else Modifier)
     ) {
+        TimerVisualContent(
+            profileName = profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
+            currentRound = currentRound,
+            roundInfo = roundInfo,
+            paused = paused,
+            running = running,
+            finished = finished,
+            canRefresh = canRefresh,
+            timerFinishedText = timerFinishedText,
+            timerPausedText = timerPausedText,
+            emoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱",
+            countdownState = viewModel.countdownState,
+            isLeaving = isLeaving,
+            onBack = ::handleBack
+        )
+        TimerControls(
+            hasRounds = profile?.rounds?.isNotEmpty() == true,
+            profile = profile,
+            startReady = startReady,
+            syncing = isRefreshing || profile == null || !startReady,
+            running = running,
+            paused = paused,
+            finished = finished,
+            pauseTimerText = pauseTimerText,
+            resumeTimerText = resumeTimerText,
+            restartTimerText = restartTimerText,
+            onStart = {
+                val startProfile = profile
+                if (startProfile != null) {
+                    val started = TimerService.start(
+                        context,
+                        profileId,
+                        startProfile,
+                        LocaleManager.currentLanguageTag(context),
+                        timerFinishedText
+                    )
+                    if (started) {
+                        viewModel.setFinished(false)
+                    }
+                }
+            },
+            onPause = { TimerService.pause(context) },
+            onResume = { TimerService.resume(context) },
+            onStop = { viewModel.setFinished(true); TimerService.stop(context) },
+            onRestart = { viewModel.setFinished(false) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset { IntOffset(0, 10) }
+        )
+        if (canRefresh) {
+            PullToRefreshContainer(
+                state = pullToRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimerVisualContent(
+    profileName: String,
+    currentRound: String,
+    roundInfo: String,
+    paused: Boolean,
+    running: Boolean,
+    finished: Boolean,
+    canRefresh: Boolean,
+    timerFinishedText: String,
+    timerPausedText: String,
+    emoji: String,
+    countdownState: StateFlow<TimerCountdownState>,
+    isLeaving: Boolean,
+    onBack: () -> Unit
+) {
+    val countdown by countdownState.collectAsState()
+    val remaining = countdown.remaining
+    val roundTotal = countdown.roundTotal
+    val defaultBgColor = MaterialTheme.colorScheme.background
+    val progressRatioForBg = if (roundTotal > 0) remaining.toFloat() / roundTotal.toFloat() else 1f
+    val targetBgColor = if (running && !finished) {
+        lerp(Color(0xFFE65100), Color(0xFF4A148C), progressRatioForBg)
+    } else {
+        defaultBgColor
+    }
+    val animatedBgColor by animateColorAsState(
+        targetValue = targetBgColor,
+        animationSpec = tween(1000, easing = LinearEasing),
+        label = "bgColor"
+    )
     BoxWithConstraints(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(animatedBgColor)
     ) {
         val maxW = maxWidth.value
         val maxH = maxHeight.value
@@ -221,7 +298,6 @@ fun TimerScreen(
         val primaryColor = MaterialTheme.colorScheme.primary
         val onBgColor = MaterialTheme.colorScheme.onBackground
         val onSurfaceVarColor = MaterialTheme.colorScheme.onSurfaceVariant
-
         val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
@@ -229,9 +305,9 @@ fun TimerScreen(
                 .then(if (canRefresh) Modifier.verticalScroll(scrollState) else Modifier)
         ) {
             TimerTopBar(
-                profileName = profile?.name?.ifBlank { stringResource(R.string.unnamed_profile) } ?: "",
+                profileName = profileName,
                 backEnabled = !isLeaving,
-                onBack = ::handleBack
+                onBack = onBack
             )
 
             Column(
@@ -303,37 +379,11 @@ fun TimerScreen(
                         maxRingSize = minOf(this@BoxWithConstraints.maxWidth, 320.dp),
                         timerFontSize = timerFontSize,
                         onBgColor = onBgColor,
-                        emoji = profile?.emoji?.ifBlank { "⏱" } ?: "⏱"
+                        emoji = emoji
                     )
                 }
             }
-
-            TimerControls(
-                hasRounds = profile?.rounds?.isNotEmpty() == true,
-                profile = profile,
-                startReady = startReady,
-                syncing = isRefreshing || profile == null || !startReady,
-                running = running,
-                paused = paused,
-                finished = finished,
-                pauseTimerText = pauseTimerText,
-                resumeTimerText = resumeTimerText,
-                restartTimerText = restartTimerText,
-                onStart = { viewModel.setFinished(false); TimerService.start(context, profileId, profile!!, LocaleManager.currentLanguageTag(context), timerFinishedText) },
-                onPause = { TimerService.pause(context) },
-                onResume = { TimerService.resume(context) },
-                onStop = { viewModel.setFinished(true); TimerService.stop(context) },
-                onRestart = { viewModel.setFinished(false) },
-                modifier = Modifier.offset { IntOffset(0, 10) }
-            )
         }
-    }
-    if (canRefresh) {
-        PullToRefreshContainer(
-            state = pullToRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-    }
     }
 }
 

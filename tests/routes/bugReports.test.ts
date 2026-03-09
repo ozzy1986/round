@@ -1,10 +1,18 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const sendBugReportEmailMock = vi.fn();
-
-vi.mock('../../src/email.js', () => ({
-  sendBugReportEmail: sendBugReportEmailMock,
+const { sendBugReportEmailMock } = vi.hoisted(() => ({
+  sendBugReportEmailMock: vi.fn(),
 }));
+
+vi.mock('../../src/email.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/email.js')>(
+    '../../src/email.js'
+  );
+  return {
+    ...actual,
+    sendBugReportEmail: sendBugReportEmailMock,
+  };
+});
 
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/server.js';

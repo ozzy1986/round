@@ -51,13 +51,13 @@
     <string name="leave_app_setting_hint">Қосымшадан шыққанда кідірту үшін өшіріңіз</string>
     <string name="timer_running">Таймер жұмыс істеуде</string>
     <string name="loading">Жүктелуде…</string>
-    <string name="report_bug">Report bug</string>
-    <string name="bug_report_hint">Describe what happened and how to reproduce it.</string>
-    <string name="bug_report_placeholder">Example: Open the timer, tap Start, the screen turns black.</string>
-    <string name="bug_report_device_note">Phone model, Android version, and app version are attached automatically.</string>
-    <string name="send_bug_report">Send report</string>
-    <string name="sending_bug_report">Sending…</string>
-    <string name="bug_report_message_required">Please describe the bug and how to reproduce it.</string>
-    <string name="bug_report_success">Bug report sent.</string>
-    <string name="bug_report_failed">Bug report could not be sent. Check your connection and try again.</string>
+    <string name="report_bug">Қате туралы хабарлау</string>
+    <string name="bug_report_hint">Не болғанын және қалай қайталауға болатынын жазыңыз.</string>
+    <string name="bug_report_placeholder">Мысалы: Таймерді ашамын, Бастауды басамын — экран қараңғы болады.</string>
+    <string name="bug_report_device_note">Телефон моделі, Android және қолданба нұсқасы автоматты қосылады.</string>
+    <string name="send_bug_report">Жіберу</string>
+    <string name="sending_bug_report">Жіберілуде…</string>
+    <string name="bug_report_message_required">Қатені және қалай қайталау керектігін жазыңыз.</string>
+    <string name="bug_report_success">Хабарлама жіберілді.</string>
+    <string name="bug_report_failed">Жіберу сәтсіз. Интернетті тексеріп, қайта көріңіз.</string>
 </resources>

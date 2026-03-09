@@ -61,6 +61,66 @@ export async function createBugReport(
   return bugReportFromRow(result.rows[0]);
 }
 
+export async function listBugReports(
+  pool: Pool,
+  input: {
+    limit: number;
+    userId?: string;
+    search?: string;
+    before?: string;
+  }
+): Promise<BugReport[]> {
+  const values: Array<string | number> = [];
+  const where: string[] = [];
+
+  if (input.userId) {
+    values.push(input.userId);
+    where.push(`user_id = $${values.length}`);
+  }
+
+  if (input.search) {
+    values.push(`%${input.search}%`);
+    const searchParam = `$${values.length}`;
+    where.push(`(
+      message ILIKE ${searchParam}
+      OR COALESCE(screen, '') ILIKE ${searchParam}
+      OR user_id::text ILIKE ${searchParam}
+      OR device_manufacturer ILIKE ${searchParam}
+      OR device_model ILIKE ${searchParam}
+      OR os_version ILIKE ${searchParam}
+      OR app_version ILIKE ${searchParam}
+      OR app_build ILIKE ${searchParam}
+    )`);
+  }
+
+  if (input.before) {
+    values.push(input.before);
+    where.push(`created_at < $${values.length}`);
+  }
+
+  values.push(Math.min(Math.max(input.limit, 1), 200));
+  const result = await pool.query(
+    `SELECT
+       id,
+       user_id,
+       message,
+       screen,
+       device_manufacturer,
+       device_model,
+       os_version,
+       sdk_int,
+       app_version,
+       app_build,
+       created_at
+     FROM bug_reports
+     ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY created_at DESC
+     LIMIT $${values.length}`,
+    values
+  );
+  return result.rows.map(bugReportFromRow);
+}
+
 export async function getBugReportById(
   pool: Pool,
   id: string

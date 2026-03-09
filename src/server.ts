@@ -7,9 +7,11 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { getPool } from './db/pool.js';
+import { getBugReportEmailConfigMissingKeys } from './email.js';
 import { getRedis } from './redis.js';
 import { authRoutes } from './auth/register.js';
 import { authVerify } from './auth/middleware.js';
+import { adminBugReportsRoutes } from './routes/adminBugReports.js';
 import { bugReportsRoutes } from './routes/bugReports.js';
 import { privacyRoutes } from './routes/privacy.js';
 import { profilesRoutes } from './routes/profiles.js';
@@ -117,6 +119,13 @@ export async function buildApp() {
       'REDIS_URL is not set; rate limits and caches stay per-instance in production'
     );
   }
+  const bugReportEmailMissingKeys = getBugReportEmailConfigMissingKeys();
+  if (bugReportEmailMissingKeys.length > 0) {
+    app.log.warn(
+      { missingKeys: bugReportEmailMissingKeys },
+      'bug report email notifications are disabled'
+    );
+  }
 
   await app.register(authRoutes);
 
@@ -133,6 +142,7 @@ export async function buildApp() {
   });
 
   await app.register(privacyRoutes);
+  await app.register(adminBugReportsRoutes);
 
   await app.register(
     async (instance) => {
