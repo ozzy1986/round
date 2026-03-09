@@ -75,17 +75,13 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-const RU_DATE_TIME = new Intl.DateTimeFormat('ru-RU', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
-
-function formatDateTimeRu(date: Date): string {
-  return RU_DATE_TIME.format(date);
+function formatDateDdMmYyyy(date: Date): string {
+  const d = date.getDate();
+  const m = date.getMonth() + 1;
+  const y = date.getFullYear();
+  const dd = String(d).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  return `${dd}.${mm}.${y}`;
 }
 
 function formatPreview(message: string): string {
@@ -122,7 +118,7 @@ export function renderBugReportsAdminPage(input: {
       ? '<div class="empty">No bug reports found for the current filters.</div>'
       : bugReports
           .map((report) => {
-            const createdAtDisplay = formatDateTimeRu(report.created_at);
+            const createdAtDisplay = formatDateDdMmYyyy(report.created_at);
             const userFilterHref = buildAdminHref({
               limit,
               query,
@@ -155,6 +151,7 @@ export function renderBugReportsAdminPage(input: {
                     <div><strong>Android:</strong> ${escapeHtml(
                       `${report.os_version} (SDK ${String(report.sdk_int)})`
                     )}</div>
+                    ${report.build_fingerprint ? `<div><strong>Build fingerprint:</strong> ${escapeHtml(report.build_fingerprint)}</div>` : ''}
                   </div>
                   <pre class="message">${escapeHtml(report.message)}</pre>
                 </details>

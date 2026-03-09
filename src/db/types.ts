@@ -57,6 +57,7 @@ export interface BugReport {
   sdk_int: number;
   app_version: string;
   app_build: string;
+  build_fingerprint: string | null;
   created_at: Date;
 }
 
@@ -70,4 +71,5 @@ export interface CreateBugReportInput {
   sdk_int: number;
   app_version: string;
   app_build: string;
+  build_fingerprint?: string | null;
 }

@@ -82,6 +82,7 @@ export const bugReportBodySchema = {
     sdk_int: { type: 'integer', minimum: 1, maximum: 1000 },
     app_version: { type: 'string', minLength: 1, maxLength: 64 },
     app_build: { type: 'string', minLength: 1, maxLength: 64 },
+    build_fingerprint: { type: 'string', minLength: 1, maxLength: 256 },
   },
 };
 

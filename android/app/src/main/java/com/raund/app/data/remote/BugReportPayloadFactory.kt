@@ -14,7 +14,8 @@ data class BugReportRequest(
     val os_version: String,
     val sdk_int: Int,
     val app_version: String,
-    val app_build: String
+    val app_build: String,
+    val build_fingerprint: String?
 )
 
 data class BugReportResponse(
@@ -34,6 +35,7 @@ object BugReportPayloadFactory {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
 
+        val fingerprint = Build.FINGERPRINT?.trim()?.take(256).takeIf { it.isNotBlank() }
         return BugReportRequest(
             message = message.trim(),
             screen = screen.trim(),
@@ -42,7 +44,8 @@ object BugReportPayloadFactory {
             os_version = Build.VERSION.RELEASE.trim(),
             sdk_int = Build.VERSION.SDK_INT,
             app_version = BuildConfig.VERSION_NAME,
-            app_build = PackageInfoCompat.getLongVersionCode(packageInfo).toString()
+            app_build = PackageInfoCompat.getLongVersionCode(packageInfo).toString(),
+            build_fingerprint = fingerprint
         )
     }
 }

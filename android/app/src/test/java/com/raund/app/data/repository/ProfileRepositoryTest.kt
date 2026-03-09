@@ -70,7 +70,8 @@ class ProfileRepositoryTest {
             os_version = "15",
             sdk_int = 35,
             app_version = "1.0.0",
-            app_build = "1"
+            app_build = "1",
+            build_fingerprint = null
         )
     }
 

@@ -14,6 +14,7 @@ interface BugReportBody {
   sdk_int: number;
   app_version: string;
   app_build: string;
+  build_fingerprint?: string;
 }
 
 export async function bugReportsRoutes(app: FastifyInstance): Promise<void> {
@@ -57,6 +58,7 @@ export async function bugReportsRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ message: 'Bug report payload is invalid' });
       }
 
+      const buildFingerprint = req.body.build_fingerprint?.trim();
       const bugReport = await bugReportsDb.createBugReport(pool, {
         user_id: userId,
         message,
@@ -67,6 +69,7 @@ export async function bugReportsRoutes(app: FastifyInstance): Promise<void> {
         sdk_int: req.body.sdk_int,
         app_version: appVersion,
         app_build: appBuild,
+        build_fingerprint: buildFingerprint || null,
       });
 
       try {

@@ -13,6 +13,7 @@ function bugReportFromRow(row: Record<string, unknown>): BugReport {
     sdk_int: row.sdk_int as number,
     app_version: row.app_version as string,
     app_build: row.app_build as string,
+    build_fingerprint: (row.build_fingerprint as string | null) ?? null,
     created_at: row.created_at as Date,
   };
 }
@@ -31,9 +32,10 @@ export async function createBugReport(
        os_version,
        sdk_int,
        app_version,
-       app_build
+       app_build,
+       build_fingerprint
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING
        id,
        user_id,
@@ -45,6 +47,7 @@ export async function createBugReport(
        sdk_int,
        app_version,
        app_build,
+       build_fingerprint,
        created_at`,
     [
       input.user_id,
@@ -56,6 +59,7 @@ export async function createBugReport(
       input.sdk_int,
       input.app_version,
       input.app_build,
+      input.build_fingerprint?.trim() || null,
     ]
   );
   return bugReportFromRow(result.rows[0]);
@@ -90,6 +94,7 @@ export async function listBugReports(
       OR os_version ILIKE ${searchParam}
       OR app_version ILIKE ${searchParam}
       OR app_build ILIKE ${searchParam}
+      OR COALESCE(build_fingerprint, '') ILIKE ${searchParam}
     )`);
   }
 
@@ -111,6 +116,7 @@ export async function listBugReports(
        sdk_int,
        app_version,
        app_build,
+       build_fingerprint,
        created_at
      FROM bug_reports
      ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
@@ -137,6 +143,7 @@ export async function getBugReportById(
        sdk_int,
        app_version,
        app_build,
+       build_fingerprint,
        created_at
      FROM bug_reports
      WHERE id = $1`,

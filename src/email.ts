@@ -79,7 +79,7 @@ export async function sendBugReportEmail(report: BugReport): Promise<void> {
   const transport = getTransporter(config);
   const createdAt = report.created_at.toISOString();
   const subject = `[Round] Bug report ${report.id}`;
-  const text = [
+  const lines = [
     'A new bug report was submitted.',
     '',
     `Report ID: ${report.id}`,
@@ -89,10 +89,12 @@ export async function sendBugReportEmail(report: BugReport): Promise<void> {
     `App version: ${report.app_version} (${report.app_build})`,
     `Device: ${report.device_manufacturer} ${report.device_model}`,
     `Android: ${report.os_version} (SDK ${report.sdk_int})`,
-    '',
-    'Message:',
-    report.message,
-  ].join('\n');
+  ];
+  if (report.build_fingerprint) {
+    lines.push(`Build fingerprint: ${report.build_fingerprint}`);
+  }
+  lines.push('', 'Message:', report.message);
+  const text = lines.join('\n');
 
   await transport.sendMail({
     from: config.from,
