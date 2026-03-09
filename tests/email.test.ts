@@ -55,6 +55,7 @@ describe('bug report email config', () => {
         sdk_int: 35,
         app_version: '1.0.0',
         app_build: '1',
+        build_fingerprint: null,
         created_at: new Date('2026-03-09T14:13:50.416Z'),
       })
     ).rejects.toThrow('Bug report email is not configured. Missing: SMTP_HOST, BUG_REPORT_RECIPIENT');
