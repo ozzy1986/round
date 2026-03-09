@@ -16,8 +16,8 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 git fetch origin
 git reset --hard origin/main
 npm ci --include=dev
-npm run migrate:up
 npm run build
+npm run migrate:up
 npm prune --omit=dev
 export NODE_ENV=production
 if pm2 describe round-api >/dev/null 2>&1; then

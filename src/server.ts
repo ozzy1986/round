@@ -10,6 +10,7 @@ import { getPool } from './db/pool.js';
 import { getRedis } from './redis.js';
 import { authRoutes } from './auth/register.js';
 import { authVerify } from './auth/middleware.js';
+import { bugReportsRoutes } from './routes/bugReports.js';
 import { privacyRoutes } from './routes/privacy.js';
 import { profilesRoutes } from './routes/profiles.js';
 import { roundsRoutes } from './routes/rounds.js';
@@ -79,6 +80,20 @@ function getRateLimitKey(app: FastifyInstance, request: FastifyRequest): string 
   return request.ip;
 }
 
+async function reportFatalError(error: unknown): Promise<void> {
+  if (!process.env.SENTRY_DSN) {
+    return;
+  }
+
+  try {
+    const S = await import('@sentry/node');
+    S.captureException(error);
+    await S.flush(2000);
+  } catch {
+    // Best-effort fatal reporting only.
+  }
+}
+
 export async function buildApp() {
   const app = Fastify({ logger: true, trustProxy: true });
 
@@ -122,6 +137,7 @@ export async function buildApp() {
   await app.register(
     async (instance) => {
       instance.addHook('onRequest', authVerify);
+      await instance.register(bugReportsRoutes);
       await instance.register(profilesRoutes);
       await instance.register(roundsRoutes);
     },
@@ -168,8 +184,22 @@ export async function start() {
       process.exit(1);
     }
   };
+  const handleFatalProcessError = async (
+    type: 'uncaughtException' | 'unhandledRejection',
+    error: unknown
+  ) => {
+    app.log.error({ err: error, type }, 'fatal process error');
+    await reportFatalError(error);
+    process.exit(1);
+  };
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('uncaughtException', (error) => {
+    void handleFatalProcessError('uncaughtException', error);
+  });
+  process.on('unhandledRejection', (reason) => {
+    void handleFatalProcessError('unhandledRejection', reason);
+  });
   try {
     await app.listen({ port: PORT, host: HOST });
   } catch (err) {

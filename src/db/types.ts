@@ -45,3 +45,29 @@ export interface UpdateRoundInput {
   warn10sec?: boolean;
   position?: number;
 }
+
+export interface BugReport {
+  id: string;
+  user_id: string;
+  message: string;
+  screen: string | null;
+  device_manufacturer: string;
+  device_model: string;
+  os_version: string;
+  sdk_int: number;
+  app_version: string;
+  app_build: string;
+  created_at: Date;
+}
+
+export interface CreateBugReportInput {
+  user_id: string;
+  message: string;
+  screen?: string | null;
+  device_manufacturer: string;
+  device_model: string;
+  os_version: string;
+  sdk_int: number;
+  app_version: string;
+  app_build: string;
+}

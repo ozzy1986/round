@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.raund.app.RaundApplication
 import com.raund.app.data.dao.RoundStats
 import com.raund.app.data.entity.Profile
+import com.raund.app.data.remote.BugReportPayloadFactory
 import com.raund.app.data.repository.ProfileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,8 @@ class ProfileListViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val _isSubmittingBugReport = MutableStateFlow(false)
+    val isSubmittingBugReport: StateFlow<Boolean> = _isSubmittingBugReport.asStateFlow()
 
     val listState: StateFlow<ProfileListState> = combine(
         repository.profiles,
@@ -48,5 +51,35 @@ class ProfileListViewModel(application: Application) : AndroidViewModel(applicat
                 _isRefreshing.value = false
             }
         }
+    }
+
+    fun submitBugReport(
+        message: String,
+        onSuccess: () -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        if (_isSubmittingBugReport.value) return
+
+        viewModelScope.launch {
+            _isSubmittingBugReport.value = true
+            try {
+                repository.submitBugReport(
+                    BugReportPayloadFactory.create(
+                        context = getApplication(),
+                        message = message,
+                        screen = BUG_REPORT_SCREEN
+                    )
+                )
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e)
+            } finally {
+                _isSubmittingBugReport.value = false
+            }
+        }
+    }
+
+    companion object {
+        private const val BUG_REPORT_SCREEN = "profile_list_settings"
     }
 }

@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import com.raund.app.data.db.AppDatabase
-import com.raund.app.data.local.DataConsentPrefs
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.local.TokenStore
 import com.raund.app.data.remote.ApiService
@@ -31,7 +30,6 @@ class RaundApplication : Application() {
     val database by lazy { AppDatabase.get(this) }
     val tokenStore by lazy { TokenStore(this) }
     private val syncPrefs by lazy { SyncPrefs(this) }
-    val dataConsentPrefs by lazy { DataConsentPrefs(this) }
 
     @Volatile
     var repositoryReady = false
@@ -57,18 +55,22 @@ class RaundApplication : Application() {
             .writeTimeout(10, TimeUnit.SECONDS)
             .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
             .addInterceptor(TokenInterceptor(tokenStore))
-            .addInterceptor { chain ->
-                val request = chain.request()
-                val startMs = System.currentTimeMillis()
-                try {
-                    val response = chain.proceed(request)
-                    val elapsed = System.currentTimeMillis() - startMs
-                    Log.i("PerfFix", "HTTP ${request.method} ${request.url.encodedPath}: ${response.code} in ${elapsed}ms")
-                    response
-                } catch (e: Exception) {
-                    val elapsed = System.currentTimeMillis() - startMs
-                    Log.i("PerfFix", "HTTP ${request.method} ${request.url.encodedPath}: FAILED in ${elapsed}ms: ${e.message}")
-                    throw e
+            .apply {
+                if (BuildConfig.DEBUG) {
+                    addInterceptor { chain ->
+                        val request = chain.request()
+                        val startMs = System.currentTimeMillis()
+                        try {
+                            val response = chain.proceed(request)
+                            val elapsed = System.currentTimeMillis() - startMs
+                            Log.i("PerfFix", "HTTP ${request.method} ${request.url.encodedPath}: ${response.code} in ${elapsed}ms")
+                            response
+                        } catch (e: Exception) {
+                            val elapsed = System.currentTimeMillis() - startMs
+                            Log.i("PerfFix", "HTTP ${request.method} ${request.url.encodedPath}: FAILED in ${elapsed}ms: ${e.message}")
+                            throw e
+                        }
+                    }
                 }
             }
             .authenticator(AuthAuthenticator(tokenStore, authService))
@@ -90,7 +92,6 @@ class RaundApplication : Application() {
             tokenStoreProvider = { tokenStore },
             authServiceProvider = { authService },
             syncPrefs = syncPrefs,
-            dataConsentPrefs = dataConsentPrefs,
             database = database
         )
     }

@@ -9,11 +9,12 @@ import com.raund.app.data.dao.RoundDao
 import com.raund.app.data.dao.RoundStats
 import com.raund.app.data.entity.Profile
 import com.raund.app.data.entity.Round
-import com.raund.app.data.local.DataConsentPrefs
 import com.raund.app.data.local.TokenStore
 import com.raund.app.data.local.SyncPrefs
 import com.raund.app.data.remote.ApiService
 import com.raund.app.data.remote.AuthService
+import com.raund.app.data.remote.BugReportRequest
+import com.raund.app.data.remote.BugReportResponse
 import com.raund.app.data.remote.CreateProfileRequest
 import com.raund.app.data.remote.PutRoundItem
 import com.raund.app.data.remote.PutRoundsRequest
@@ -34,6 +35,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -44,13 +46,13 @@ class ProfileRepository(
     private val tokenStoreProvider: () -> TokenStore,
     private val authServiceProvider: () -> AuthService,
     private val syncPrefs: SyncPrefs,
-    private val dataConsentPrefs: DataConsentPrefs,
     private val database: RoomDatabase
 ) {
 
     private val bgScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val pendingProfileCreate = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
     private val syncMutex = Mutex()
+    private val tokenMutex = Mutex()
     private val api: ApiService?
         get() = apiProvider()
     private val tokenStore: TokenStore
@@ -95,13 +97,41 @@ class ProfileRepository(
     }
 
     private suspend fun ensureToken() {
-        if (!dataConsentPrefs.isConsentGranted()) return
         if (tokenStore.getToken() != null) return
-        try {
-            val r = authService.register()
-            tokenStore.setTokens(r.token, r.refresh_token)
+        tokenMutex.withLock {
+            if (tokenStore.getToken() != null) return
+            try {
+                val r = authService.register()
+                tokenStore.setTokens(r.token, r.refresh_token)
+            } catch (e: Exception) {
+                Log.w(PERF, "ensureToken: register failed", e)
+            }
+        }
+    }
+
+    private suspend fun ensureAuthenticatedToken() {
+        ensureToken()
+        if (tokenStore.getToken() == null) {
+            throw IllegalStateException("Bug report authentication failed")
+        }
+    }
+
+    private fun parseServerUpdatedAtMillis(updatedAt: String?, profileId: String): Long {
+        val safeUpdatedAt = updatedAt ?: throw IllegalStateException("Profile $profileId is missing updated_at")
+        return try {
+            Instant.parse(safeUpdatedAt).toEpochMilli()
         } catch (e: Exception) {
-            Log.w(PERF, "ensureToken: register failed", e)
+            throw IllegalStateException("Profile $profileId has invalid updated_at: $safeUpdatedAt", e)
+        }
+    }
+
+    private fun isNewerServerTimestamp(candidate: String?, current: String?): Boolean {
+        if (candidate == null) return false
+        if (current == null) return true
+        try {
+            return Instant.parse(candidate).isAfter(Instant.parse(current))
+        } catch (e: Exception) {
+            throw IllegalStateException("Invalid sync watermark timestamp", e)
         }
     }
 
@@ -232,6 +262,13 @@ class ProfileRepository(
         }
     }
 
+    suspend fun submitBugReport(request: BugReportRequest): BugReportResponse = withContext(Dispatchers.IO) {
+        ensureAuthenticatedToken()
+        val api = this@ProfileRepository.api
+            ?: throw IllegalStateException("Bug report API is unavailable")
+        api.submitBugReport(request)
+    }
+
     suspend fun requestSync() = withContext(Dispatchers.IO) { syncGuarded(force = false) }
 
     suspend fun forceSync() = withContext(Dispatchers.IO) { syncGuarded(force = true) }
@@ -251,8 +288,9 @@ class ProfileRepository(
         try {
             val api = this@ProfileRepository.api ?: return@withContext
             val dto = api.getProfileWithRounds(profileId)
+            val updatedAtMillis = parseServerUpdatedAtMillis(dto.updated_at, dto.id)
             database.withTransaction {
-                profileDao.insert(Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis()))
+                profileDao.insert(Profile(dto.id, dto.name, dto.emoji, updatedAtMillis))
                 roundDao.deleteByProfileId(dto.id)
                 roundDao.insertAll(dto.rounds.mapIndexed { i, r ->
                     Round(r.id, r.profile_id, r.name, r.duration_seconds.coerceAtLeast(5), r.warn10sec, i)
@@ -271,28 +309,36 @@ class ProfileRepository(
             val api = this@ProfileRepository.api ?: return@withContext
             val updatedSince = syncPrefs.getLastSyncedAtForApi()
             var cursor: String? = null
+            var nextWatermark = updatedSince
             do {
                 val page = api.getProfilesWithRoundsPage(
                     limit = 100,
                     cursor = cursor,
                     updatedSince = updatedSince
                 )
+                if (isNewerServerTimestamp(page.synced_at, nextWatermark)) {
+                    nextWatermark = page.synced_at
+                }
                 if (page.data.isNotEmpty()) {
                     val pageStart = SystemClock.elapsedRealtime()
                     database.withTransaction {
                         page.data.forEach { dto ->
-                            profileDao.insert(Profile(dto.id, dto.name, dto.emoji, System.currentTimeMillis()))
+                            val updatedAtMillis = parseServerUpdatedAtMillis(dto.updated_at, dto.id)
+                            profileDao.insert(Profile(dto.id, dto.name, dto.emoji, updatedAtMillis))
                             roundDao.deleteByProfileId(dto.id)
                             roundDao.insertAll(dto.rounds.mapIndexed { i, r ->
                                 Round(r.id, r.profile_id, r.name, r.duration_seconds.coerceAtLeast(5), r.warn10sec, i)
                             })
+                            if (isNewerServerTimestamp(dto.updated_at, nextWatermark)) {
+                                nextWatermark = dto.updated_at
+                            }
                         }
                     }
                     Log.i(PERF, "syncFromApi: page upsert took ${SystemClock.elapsedRealtime() - pageStart}ms (${page.data.size} profiles, transaction=true)")
                 }
                 cursor = page.next_cursor
             } while (cursor != null)
-            syncPrefs.setLastSyncedAtNow()
+            nextWatermark?.let(syncPrefs::setLastSyncedAt)
             Log.i(PERF, "syncFromApi: total sync took ${SystemClock.elapsedRealtime() - totalStart}ms")
         } catch (e: Exception) {
             Log.w(PERF, "syncFromApi failed", e)

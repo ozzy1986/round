@@ -1,5 +1,7 @@
 package com.raund.app.ui
 
+import android.app.Activity
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,7 +62,6 @@ import androidx.compose.ui.Alignment
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import android.app.Activity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -95,11 +97,20 @@ fun ProfileListScreen(
     val profiles = listState.profiles
     val roundStats = listState.roundStats
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val isSubmittingBugReport by viewModel.isSubmittingBugReport.collectAsState()
     val context = LocalContext.current
     var currentLang by remember { mutableStateOf(LocaleManager.currentLanguageTag(context)) }
     var showSettings by remember { mutableStateOf(false) }
-    var keepRunning by remember(showSettings) { mutableStateOf(SettingsManager.isKeepRunningOnScreenOff(context)) }
-    var keepRunningLeaveApp by remember(showSettings) { mutableStateOf(SettingsManager.isKeepRunningWhenLeavingApp(context)) }
+    var keepRunning by remember { mutableStateOf(SettingsManager.isKeepRunningOnScreenOff(context)) }
+    var keepRunningLeaveApp by remember { mutableStateOf(SettingsManager.isKeepRunningWhenLeavingApp(context)) }
+    var showBugReportDialog by remember { mutableStateOf(false) }
+    var bugReportMessage by remember { mutableStateOf("") }
+    var bugReportError by remember { mutableStateOf<String?>(null) }
+    val closeBugReportDialog = {
+        showBugReportDialog = false
+        bugReportMessage = ""
+        bugReportError = null
+    }
 
     Scaffold(
         topBar = {
@@ -393,6 +404,17 @@ fun ProfileListScreen(
                             }
                         )
                     }
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = {
+                            showSettings = false
+                            bugReportError = null
+                            showBugReportDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.report_bug))
+                    }
                 }
             },
             confirmButton = {
@@ -402,6 +424,117 @@ fun ProfileListScreen(
             }
         )
     }
+
+    if (showBugReportDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isSubmittingBugReport) {
+                    closeBugReportDialog()
+                }
+            },
+            title = {
+                Text(
+                    stringResource(R.string.report_bug),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        stringResource(R.string.bug_report_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = bugReportMessage,
+                        onValueChange = { value ->
+                            bugReportMessage = value.take(BUG_REPORT_MAX_LENGTH)
+                            if (bugReportError != null) {
+                                bugReportError = null
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text(stringResource(R.string.bug_report_placeholder))
+                        },
+                        minLines = 4,
+                        maxLines = 8
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.bug_report_device_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    bugReportError?.let { error ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isSubmittingBugReport,
+                    onClick = {
+                        val trimmedMessage = bugReportMessage.trim()
+                        if (trimmedMessage.length < BUG_REPORT_MIN_LENGTH) {
+                            bugReportError = context.getString(R.string.bug_report_message_required)
+                            return@TextButton
+                        }
+
+                        bugReportError = null
+                        viewModel.submitBugReport(
+                            message = trimmedMessage,
+                            onSuccess = {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.bug_report_success),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                closeBugReportDialog()
+                            },
+                            onError = {
+                                bugReportError = context.getString(R.string.bug_report_failed)
+                            }
+                        )
+                    }
+                ) {
+                    if (isSubmittingBugReport) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(stringResource(R.string.sending_bug_report))
+                        }
+                    } else {
+                        Text(stringResource(R.string.send_bug_report))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isSubmittingBugReport,
+                    onClick = {
+                        closeBugReportDialog()
+                    }
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 }
 
 private fun formatDurationShort(totalSeconds: Int): String = com.raund.app.formatDuration(totalSeconds)
+
+private const val BUG_REPORT_MIN_LENGTH = 10
+private const val BUG_REPORT_MAX_LENGTH = 5000

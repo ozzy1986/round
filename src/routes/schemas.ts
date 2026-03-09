@@ -60,3 +60,36 @@ export const roundIdParamSchema = {
   required: ['roundId'],
   properties: { roundId: { type: 'string', format: 'uuid' } },
 };
+
+export const bugReportBodySchema = {
+  type: 'object' as const,
+  required: [
+    'message',
+    'device_manufacturer',
+    'device_model',
+    'os_version',
+    'sdk_int',
+    'app_version',
+    'app_build',
+  ],
+  additionalProperties: false,
+  properties: {
+    message: { type: 'string', minLength: 10, maxLength: 5000 },
+    screen: { type: 'string', minLength: 1, maxLength: 64 },
+    device_manufacturer: { type: 'string', minLength: 1, maxLength: 120 },
+    device_model: { type: 'string', minLength: 1, maxLength: 120 },
+    os_version: { type: 'string', minLength: 1, maxLength: 120 },
+    sdk_int: { type: 'integer', minimum: 1, maximum: 1000 },
+    app_version: { type: 'string', minLength: 1, maxLength: 64 },
+    app_build: { type: 'string', minLength: 1, maxLength: 64 },
+  },
+};
+
+export const bugReportResponseSchema = {
+  type: 'object' as const,
+  required: ['id', 'created_at'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    created_at: { type: 'string', format: 'date-time' },
+  },
+};

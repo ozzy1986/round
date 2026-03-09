@@ -51,8 +51,13 @@
     <string name="leave_app_setting_hint">Ilovadan chiqqanda pauza qilish uchun oʻchiring</string>
     <string name="timer_running">Taymer ishlayapti</string>
     <string name="loading">Yuklanmoqda…</string>
-    <string name="consent_title">Ma\'lumotlarni qayta ishlash</string>
-    <string name="consent_message">Ilova anonim hisob yaratadi va mashg\'ulotlaringizni boshqa qurilmalarda ishlatish uchun serverga sinxronlashtiradi. Ism, email yoki telefon to\'plamaymiz. «Qabul qilish»ni bosish orqali siz buni qabul qilasiz. Batafsil: maxfiylik siyosati.</string>
-    <string name="consent_accept">Qabul qilish</string>
-    <string name="consent_privacy_policy">Maxfiylik siyosati</string>
+    <string name="report_bug">Report bug</string>
+    <string name="bug_report_hint">Describe what happened and how to reproduce it.</string>
+    <string name="bug_report_placeholder">Example: Open the timer, tap Start, the screen turns black.</string>
+    <string name="bug_report_device_note">Phone model, Android version, and app version are attached automatically.</string>
+    <string name="send_bug_report">Send report</string>
+    <string name="sending_bug_report">Sending…</string>
+    <string name="bug_report_message_required">Please describe the bug and how to reproduce it.</string>
+    <string name="bug_report_success">Bug report sent.</string>
+    <string name="bug_report_failed">Bug report could not be sent. Check your connection and try again.</string>
 </resources>

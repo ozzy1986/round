@@ -20,12 +20,13 @@ const PRIVACY_HTML = `<!DOCTYPE html>
   <p>Приложение Round («Раунд») — интервальный таймер для тренировок.</p>
   <h2>Какие данные мы обрабатываем</h2>
   <p>При первом использовании синхронизации приложение создаёт анонимный идентификатор пользователя (UUID). На сервер передаются только ваши тренировки (названия, эмодзи, раунды с длительностями и настройками). Эти данные нужны для синхронизации между вашими устройствами.</p>
+  <p>Если вы добровольно отправляете сообщение через кнопку bug report в приложении, мы также сохраняем текст сообщения, шаги воспроизведения, модель устройства, версию Android, SDK и версию приложения, чтобы исправлять ошибки и отвечать на проблемы со стабильностью.</p>
   <h2>Чего мы не собираем</h2>
   <p>Мы не собираем имя, адрес электронной почты, номер телефона, геолокацию, рекламные идентификаторы и не ведём аналитику поведения.</p>
   <h2>Цель обработки</h2>
-  <p>Синхронизация ваших тренировок между устройствами при включённой синхронизации.</p>
+  <p>Синхронизация ваших тренировок между устройствами при включённой синхронизации, а также диагностика и исправление ошибок, которые вы добровольно отправляете через bug report.</p>
   <h2>Хранение</h2>
-  <p>Данные хранятся на сервере round.ozzy1986.com в базе данных PostgreSQL. Мы не передаём их третьим лицам.</p>
+  <p>Данные хранятся на сервере round.ozzy1986.com в базе данных PostgreSQL. Bug reports дополнительно отправляют email-уведомление владельцу сервиса. Мы не передаём ваши данные сторонним аналитическим системам.</p>
   <h2>Удаление данных</h2>
   <p>При удалении приложения локальные данные удаляются с устройства. Анонимный аккаунт на сервере остаётся (привязки к личности нет). По запросу можно удалить данные, связанные с вашим аккаунтом — напишите на контакт ниже.</p>
   <h2>Контакт</h2>
@@ -36,12 +37,13 @@ const PRIVACY_HTML = `<!DOCTYPE html>
     <p>Round is an interval timer app for workouts.</p>
     <h2>Data we process</h2>
     <p>When you first use sync, the app creates an anonymous user identifier (UUID). Only your trainings (names, emoji, rounds with durations and settings) are sent to the server for syncing across your devices.</p>
+    <p>If you voluntarily submit a bug report from the app, we also store the report text, reproduction details, device model, Android version, SDK level, and app version so we can investigate and fix the issue.</p>
     <h2>What we do not collect</h2>
     <p>We do not collect name, email, phone number, location, advertising identifiers, or behavioural analytics.</p>
     <h2>Purpose</h2>
-    <p>To sync your trainings across devices when sync is enabled.</p>
+    <p>To sync your trainings across devices when sync is enabled, and to diagnose and fix issues that you voluntarily send through the bug-report form.</p>
     <h2>Storage</h2>
-    <p>Data is stored on the server round.ozzy1986.com in a PostgreSQL database. We do not share it with third parties.</p>
+    <p>Data is stored on the server round.ozzy1986.com in a PostgreSQL database. Bug reports also trigger an email alert to the service owner. We do not send your data to third-party analytics providers.</p>
     <h2>Data deletion</h2>
     <p>When you uninstall the app, local data is removed from the device. The anonymous server account remains (not linked to identity). You can request deletion of data tied to your account — use the contact below.</p>
     <h2>Contact</h2>

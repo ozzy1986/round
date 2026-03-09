@@ -20,6 +20,7 @@ data class ProfileWithRoundsDto(
     val id: String,
     val name: String,
     val emoji: String,
+    val updated_at: String? = null,
     val rounds: List<RoundDto>
 )
 
@@ -54,7 +55,8 @@ data class ProfilesPageDto(
 
 data class ProfilesWithRoundsPageDto(
     val data: List<ProfileWithRoundsDto>,
-    val next_cursor: String?
+    val next_cursor: String?,
+    val synced_at: String? = null
 )
 
 data class PutRoundsRequest(val rounds: List<PutRoundItem>)
@@ -66,6 +68,9 @@ data class PutRoundItem(
 )
 
 interface ApiService {
+    @POST("bug-reports")
+    suspend fun submitBugReport(@Body body: BugReportRequest): BugReportResponse
+
     @GET("profiles")
     suspend fun getProfilesPage(
         @Query("limit") limit: Int = 20,

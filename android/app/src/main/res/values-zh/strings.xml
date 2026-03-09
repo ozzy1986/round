@@ -51,8 +51,13 @@
     <string name="leave_app_setting_hint">关闭此选项可在离开应用时暂停</string>
     <string name="timer_running">计时器运行中</string>
     <string name="loading">加载中…</string>
-    <string name="consent_title">数据处理</string>
-    <string name="consent_message">应用会创建匿名账号并将您的训练和回合同步到服务器，以便在其他设备上使用。我们不收集姓名、邮箱或手机号。点击「接受」即表示您同意此处理。详见隐私政策。</string>
-    <string name="consent_accept">接受</string>
-    <string name="consent_privacy_policy">隐私政策</string>
+    <string name="report_bug">Report bug</string>
+    <string name="bug_report_hint">Describe what happened and how to reproduce it.</string>
+    <string name="bug_report_placeholder">Example: Open the timer, tap Start, the screen turns black.</string>
+    <string name="bug_report_device_note">Phone model, Android version, and app version are attached automatically.</string>
+    <string name="send_bug_report">Send report</string>
+    <string name="sending_bug_report">Sending…</string>
+    <string name="bug_report_message_required">Please describe the bug and how to reproduce it.</string>
+    <string name="bug_report_success">Bug report sent.</string>
+    <string name="bug_report_failed">Bug report could not be sent. Check your connection and try again.</string>
 </resources>

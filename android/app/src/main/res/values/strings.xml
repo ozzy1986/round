@@ -51,8 +51,13 @@
     <string name="leave_app_setting_hint">Turn off to pause when you leave the app</string>
     <string name="timer_running">Timer running</string>
     <string name="loading">Loading…</string>
-    <string name="consent_title">Data processing</string>
-    <string name="consent_message">The app creates an anonymous account and syncs your training profiles and rounds to the server so you can use them on other devices. We do not collect your name, email, phone, or location. By tapping Accept you agree to this processing. See the privacy policy for details.</string>
-    <string name="consent_accept">Accept</string>
-    <string name="consent_privacy_policy">Privacy policy</string>
+    <string name="report_bug">Report bug</string>
+    <string name="bug_report_hint">Describe what happened and how to reproduce it.</string>
+    <string name="bug_report_placeholder">Example: Open the timer, tap Start, the screen turns black.</string>
+    <string name="bug_report_device_note">Phone model, Android version, and app version are attached automatically.</string>
+    <string name="send_bug_report">Send report</string>
+    <string name="sending_bug_report">Sending…</string>
+    <string name="bug_report_message_required">Please describe the bug and how to reproduce it.</string>
+    <string name="bug_report_success">Bug report sent.</string>
+    <string name="bug_report_failed">Bug report could not be sent. Check your connection and try again.</string>
 </resources>
