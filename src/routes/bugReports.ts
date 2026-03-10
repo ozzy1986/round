@@ -3,6 +3,7 @@ import { getUserId, type AuthenticatedRequest } from '../auth/middleware.js';
 import { getPool } from '../db/pool.js';
 import * as bugReportsDb from '../db/bugReports.js';
 import { sendBugReportEmail } from '../email.js';
+import { sendBugReportTelegramNotification } from '../bugReportTelegram.js';
 import { bugReportBodySchema, bugReportResponseSchema } from './schemas.js';
 
 interface BugReportBody {
@@ -72,13 +73,24 @@ export async function bugReportsRoutes(app: FastifyInstance): Promise<void> {
         build_fingerprint: buildFingerprint || null,
       });
 
-      try {
-        await sendBugReportEmail(bugReport);
-      } catch (error) {
-        req.log.warn(
-          { err: error, bugReportId: bugReport.id, userId },
-          'failed to send bug report email'
-        );
+      const notificationResults = await Promise.allSettled([
+        sendBugReportEmail(bugReport),
+        sendBugReportTelegramNotification(bugReport),
+      ]);
+
+      const channels = ['email', 'Telegram'] as const;
+      for (const [index, result] of notificationResults.entries()) {
+        if (result.status === 'rejected') {
+          req.log.warn(
+            {
+              channel: channels[index],
+              err: result.reason,
+              bugReportId: bugReport.id,
+              userId,
+            },
+            'failed to send bug report notification'
+          );
+        }
       }
 
       return reply.status(201).send({

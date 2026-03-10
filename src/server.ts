@@ -8,6 +8,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { getPool } from './db/pool.js';
 import { getBugReportEmailConfigMissingKeys } from './email.js';
+import { getBugReportTelegramConfigMissingKeys } from './bugReportTelegram.js';
 import { getRedis } from './redis.js';
 import { authRoutes } from './auth/register.js';
 import { authVerify } from './auth/middleware.js';
@@ -124,6 +125,13 @@ export async function buildApp() {
     app.log.warn(
       { missingKeys: bugReportEmailMissingKeys },
       'bug report email notifications are disabled'
+    );
+  }
+  const bugReportTelegramMissingKeys = getBugReportTelegramConfigMissingKeys();
+  if (bugReportTelegramMissingKeys.length > 0) {
+    app.log.warn(
+      { missingKeys: bugReportTelegramMissingKeys },
+      'bug report Telegram notifications are disabled'
     );
   }
 

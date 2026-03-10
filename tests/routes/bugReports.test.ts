@@ -3,6 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 const { sendBugReportEmailMock } = vi.hoisted(() => ({
   sendBugReportEmailMock: vi.fn(),
 }));
+const { sendBugReportTelegramNotificationMock } = vi.hoisted(() => ({
+  sendBugReportTelegramNotificationMock: vi.fn(),
+}));
 
 vi.mock('../../src/email.js', async () => {
   const actual = await vi.importActual<typeof import('../../src/email.js')>(
@@ -11,6 +14,15 @@ vi.mock('../../src/email.js', async () => {
   return {
     ...actual,
     sendBugReportEmail: sendBugReportEmailMock,
+  };
+});
+vi.mock('../../src/bugReportTelegram.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/bugReportTelegram.js')>(
+    '../../src/bugReportTelegram.js'
+  );
+  return {
+    ...actual,
+    sendBugReportTelegramNotification: sendBugReportTelegramNotificationMock,
   };
 });
 
@@ -52,9 +64,11 @@ describe('bug reports routes', () => {
   beforeEach(() => {
     sendBugReportEmailMock.mockReset();
     sendBugReportEmailMock.mockResolvedValue(undefined);
+    sendBugReportTelegramNotificationMock.mockReset();
+    sendBugReportTelegramNotificationMock.mockResolvedValue(undefined);
   });
 
-  it('returns 201, stores the bug report, and sends an email alert', async () => {
+  it('returns 201, stores the bug report, and sends email and Telegram alerts', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/bug-reports',
@@ -77,6 +91,14 @@ describe('bug reports routes', () => {
     expect(saved?.device_model).toBe(validPayload.device_model);
     expect(sendBugReportEmailMock).toHaveBeenCalledTimes(1);
     expect(sendBugReportEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: body.id,
+        user_id: testUserId,
+        message: validPayload.message,
+      })
+    );
+    expect(sendBugReportTelegramNotificationMock).toHaveBeenCalledTimes(1);
+    expect(sendBugReportTelegramNotificationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         id: body.id,
         user_id: testUserId,
@@ -119,6 +141,28 @@ describe('bug reports routes', () => {
       payload: {
         ...validPayload,
         message: 'Email delivery can fail, but the report must still be saved in the database.',
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json() as { id: string };
+    const saved = await getBugReportById(pool, body.id);
+    expect(saved).not.toBeNull();
+    expect(saved?.message).toContain('report must still be saved');
+  });
+
+  it('still stores the report when sending the Telegram alert fails', async () => {
+    sendBugReportTelegramNotificationMock.mockRejectedValueOnce(
+      new Error('telegram unavailable')
+    );
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/bug-reports',
+      headers: authHeaders,
+      payload: {
+        ...validPayload,
+        message: 'Telegram delivery can fail, but the report must still be saved in the database.',
       },
     });
 
