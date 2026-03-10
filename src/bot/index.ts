@@ -219,6 +219,12 @@ export function createBot(): Telegraf {
     ctx.reply(getString(locale, 'bot.welcome'), withReplyMarkup(mainMenuKeyboard(locale))).catch(() => {});
   });
 
+  bot.command('chatid', (ctx) => {
+    const chatId = ctx.chat?.id;
+    if (chatId == null) return;
+    ctx.reply(`Your chat ID: ${chatId}\nUse this as BUG_REPORT_TELEGRAM_CHAT_ID for bug report notifications.`).catch(() => {});
+  });
+
   bot.command('profiles', async (ctx) => {
     const locale = getLocale(ctx);
     const telegramId = ctx.from?.id;
