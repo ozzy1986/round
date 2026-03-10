@@ -11,6 +11,17 @@ import { getBugReportStatusLabel } from './bugReportStatus.js';
  *   os_incremental (build identity).
  * - Secondary: security_patch (relevant for security bugs; can be omitted from short notification).
  */
+function formatDateRu(date: Date): string {
+  const d = date.getUTCDate();
+  const m = date.getUTCMonth() + 1;
+  const y = date.getUTCFullYear();
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const dd = String(d).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  return `${dd}.${mm}.${y} ${hours}:${minutes}`;
+}
+
 function appendOptionalLine(lines: string[], label: string, value: string | null): void {
   if (!value) return;
   lines.push(`${label}: ${value}`);
@@ -20,7 +31,7 @@ export function buildBugReportNotificationDetails(report: BugReport): string[] {
   const lines = [
     `ID отчёта: ${report.id}`,
     `Статус: ${getBugReportStatusLabel(report.status)}`,
-    `Создан: ${report.created_at.toISOString()}`,
+    `Создан: ${formatDateRu(report.created_at)}`,
     `Пользователь: ${report.user_id}`,
     `Экран: ${report.screen ?? 'не указан'}`,
     `Версия приложения: ${report.app_version} (${report.app_build})`,
