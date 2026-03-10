@@ -71,7 +71,7 @@ Backend:
   - Migrations: node-pg-migrate (migrations in migrations/*.cjs, including refresh_tokens, composite profile index)
   - Tests: Vitest, coverage with v8; lightweight backend test suite includes timer-engine, bot parser, i18n, cache, rate-limit, profiles query validation, server runtime config, and pool config
   - Bot: Telegraf; TTS: @google-cloud/text-to-speech (free tier); caches use Redis or in-memory fallback
-  - Email: nodemailer; bug reports are stored first, then emailed via SMTP (supports local postfix or authenticated relay SMTP such as Timeweb submission on 2525/465)
+  - Email: nodemailer; bug reports are stored first, then emailed via SMTP (supports local postfix or authenticated relay SMTP such as Interserver submission on 2525/465)
   - Telegram bug alerts: uses the existing bot token and sends bug report notifications to one configured admin chat (`BUG_REPORT_TELEGRAM_CHAT_ID`) or multiple chats (`BUG_REPORT_TELEGRAM_CHAT_IDS`)
   - Monitoring: optional Sentry (SENTRY_DSN); health-check script for cron; server flushes Sentry on shutdown and also captures uncaughtException / unhandledRejection before exit
 
