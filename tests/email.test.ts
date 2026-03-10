@@ -50,12 +50,17 @@ describe('bug report email config', () => {
         message: 'Enough detail to satisfy validation and reach the mail sender.',
         screen: 'profile_list_settings',
         device_manufacturer: 'Google',
+        device_brand: 'google',
         device_model: 'Pixel 8',
         os_version: 'Android 15',
+        os_incremental: 'UP1A.240905.001',
         sdk_int: 35,
         app_version: '1.0.0',
         app_build: '1',
+        build_display: 'HiOS 14.6.0 test build',
         build_fingerprint: null,
+        security_patch: '2026-03-01',
+        status: 'open',
         created_at: new Date('2026-03-09T14:13:50.416Z'),
       })
     ).rejects.toThrow('Bug report email is not configured. Missing: SMTP_HOST, BUG_REPORT_RECIPIENT');

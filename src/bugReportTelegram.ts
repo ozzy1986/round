@@ -1,4 +1,5 @@
 import type { BugReport } from './db/types.js';
+import { buildBugReportNotificationDetails } from './bugReportNotificationText.js';
 
 const DEFAULT_TELEGRAM_API_BASE = 'https://api.telegram.org';
 const DEFAULT_TELEGRAM_TIMEOUT_MS = 5000;
@@ -118,21 +119,9 @@ export function buildBugReportTelegramMessages(
   report: BugReport,
   maxMessageLength = DEFAULT_TELEGRAM_MESSAGE_LIMIT
 ): string[] {
-  const headerLines = [
-    '[Round] New bug report',
-    `Report ID: ${report.id}`,
-    `Created at: ${report.created_at.toISOString()}`,
-    `User ID: ${report.user_id}`,
-    `Screen: ${report.screen ?? 'unknown'}`,
-    `App version: ${report.app_version} (${report.app_build})`,
-    `Device: ${report.device_manufacturer} ${report.device_model}`,
-    `Android: ${report.os_version} (SDK ${report.sdk_int})`,
-  ];
-  if (report.build_fingerprint) {
-    headerLines.push(`Build fingerprint: ${report.build_fingerprint}`);
-  }
+  const headerLines = ['[Round] Новый баг-репорт', ...buildBugReportNotificationDetails(report)];
 
-  const firstMessagePrefix = `${headerLines.join('\n')}\n\nMessage:\n`;
+  const firstMessagePrefix = `${headerLines.join('\n')}\n\nСообщение:\n`;
   const firstMessageBudget = Math.max(
     500,
     maxMessageLength - Array.from(firstMessagePrefix).length
@@ -144,7 +133,7 @@ export function buildBugReportTelegramMessages(
       return `${firstMessagePrefix}${chunk}`;
     }
 
-    const continuationPrefix = `[Round] Bug report ${report.id} (continued ${index})\n\n`;
+    const continuationPrefix = `[Round] Баг-репорт ${report.id} (продолжение ${index})\n\n`;
     const continuationBudget = Math.max(
       500,
       maxMessageLength - Array.from(continuationPrefix).length

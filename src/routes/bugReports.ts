@@ -10,12 +10,16 @@ interface BugReportBody {
   message: string;
   screen?: string;
   device_manufacturer: string;
+  device_brand?: string;
   device_model: string;
   os_version: string;
+  os_incremental?: string;
   sdk_int: number;
   app_version: string;
   app_build: string;
+  build_display?: string;
   build_fingerprint?: string;
+  security_patch?: string;
 }
 
 export async function bugReportsRoutes(app: FastifyInstance): Promise<void> {
@@ -60,17 +64,25 @@ export async function bugReportsRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const buildFingerprint = req.body.build_fingerprint?.trim();
+      const deviceBrand = req.body.device_brand?.trim();
+      const osIncremental = req.body.os_incremental?.trim();
+      const buildDisplay = req.body.build_display?.trim();
+      const securityPatch = req.body.security_patch?.trim();
       const bugReport = await bugReportsDb.createBugReport(pool, {
         user_id: userId,
         message,
         screen: req.body.screen?.trim() || null,
         device_manufacturer: deviceManufacturer,
+        device_brand: deviceBrand || null,
         device_model: deviceModel,
         os_version: osVersion,
+        os_incremental: osIncremental || null,
         sdk_int: req.body.sdk_int,
         app_version: appVersion,
         app_build: appBuild,
+        build_display: buildDisplay || null,
         build_fingerprint: buildFingerprint || null,
+        security_patch: securityPatch || null,
       });
 
       const notificationResults = await Promise.allSettled([

@@ -12,12 +12,17 @@ const sampleReport = {
   message: 'Enough detail to verify that Telegram delivery receives the bug report payload.',
   screen: 'profile_list_settings',
   device_manufacturer: 'Google',
+  device_brand: 'google',
   device_model: 'Pixel 8',
   os_version: 'Android 15',
+  os_incremental: 'UP1A.240905.001',
   sdk_int: 35,
   app_version: '1.0.0',
   app_build: '1',
+  build_display: 'HiOS 14.6.0 test build',
   build_fingerprint: 'google/pixel/pixel8:15/UP1A/test:user/release-keys',
+  security_patch: '2026-03-01',
+  status: 'open' as const,
   created_at: new Date('2026-03-09T14:13:50.416Z'),
 };
 
@@ -69,6 +74,9 @@ describe('bug report Telegram config', () => {
 
     expect(messages.length).toBeGreaterThan(1);
     expect(messages.every((message) => Array.from(message).length <= 4000)).toBe(true);
+    expect(messages[0]).toContain('Новый баг-репорт');
+    expect(messages[0]).toContain('Статус: Открыт');
+    expect(messages[0]).toContain('Отображаемая сборка: HiOS 14.6.0 test build');
   });
 
   it('sends every message chunk to every configured chat', async () => {

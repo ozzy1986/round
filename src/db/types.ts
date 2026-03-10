@@ -1,3 +1,5 @@
+import type { BugReportStatus } from '../bugReportStatus.js';
+
 export interface Profile {
   id: string;
   name: string;
@@ -52,12 +54,17 @@ export interface BugReport {
   message: string;
   screen: string | null;
   device_manufacturer: string;
+  device_brand: string | null;
   device_model: string;
   os_version: string;
+  os_incremental: string | null;
   sdk_int: number;
   app_version: string;
   app_build: string;
+  build_display: string | null;
   build_fingerprint: string | null;
+  security_patch: string | null;
+  status: BugReportStatus;
   created_at: Date;
 }
 
@@ -66,10 +73,14 @@ export interface CreateBugReportInput {
   message: string;
   screen?: string | null;
   device_manufacturer: string;
+  device_brand?: string | null;
   device_model: string;
   os_version: string;
+  os_incremental?: string | null;
   sdk_int: number;
   app_version: string;
   app_build: string;
+  build_display?: string | null;
   build_fingerprint?: string | null;
+  security_patch?: string | null;
 }

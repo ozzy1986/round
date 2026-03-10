@@ -41,11 +41,16 @@ describe('bug reports routes', () => {
     message: 'The bug report dialog should save after I explain how to reproduce it.',
     screen: 'profile_list_settings',
     device_manufacturer: 'Google',
+    device_brand: 'google',
     device_model: 'Pixel 8',
     os_version: 'Android 15',
+    os_incremental: 'UP1A.240905.001',
     sdk_int: 35,
     app_version: '1.0.0',
     app_build: '1',
+    build_display: 'HiOS 14.6.0 test build',
+    security_patch: '2026-03-01',
+    build_fingerprint: 'google/pixel/pixel8:15/UP1A/test:user/release-keys',
   };
 
   beforeAll(async () => {
@@ -89,6 +94,12 @@ describe('bug reports routes', () => {
     expect(saved?.message).toBe(validPayload.message);
     expect(saved?.screen).toBe(validPayload.screen);
     expect(saved?.device_model).toBe(validPayload.device_model);
+    expect(saved?.device_brand).toBe(validPayload.device_brand);
+    expect(saved?.os_incremental).toBe(validPayload.os_incremental);
+    expect(saved?.build_display).toBe(validPayload.build_display);
+    expect(saved?.security_patch).toBe(validPayload.security_patch);
+    expect(saved?.build_fingerprint).toBe(validPayload.build_fingerprint);
+    expect(saved?.status).toBe('open');
     expect(sendBugReportEmailMock).toHaveBeenCalledTimes(1);
     expect(sendBugReportEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({

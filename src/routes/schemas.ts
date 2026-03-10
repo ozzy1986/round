@@ -77,12 +77,16 @@ export const bugReportBodySchema = {
     message: { type: 'string', minLength: 10, maxLength: 5000 },
     screen: { type: 'string', minLength: 1, maxLength: 64 },
     device_manufacturer: { type: 'string', minLength: 1, maxLength: 120 },
+    device_brand: { type: 'string', minLength: 1, maxLength: 120 },
     device_model: { type: 'string', minLength: 1, maxLength: 120 },
     os_version: { type: 'string', minLength: 1, maxLength: 120 },
+    os_incremental: { type: 'string', minLength: 1, maxLength: 160 },
     sdk_int: { type: 'integer', minimum: 1, maximum: 1000 },
     app_version: { type: 'string', minLength: 1, maxLength: 64 },
     app_build: { type: 'string', minLength: 1, maxLength: 64 },
+    build_display: { type: 'string', minLength: 1, maxLength: 160 },
     build_fingerprint: { type: 'string', minLength: 1, maxLength: 256 },
+    security_patch: { type: 'string', minLength: 1, maxLength: 32 },
   },
 };
 

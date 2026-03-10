@@ -30,11 +30,27 @@ class BugReportPayloadFactoryTest {
         assertTrue(payload.app_build.isNotBlank())
         assertTrue(payload.sdk_int > 0)
         assertFalse(payload.device_manufacturer.isBlank())
+        payload.device_brand?.let {
+            assertTrue(it.isNotBlank())
+            assertTrue(it.length <= 120)
+        }
         assertFalse(payload.device_model.isBlank())
         assertFalse(payload.os_version.isBlank())
+        payload.os_incremental?.let {
+            assertTrue(it.isNotBlank())
+            assertTrue(it.length <= 160)
+        }
+        payload.build_display?.let {
+            assertTrue(it.isNotBlank())
+            assertTrue(it.length <= 160)
+        }
         payload.build_fingerprint?.let {
             assertTrue(it.isNotBlank())
             assertTrue(it.length <= 256)
+        }
+        payload.security_patch?.let {
+            assertTrue(it.isNotBlank())
+            assertTrue(it.length <= 32)
         }
     }
 }

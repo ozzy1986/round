@@ -49,7 +49,7 @@ Interval timer for boxing, MMA, HIIT, running. Users define profiles: each profi
 - Timer screen: big countdown (H:MM:SS when >= 1 hour, MM:SS otherwise) + current round emoji (profile emoji or round-based).
 - i18n: EN + RU from start; strings in backend and Android resources.
 - Offline-first: Android works without network; backend used for sync and Telegram.
-- Bug reports: main-screen Settings includes a small English "Report bug" form; the app sends the user's description plus device/app metadata to the backend, stores it in PostgreSQL, triggers email and Telegram alerts, and includes an optional Android build fingerprint so OEM/ROM-specific behavior (for example HiOS) is visible in admin and notification alerts.
+- Bug reports: main-screen Settings includes a small English "Report bug" form; the app sends the user's description plus device/app metadata to the backend, stores it in PostgreSQL, triggers email and Telegram alerts, and includes extended Android/ROM diagnostics (brand, incremental build, display build, security patch, build fingerprint) so OEM-specific behavior such as HiOS is visible in admin and owner notifications. Each report is created with status `open` and can be triaged in admin as `open`, `in_progress`, `fixed`, or `closed`.
 
 
 3. ARCHITECTURE
@@ -70,7 +70,7 @@ Backend:
   - Redis: optional (REDIS_URL); when set: shared rate limit, bot caches (token, fileId, TTS) via src/cache.ts; init/cache errors are logged instead of failing silently. At scale Redis is required for rate limit across instances.
   - Migrations: node-pg-migrate (migrations in migrations/*.cjs, including refresh_tokens, composite profile index)
   - Tests: Vitest, coverage with v8; lightweight backend test suite includes timer-engine, bot parser, i18n, cache, rate-limit, profiles query validation, server runtime config, and pool config
-  - Bot: Telegraf; TTS: @google-cloud/text-to-speech (free tier); caches use Redis or in-memory fallback
+  - Bot: Telegraf; TTS: @google-cloud/text-to-speech (free tier); caches use Redis or in-memory fallback; `/chatid` replies with the current chat ID so the owner can set `BUG_REPORT_TELEGRAM_CHAT_ID`
   - Email: nodemailer; bug reports are stored first, then emailed via SMTP (supports local postfix or authenticated relay SMTP such as Interserver submission on 2525/465)
   - Telegram bug alerts: uses the existing bot token and sends bug report notifications to one configured admin chat (`BUG_REPORT_TELEGRAM_CHAT_ID`) or multiple chats (`BUG_REPORT_TELEGRAM_CHAT_IDS`)
   - Monitoring: optional Sentry (SENTRY_DSN); health-check script for cron; server flushes Sentry on shutdown and also captures uncaughtException / unhandledRejection before exit
@@ -97,7 +97,7 @@ raund/
     cache.ts            - cacheGet/cacheSet (Redis or in-memory); in-memory eviction keeps memoryKeys in sync when entries expire; CacheKeys, CacheTTL for bot/TTS
     sentry.ts           - initSentry() / closeSentry() for error tracking (optional)
     bugReportTelegram.ts - bug report Telegram config, message chunking, and Bot API sender for admin alerts
-    routes/             - schemas.ts (shared Fastify JSON schemas for profiles/rounds, DRY), profiles.ts (CRUD + ISO-8601 validation for cursor/updated_since), rounds.ts (CRUD), bugReports.ts (POST /bug-reports, validation, DB-first save, SMTP email + Telegram alerts), adminBugReports.ts (GET /admin/bug-reports, HTTP Basic auth, searchable HTML inspector for stored reports), privacy.ts (GET /privacy — HTML privacy policy, Cache-Control 1h for performance)
+    routes/             - schemas.ts (shared Fastify JSON schemas for profiles/rounds, DRY), profiles.ts (CRUD + ISO-8601 validation for cursor/updated_since), rounds.ts (CRUD), bugReports.ts (POST /bug-reports, validation, DB-first save, SMTP email + Telegram alerts with extended device/ROM metadata), adminBugReports.ts (GET /admin/bug-reports + PATCH status, HTTP Basic auth, searchable HTML inspector for stored reports with Russian UI and status controls), privacy.ts (GET /privacy — HTML privacy policy, Cache-Control 1h for performance)
     db/                 - config (PG_DATABASE default `round`), pool (statement_timeout, exhaustion logging), types, profiles, rounds, bugReports, users, refreshTokens (purgeStaleTokens for cron)
     timer-engine/       - types.ts, index.ts (getInitialState, advance, runToCompletion)
     bot/                - index.ts (Telegraf), parser.ts, tts.ts (caches via cache.ts), run.ts
@@ -127,7 +127,7 @@ refresh_tokens:
   id (uuid, PK), token_hash (text), user_id (uuid, FK -> users, CASCADE), expires_at (timestamptz), revoked_at (timestamptz), created_at (timestamptz)
 
 bug_reports:
-  id (uuid, PK), user_id (uuid, FK -> users, CASCADE), message (text), screen (text, nullable), device_manufacturer (text), device_model (text), os_version (text), sdk_int (int), app_version (text), app_build (text), created_at (timestamptz)
+  id (uuid, PK), user_id (uuid, FK -> users, CASCADE), message (text), screen (text, nullable), device_manufacturer (text), device_brand (text, nullable), device_model (text), os_version (text), os_incremental (text, nullable), sdk_int (int), app_version (text), app_build (text), build_display (text, nullable), build_fingerprint (text, nullable), security_patch (text, nullable), status (text: open|in_progress|fixed|closed, default open), created_at (timestamptz)
 
 Auth: JWT-based. Access token 15m; refresh token 30 days, rotated on use. Anonymous registration (POST /auth/register) and Telegram auth (POST /auth/telegram with X-Bot-Secret) return token + refresh_token. POST /auth/refresh exchanges refresh_token for new token pair; POST /auth/logout revokes refresh_token. User isolation: all profile/round queries filter by user_id.
 
@@ -150,8 +150,9 @@ Auth: JWT-based. Access token 15m; refresh token 30 days, rotated on use. Anonym
   POST   /auth/telegram        - (X-Bot-Secret) create/find user by telegram_id; returns token, refresh_token, user_id
   POST   /auth/refresh         - body: refresh_token; returns new token, refresh_token, user_id (rotation)
   POST   /auth/logout          - body: refresh_token; revokes token (204)
-  POST   /bug-reports          - authenticated manual bug report; body: message, screen, device_manufacturer, device_model, os_version, sdk_int, app_version, app_build, optional build_fingerprint; stores row in PostgreSQL and sends SMTP email + Telegram bot alerts
-  GET    /admin/bug-reports    - HTTP Basic auth admin page; searchable/paginated HTML view of bug reports with dd.mm.yyyy HH:mm timestamps
+  POST   /bug-reports          - authenticated manual bug report; body: message, screen, device_manufacturer, device_model, os_version, sdk_int, app_version, app_build, optional device_brand, os_incremental, build_display, security_patch, build_fingerprint; stores row in PostgreSQL and sends SMTP email + Telegram bot alerts
+  GET    /admin/bug-reports    - HTTP Basic auth admin page; searchable/paginated HTML view of bug reports with dd.mm.yyyy HH:mm timestamps, Russian labels, and status filter
+  PATCH  /admin/bug-reports/:id/status - HTTP Basic auth admin action; updates bug report status (`open`, `in_progress`, `fixed`, `closed`)
 
   GET    /                     - liveness (no DB); returns { status: 'ok' }
   GET    /health               - readiness (DB check); returns { status: 'ok' } or 503
@@ -181,7 +182,7 @@ UI: Button-based (inline keyboards). No need to type commands; user taps buttons
 /start: Welcome message (i18n by user language_code) with two buttons: "Profiles", "Quick timer".
   - Profiles: Lists profiles from API as buttons (emoji + name); tap to start that profile's timer. "Back" returns to main menu.
   - Quick timer: Presets as buttons — e.g. 3×5+1, 5×3+1, "5 run, 5 walk". "Back" returns to main menu.
-Commands (still supported): /profiles (same list with buttons), /timer <spec> (with no arg shows main menu; with arg starts timer).
+Commands (still supported): /profiles (same list with buttons), /timer <spec> (with no arg shows main menu; with arg starts timer), /chatid (returns current chat ID for owner-side bug-report Telegram routing).
 <spec> for /timer: "3x5 1" (template), "5 run, 5 walk" (custom), or profile name/ID from API.
 
 Flow: runs timer-engine in process; every second calls advance(). On round_start and warn10, synthesizes speech via Google TTS and sends voice message. On training_end sends text "Training finished." One running timer per user (stored in memory).
@@ -281,7 +282,7 @@ Aligned with CORE PRINCIPLES above: security, speed, stability, scalability; DRY
 - Redis (optional): when REDIS_URL set, rate limit is shared across PM2 workers; bot token/fileId/TTS caches use Redis with TTL. Required at scale (multi-instance). Rate limit key: verified JWT user id when Bearer is valid, else IP; invalid/forged bearer tokens fall back to IP; RATE_LIMIT_MAX (default 200), RATE_LIMIT_WINDOW (default 1 minute).
 - PgBouncer (optional): deploy/pgbouncer.ini.sample; PG_POOL_MAX per worker (default 10); pool.on('error') and exhaustion warning; PG_STMT_TIMEOUT_MS is optional but production falls back to 10000 when unset.
 - Sentry (optional): SENTRY_DSN for 5xx error reporting; health-check.sh for uptime cron. Android: the Sentry SDK is packaged only when SENTRY_DSN is provided for the build; auto-init disabled (meta-data io.sentry.auto-init=false); RaundApplication initializes it only when BuildConfig.SENTRY_ENABLED is true and does so from the background init scope so no-DSN builds omit the SDK/provider size cost and Sentry setup does not sit on the cold-start critical path. ProGuard keeps io.sentry.** and LineNumberTable/SourceFile only matter when the dependency is present.
-- Bug reports: validated JSON schema, auth required, route limit 5/15m/user, PostgreSQL save happens before email/Telegram notification so an SMTP outage does not drop the report. Privacy policy explicitly discloses voluntary bug-report text + device/app metadata. The payload supports optional build_fingerprint for OEM/ROM diagnostics, SMTP and Telegram alerts include that field when present, and the admin inspector at /admin/bug-reports shows stored reports with searchable metadata and dd.mm.yyyy HH:mm timestamps. Telegram delivery uses the existing bot token plus configured admin chat ID(s), and long messages are split into Telegram-safe chunks. The production API was smoke-tested after deploy and the physical phone flow showed the "Bug report sent." toast against the live VPS.
+- Bug reports: validated JSON schema, auth required, route limit 5/15m/user, PostgreSQL save happens before email/Telegram notification so an SMTP outage does not drop the report. Privacy policy explicitly discloses voluntary bug-report text + device/app metadata. The payload supports optional build_fingerprint plus extra ROM/build fields (brand, incremental, display build, security patch) for OEM diagnostics such as HiOS, SMTP and Telegram alerts include those fields when present, and the admin inspector at /admin/bug-reports shows stored reports with searchable metadata, Russian labels, dd.mm.yyyy HH:mm timestamps, and editable status (`open`, `in_progress`, `fixed`, `closed`). Telegram delivery uses the existing bot token plus configured admin chat ID(s), and long messages are split into Telegram-safe chunks. The production API was smoke-tested after deploy and the physical phone flow showed the "Bug report sent." toast against the live VPS.
 - Android unit tests: JUnit 4, MockK, Robolectric, kotlinx-coroutines-test; test directory android/app/src/test/. Current count: 54 tests. Coverage includes: TimerStateHolder (thread safety, update, reset), TimerAutoResumePolicy (screen-off pause/unlock resume decisions), AuthAuthenticator (authenticated 401 refresh, retry guard, strict concurrent refresh dedupe), TokenStore (CRUD, encrypted storage fallback to memory-only, no plain-text persistence), ProfileRepository (atomic saveRounds, anonymous register on first sync, server-timestamp watermarking, sanitization, validation, sync throttle/forceSync behavior, bug report submission), BugReportPayloadFactory (device/app metadata assembly), TtsCache (phrase list, deterministic cache paths, allExist detection), NavControllerExtensions (repeat-safe return to `profiles`), BuildConfig (HTTPS URL, SENTRY_DSN, SENTRY_ENABLED fields).
 - Shared timer core; Vitest with coverage (timer-engine 100%, auth, cache, others high).
 - Offline-first and data validation. UI: minimal, big countdown (shared formatDuration: H:MM:SS when >= 1h, MM:SS otherwise — used in profile list, timer screen, notification), clear typography.

@@ -222,7 +222,9 @@ export function createBot(): Telegraf {
   bot.command('chatid', (ctx) => {
     const chatId = ctx.chat?.id;
     if (chatId == null) return;
-    ctx.reply(`Your chat ID: ${chatId}\nUse this as BUG_REPORT_TELEGRAM_CHAT_ID for bug report notifications.`).catch(() => {});
+    ctx.reply(
+      `Ваш chat ID: ${chatId}\nИспользуйте его как BUG_REPORT_TELEGRAM_CHAT_ID для уведомлений о баг-репортах.`
+    ).catch(() => {});
   });
 
   bot.command('profiles', async (ctx) => {

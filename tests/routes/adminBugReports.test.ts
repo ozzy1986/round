@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { listBugReportsMock } = vi.hoisted(() => ({
+const { listBugReportsMock, updateBugReportStatusMock } = vi.hoisted(() => ({
   listBugReportsMock: vi.fn(),
+  updateBugReportStatusMock: vi.fn(),
 }));
 
 vi.mock('../../src/db/bugReports.js', async () => {
@@ -11,6 +12,7 @@ vi.mock('../../src/db/bugReports.js', async () => {
   return {
     ...actual,
     listBugReports: listBugReportsMock,
+    updateBugReportStatus: updateBugReportStatusMock,
   };
 });
 
@@ -44,6 +46,7 @@ describe('admin bug reports route', () => {
   beforeEach(() => {
     listBugReportsMock.mockReset();
     listBugReportsMock.mockResolvedValue([]);
+    updateBugReportStatusMock.mockReset();
   });
 
   it('requires HTTP Basic auth', async () => {
@@ -82,12 +85,17 @@ describe('admin bug reports route', () => {
         message: 'Second message with <script>alert(1)</script>',
         screen: 'timer_screen',
         device_manufacturer: 'Google',
+        device_brand: 'google',
         device_model: 'Pixel 9',
         os_version: 'Android 15',
+        os_incremental: 'UP1A.240905.001',
         sdk_int: 35,
         app_version: '1.2.3',
         app_build: '42',
+        build_display: 'HiOS 14.6.0 test build',
         build_fingerprint: 'TECNO/BG6/HiOS-15-test',
+        security_patch: '2026-03-01',
+        status: 'fixed',
         created_at: new Date('2026-03-09T10:59:00.000Z'),
       },
       {
@@ -96,19 +104,24 @@ describe('admin bug reports route', () => {
         message: 'First message',
         screen: null,
         device_manufacturer: 'Samsung',
+        device_brand: 'samsung',
         device_model: 'S24',
         os_version: 'Android 14',
+        os_incremental: 'UP1A.240801.001',
         sdk_int: 34,
         app_version: '1.2.2',
         app_build: '41',
+        build_display: 'One UI 6.1',
         build_fingerprint: null,
+        security_patch: '2026-02-01',
+        status: 'open',
         created_at: new Date('2026-03-09T10:58:00.000Z'),
       },
     ]);
 
     const res = await app.inject({
       method: 'GET',
-      url: '/admin/bug-reports?limit=2&q=crash&user_id=11111111-1111-1111-1111-111111111111&before=2026-03-09T12:00:00.000Z',
+      url: '/admin/bug-reports?limit=2&q=crash&user_id=11111111-1111-1111-1111-111111111111&status=fixed&before=2026-03-09T12:00:00.000Z',
       headers: {
         authorization: basicAuthHeader('admin', 'top-secret-password'),
       },
@@ -122,16 +135,62 @@ describe('admin bug reports route', () => {
         limit: 2,
         search: 'crash',
         userId: '11111111-1111-1111-1111-111111111111',
+        status: 'fixed',
         before: '2026-03-09T12:00:00.000Z',
       })
     );
-    expect(res.body).toContain('Bug Reports');
+    expect(res.body).toContain('Баг-репорты');
     expect(res.body).toContain('report-2');
     expect(res.body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
-    expect(res.body).toContain('Load older reports');
+    expect(res.body).toContain('Загрузить более старые отчёты');
     expect(res.body).toContain('11111111-1111-1111-1111-111111111111');
     expect(res.body).toMatch(/\b\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}\b/);
-    expect(res.body).toContain('Build fingerprint:');
+    expect(res.body).toContain('Fingerprint сборки:');
     expect(res.body).toContain('TECNO/BG6/HiOS-15-test');
+    expect(res.body).toContain('Исправлен');
+    expect(res.body).toContain('HiOS 14.6.0 test build');
+  });
+
+  it('updates a bug report status via the admin route', async () => {
+    updateBugReportStatusMock.mockResolvedValue({
+      id: 'report-1',
+      user_id: '11111111-1111-1111-1111-111111111111',
+      message: 'First message',
+      screen: null,
+      device_manufacturer: 'Samsung',
+      device_brand: 'samsung',
+      device_model: 'S24',
+      os_version: 'Android 14',
+      os_incremental: 'UP1A.240801.001',
+      sdk_int: 34,
+      app_version: '1.2.2',
+      app_build: '41',
+      build_display: 'One UI 6.1',
+      build_fingerprint: null,
+      security_patch: '2026-02-01',
+      status: 'fixed',
+      created_at: new Date('2026-03-09T10:58:00.000Z'),
+    });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/admin/bug-reports/11111111-1111-1111-1111-111111111111/status',
+      headers: {
+        authorization: basicAuthHeader('admin', 'top-secret-password'),
+      },
+      payload: {
+        status: 'fixed',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(updateBugReportStatusMock).toHaveBeenCalledWith(expect.anything(), {
+      id: '11111111-1111-1111-1111-111111111111',
+      status: 'fixed',
+    });
+    expect(res.json()).toEqual({
+      id: 'report-1',
+      status: 'fixed',
+    });
   });
 });

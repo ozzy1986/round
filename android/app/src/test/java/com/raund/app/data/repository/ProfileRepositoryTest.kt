@@ -66,12 +66,16 @@ class ProfileRepositoryTest {
             message = message,
             screen = "profile_list_settings",
             device_manufacturer = "Google",
+            device_brand = "google",
             device_model = "Pixel 8",
             os_version = "15",
+            os_incremental = "UP1A.240905.001",
             sdk_int = 35,
             app_version = "1.0.0",
             app_build = "1",
-            build_fingerprint = null
+            build_display = "HiOS 14.6.0 test build",
+            build_fingerprint = null,
+            security_patch = "2026-03-01"
         )
     }
 

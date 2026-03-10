@@ -1,8 +1,14 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { getPool } from '../db/pool.js';
-import { listBugReports } from '../db/bugReports.js';
+import { listBugReports, updateBugReportStatus } from '../db/bugReports.js';
 import type { BugReport } from '../db/types.js';
+import {
+  BUG_REPORT_STATUS_VALUES,
+  getBugReportStatusLabel,
+  isBugReportStatus,
+  type BugReportStatus,
+} from '../bugReportStatus.js';
 
 const ADMIN_REALM = 'Round Admin';
 const DEFAULT_LIMIT = 50;
@@ -18,6 +24,11 @@ interface AdminBugReportsQuerystring {
   q?: string;
   user_id?: string;
   before?: string;
+  status?: string;
+}
+
+interface AdminBugReportStatusBody {
+  status: BugReportStatus;
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -97,14 +108,47 @@ function buildAdminHref(filters: {
   query?: string;
   userId?: string;
   before?: string;
+  status?: string;
 }): string {
   const params = new URLSearchParams();
   params.set('limit', String(filters.limit));
   if (filters.query) params.set('q', filters.query);
   if (filters.userId) params.set('user_id', filters.userId);
   if (filters.before) params.set('before', filters.before);
+  if (filters.status) params.set('status', filters.status);
   const queryString = params.toString();
   return queryString ? `/admin/bug-reports?${queryString}` : '/admin/bug-reports';
+}
+
+function renderStatusOptions(selectedStatus: string, includeAllOption: boolean): string {
+  const options: Array<{ value: string; label: string }> = includeAllOption
+    ? [{ value: '', label: 'Все статусы' }]
+    : [];
+  options.push(
+    ...BUG_REPORT_STATUS_VALUES.map((status) => ({
+      value: status,
+      label: getBugReportStatusLabel(status),
+    }))
+  );
+
+  return options
+    .map(
+      (option) =>
+        `<option value="${escapeHtml(option.value)}"${
+          option.value === selectedStatus ? ' selected' : ''
+        }>${escapeHtml(option.label)}</option>`
+    )
+    .join('');
+}
+
+function buildStatusLabelMap(): Record<BugReportStatus, string> {
+  return BUG_REPORT_STATUS_VALUES.reduce(
+    (map, status) => {
+      map[status] = getBugReportStatusLabel(status);
+      return map;
+    },
+    {} as Record<BugReportStatus, string>
+  );
 }
 
 export function renderBugReportsAdminPage(input: {
@@ -112,12 +156,14 @@ export function renderBugReportsAdminPage(input: {
   limit: number;
   query: string;
   userId: string;
+  status: string;
   nextBefore: string | null;
 }): string {
-  const { bugReports, limit, query, userId, nextBefore } = input;
+  const { bugReports, limit, query, userId, status, nextBefore } = input;
+  const statusLabels = buildStatusLabelMap();
   const cardsHtml =
     bugReports.length === 0
-      ? '<div class="empty">No bug reports found for the current filters.</div>'
+      ? '<div class="empty">По текущим фильтрам баг-репорты не найдены.</div>'
       : bugReports
           .map((report) => {
             const createdAtDisplay = formatDateDdMmYyyy(report.created_at);
@@ -125,6 +171,7 @@ export function renderBugReportsAdminPage(input: {
               limit,
               query,
               userId: report.user_id,
+              status,
             });
             return `
               <article class="card">
@@ -133,7 +180,10 @@ export function renderBugReportsAdminPage(input: {
                     <div class="report-id">${escapeHtml(report.id)}</div>
                     <div class="meta-row">
                       <span>${escapeHtml(createdAtDisplay)}</span>
-                      <span>Screen: ${escapeHtml(report.screen ?? 'unknown')}</span>
+                      <span>Экран: ${escapeHtml(report.screen ?? 'не указан')}</span>
+                      <span class="status-badge status-${escapeHtml(report.status)}" data-status-label>${escapeHtml(
+                        getBugReportStatusLabel(report.status)
+                      )}</span>
                     </div>
                   </div>
                   <a class="user-link" href="${escapeHtml(userFilterHref)}">${escapeHtml(
@@ -141,19 +191,31 @@ export function renderBugReportsAdminPage(input: {
                   )}</a>
                 </div>
                 <div class="preview">${escapeHtml(formatPreview(report.message))}</div>
+                <form class="status-form" data-report-id="${escapeHtml(report.id)}">
+                  <label>
+                    <span>Статус</span>
+                    <select name="status">
+                      ${renderStatusOptions(report.status, false)}
+                    </select>
+                  </label>
+                  <button type="submit">Сохранить</button>
+                  <span class="status-save-result" aria-live="polite"></span>
+                </form>
                 <details>
-                  <summary>Open details</summary>
+                  <summary>Показать детали</summary>
                   <div class="details-grid">
-                    <div><strong>App:</strong> ${escapeHtml(
+                    <div><strong>Версия приложения:</strong> ${escapeHtml(
                       `${report.app_version} (${report.app_build})`
                     )}</div>
-                    <div><strong>Device:</strong> ${escapeHtml(
-                      `${report.device_manufacturer} ${report.device_model}`
-                    )}</div>
-                    <div><strong>Android:</strong> ${escapeHtml(
-                      `${report.os_version} (SDK ${String(report.sdk_int)})`
-                    )}</div>
-                    ${report.build_fingerprint ? `<div><strong>Build fingerprint:</strong> ${escapeHtml(report.build_fingerprint)}</div>` : ''}
+                    <div><strong>Производитель:</strong> ${escapeHtml(report.device_manufacturer)}</div>
+                    ${report.device_brand ? `<div><strong>Бренд:</strong> ${escapeHtml(report.device_brand)}</div>` : ''}
+                    <div><strong>Модель:</strong> ${escapeHtml(report.device_model)}</div>
+                    <div><strong>Android:</strong> ${escapeHtml(report.os_version)}</div>
+                    <div><strong>SDK:</strong> ${escapeHtml(String(report.sdk_int))}</div>
+                    ${report.os_incremental ? `<div><strong>Incremental сборки:</strong> ${escapeHtml(report.os_incremental)}</div>` : ''}
+                    ${report.build_display ? `<div><strong>Отображаемая сборка:</strong> ${escapeHtml(report.build_display)}</div>` : ''}
+                    ${report.security_patch ? `<div><strong>Патч безопасности:</strong> ${escapeHtml(report.security_patch)}</div>` : ''}
+                    ${report.build_fingerprint ? `<div><strong>Fingerprint сборки:</strong> ${escapeHtml(report.build_fingerprint)}</div>` : ''}
                   </div>
                   <pre class="message">${escapeHtml(report.message)}</pre>
                 </details>
@@ -167,17 +229,19 @@ export function renderBugReportsAdminPage(input: {
         limit,
         query,
         userId,
+        status,
         before: nextBefore,
       })
     : null;
   const clearHref = buildAdminHref({ limit });
+  const statusLabelsJson = JSON.stringify(statusLabels);
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Round Admin - Bug Reports</title>
+  <title>Round Admin - Баг-репорты</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -210,7 +274,7 @@ export function renderBugReportsAdminPage(input: {
     }
     form {
       display: grid;
-      grid-template-columns: minmax(0, 1.7fr) minmax(220px, 1fr) 110px auto auto;
+      grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr) minmax(160px, 0.8fr) 110px auto auto;
       gap: 12px;
       margin: 24px 0;
       padding: 16px;
@@ -219,14 +283,18 @@ export function renderBugReportsAdminPage(input: {
       border-radius: 16px;
     }
     input, button, a.button-link {
+      box-sizing: border-box;
       border-radius: 10px;
       border: 1px solid var(--card-border);
       font: inherit;
     }
-    input {
+    input, select {
       padding: 12px;
       background: #11161d;
       color: var(--text);
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      font: inherit;
     }
     button, a.button-link {
       padding: 12px 14px;
@@ -289,6 +357,54 @@ export function renderBugReportsAdminPage(input: {
       line-height: 1.5;
       margin-bottom: 10px;
     }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .status-open {
+      background: rgba(59, 130, 246, 0.18);
+      color: #93c5fd;
+    }
+    .status-in_progress {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+    }
+    .status-fixed {
+      background: rgba(34, 197, 94, 0.18);
+      color: #86efac;
+    }
+    .status-closed {
+      background: rgba(148, 163, 184, 0.18);
+      color: #cbd5e1;
+    }
+    .status-form {
+      display: grid;
+      grid-template-columns: minmax(180px, 240px) auto minmax(0, 1fr);
+      align-items: end;
+      gap: 10px;
+      margin: 0 0 12px;
+      padding: 12px;
+      background: #11161d;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+    }
+    .status-form label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .status-save-result {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 14px;
+      align-self: center;
+    }
     details summary {
       cursor: pointer;
       color: var(--muted);
@@ -329,25 +445,28 @@ export function renderBugReportsAdminPage(input: {
 </head>
 <body>
   <main>
-    <h1>Bug Reports</h1>
-    <p>Quick admin inspector for the latest app bug reports.</p>
+    <h1>Баг-репорты</h1>
+    <p>Быстрый админ-инспектор для входящих отчётов из приложения.</p>
     <form method="get" action="/admin/bug-reports">
       <input type="search" name="q" value="${escapeHtml(
         query
-      )}" placeholder="Search message, screen, device, app version, user ID">
+      )}" placeholder="Поиск по сообщению, экрану, устройству, версии, статусу, user ID">
       <input type="text" name="user_id" value="${escapeHtml(
         userId
-      )}" placeholder="Filter by exact user ID">
+      )}" placeholder="Фильтр по точному user ID">
+      <select name="status">
+        ${renderStatusOptions(status, true)}
+      </select>
       <input type="number" name="limit" min="1" max="${MAX_LIMIT}" value="${String(limit)}">
-      <button type="submit">Apply</button>
-      <a class="button-link secondary" href="${escapeHtml(clearHref)}">Clear</a>
+      <button type="submit">Применить</button>
+      <a class="button-link secondary" href="${escapeHtml(clearHref)}">Сбросить</a>
     </form>
     <div class="results-meta">
-      <span>Showing ${String(bugReports.length)} report(s).</span>
+      <span>Показано отчётов: ${String(bugReports.length)}.</span>
       ${
         nextBefore
-          ? `<a class="button-link secondary" href="${escapeHtml(olderHref ?? clearHref)}">Older</a>`
-          : '<span>No older page.</span>'
+          ? `<a class="button-link secondary" href="${escapeHtml(olderHref ?? clearHref)}">Старше</a>`
+          : '<span>Более старых страниц нет.</span>'
       }
     </div>
     <section class="cards">${cardsHtml}</section>
@@ -355,10 +474,41 @@ export function renderBugReportsAdminPage(input: {
       nextBefore
         ? `<div class="pager"><a class="button-link" href="${escapeHtml(
             olderHref ?? clearHref
-          )}">Load older reports</a></div>`
+          )}">Загрузить более старые отчёты</a></div>`
         : ''
     }
   </main>
+  <script>
+    const statusLabels = JSON.parse('${statusLabelsJson}');
+    for (const form of document.querySelectorAll('.status-form')) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const reportId = form.getAttribute('data-report-id');
+        const select = form.querySelector('select[name="status"]');
+        const result = form.querySelector('.status-save-result');
+        const badge = form.parentElement?.querySelector('[data-status-label]');
+        if (!reportId || !select || !result || !badge) return;
+        result.textContent = 'Сохраняю...';
+        try {
+          const response = await fetch('/admin/bug-reports/' + encodeURIComponent(reportId) + '/status', {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: select.value }),
+          });
+          if (!response.ok) {
+            throw new Error('Не удалось сохранить статус');
+          }
+          const data = await response.json();
+          badge.textContent = statusLabels[data.status] ?? data.status;
+          badge.className = 'status-badge status-' + data.status;
+          result.textContent = 'Сохранено';
+        } catch (error) {
+          result.textContent = error instanceof Error ? error.message : 'Не удалось сохранить статус';
+        }
+      });
+    }
+  </script>
 </body>
 </html>`;
 }
@@ -368,7 +518,7 @@ function sendAdminAuthChallenge(reply: FastifyReply): FastifyReply {
     .header('WWW-Authenticate', `Basic realm="${ADMIN_REALM}", charset="UTF-8"`)
     .type('text/plain; charset=utf-8')
     .status(401)
-    .send('Unauthorized');
+    .send('Требуется авторизация');
 }
 
 export async function adminBugReportsRoutes(app: FastifyInstance): Promise<void> {
@@ -386,13 +536,14 @@ export async function adminBugReportsRoutes(app: FastifyInstance): Promise<void>
             q: { type: 'string', maxLength: 200 },
             user_id: { type: 'string', format: 'uuid' },
             before: { type: 'string', format: 'date-time' },
+            status: { type: 'string', enum: ['', ...BUG_REPORT_STATUS_VALUES] },
           },
         },
       },
     },
     async (req: FastifyRequest<{ Querystring: AdminBugReportsQuerystring }>, reply) => {
       if (!getAdminBasicAuthConfig()) {
-        return reply.status(404).send({ message: 'Not found' });
+        return reply.status(404).send({ message: 'Не найдено' });
       }
       if (!isAuthorizedAdminRequest(req.headers.authorization)) {
         return sendAdminAuthChallenge(reply);
@@ -404,11 +555,13 @@ export async function adminBugReportsRoutes(app: FastifyInstance): Promise<void>
       );
       const query = req.query.q?.trim() ?? '';
       const userId = req.query.user_id?.trim() ?? '';
+      const status = req.query.status?.trim() ?? '';
       const bugReports = await listBugReports(pool, {
         limit,
         search: query || undefined,
         userId: userId || undefined,
         before: req.query.before || undefined,
+        status: isBugReportStatus(status) ? status : undefined,
       });
       const nextBefore =
         bugReports.length === limit
@@ -424,9 +577,70 @@ export async function adminBugReportsRoutes(app: FastifyInstance): Promise<void>
             limit,
             query,
             userId,
+            status,
             nextBefore,
           })
         );
+    }
+  );
+
+  app.patch<{ Params: { id: string }; Body: AdminBugReportStatusBody }>(
+    '/admin/bug-reports/:id/status',
+    {
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['status'],
+          additionalProperties: false,
+          properties: {
+            status: { type: 'string', enum: [...BUG_REPORT_STATUS_VALUES] },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            required: ['id', 'status'],
+            properties: {
+              id: { type: 'string', format: 'uuid' },
+              status: { type: 'string', enum: [...BUG_REPORT_STATUS_VALUES] },
+            },
+          },
+          404: {
+            type: 'object',
+            required: ['message'],
+            properties: { message: { type: 'string' } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (!getAdminBasicAuthConfig()) {
+        return reply.status(404).send({ message: 'Не найдено' });
+      }
+      if (!isAuthorizedAdminRequest(req.headers.authorization)) {
+        return sendAdminAuthChallenge(reply);
+      }
+
+      const bugReport = await updateBugReportStatus(pool, {
+        id: req.params.id,
+        status: req.body.status,
+      });
+      if (!bugReport) {
+        return reply.status(404).send({ message: 'Баг-репорт не найден' });
+      }
+
+      return reply.send({
+        id: bugReport.id,
+        status: bugReport.status,
+      });
     }
   );
 }

@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 import type { BugReport } from './db/types.js';
+import { buildBugReportNotificationDetails } from './bugReportNotificationText.js';
 
 interface BugReportEmailConfig {
   from: string;
@@ -77,23 +78,13 @@ export async function sendBugReportEmail(report: BugReport): Promise<void> {
   }
 
   const transport = getTransporter(config);
-  const createdAt = report.created_at.toISOString();
-  const subject = `[Round] Bug report ${report.id}`;
+  const subject = `[Round] Новый баг-репорт ${report.id}`;
   const lines = [
-    'A new bug report was submitted.',
+    'Поступил новый баг-репорт из приложения.',
     '',
-    `Report ID: ${report.id}`,
-    `Created at: ${createdAt}`,
-    `User ID: ${report.user_id}`,
-    `Screen: ${report.screen ?? 'unknown'}`,
-    `App version: ${report.app_version} (${report.app_build})`,
-    `Device: ${report.device_manufacturer} ${report.device_model}`,
-    `Android: ${report.os_version} (SDK ${report.sdk_int})`,
+    ...buildBugReportNotificationDetails(report),
   ];
-  if (report.build_fingerprint) {
-    lines.push(`Build fingerprint: ${report.build_fingerprint}`);
-  }
-  lines.push('', 'Message:', report.message);
+  lines.push('', 'Сообщение:', report.message);
   const text = lines.join('\n');
 
   await transport.sendMail({
