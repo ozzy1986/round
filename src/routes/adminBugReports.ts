@@ -213,7 +213,7 @@ export function renderBugReportsAdminPage(input: {
                     <div><strong>Android:</strong> ${escapeHtml(report.os_version)}</div>
                     <div><strong>SDK:</strong> ${escapeHtml(String(report.sdk_int))}</div>
                     ${report.os_incremental ? `<div><strong>Incremental сборки:</strong> ${escapeHtml(report.os_incremental)}</div>` : ''}
-                    ${report.build_display ? `<div><strong>Отображаемая сборка:</strong> ${escapeHtml(report.build_display)}</div>` : ''}
+                    ${report.build_display ? `<div><strong>Сборка/прошивка:</strong> ${escapeHtml(report.build_display)}</div>` : ''}
                     ${report.security_patch ? `<div><strong>Патч безопасности:</strong> ${escapeHtml(report.security_patch)}</div>` : ''}
                     ${report.build_fingerprint ? `<div><strong>Fingerprint сборки:</strong> ${escapeHtml(report.build_fingerprint)}</div>` : ''}
                   </div>

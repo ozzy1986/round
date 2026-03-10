@@ -76,7 +76,8 @@ describe('bug report Telegram config', () => {
     expect(messages.every((message) => Array.from(message).length <= 4000)).toBe(true);
     expect(messages[0]).toContain('Новый баг-репорт');
     expect(messages[0]).toContain('Статус: Открыт');
-    expect(messages[0]).toContain('Отображаемая сборка: HiOS 14.6.0 test build');
+    expect(messages[0]).toContain('Сборка/прошивка: HiOS 14.6.0 test build');
+    expect(messages[0]).toContain('ОС: Android 15 (API 35)');
   });
 
   it('sends every message chunk to every configured chat', async () => {
