@@ -187,7 +187,7 @@ fun TimerScreen(
     LaunchedEffect(isRefreshing) {
         if (!isRefreshing) pullToRefreshState.endRefresh()
     }
-    val controlsReservedHeight = TimerLayoutMetrics.controlsReservedHeightDp(activeWorkout = running).dp
+    val controlsReservedHeight = TimerLayoutMetrics.controlsReservedHeightDp().dp
 
     Box(
         modifier = Modifier
@@ -306,87 +306,83 @@ private fun TimerVisualContent(
                 .padding(bottom = controlsReservedHeight)
                 .then(if (canRefresh) Modifier.verticalScroll(scrollState) else Modifier)
         ) {
-            TimerTopBar(
-                profileName = profileName,
-                backEnabled = !isLeaving,
-                onBack = onBack
-            )
-
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (!canRefresh) Modifier.weight(1f) else Modifier.height((maxH * 0.7f).dp))
-                    .padding(horizontal = 24.dp)
+                    .then(
+                        if (canRefresh) {
+                            Modifier.height(this@BoxWithConstraints.maxHeight - controlsReservedHeight)
+                        } else {
+                            Modifier.fillMaxSize()
+                        }
+                    )
             ) {
-                if (finished) {
-                    Text(
-                        timerFinishedText,
-                        style = MaterialTheme.typography.displaySmall,
-                        color = primaryColor,
-                        textAlign = TextAlign.Center
-                    )
-                } else {
-                    Text(
-                        currentRound,
-                        style = MaterialTheme.typography.displaySmall,
-                        color = primaryColor,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                    if (roundInfo.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = surfaceVarColor
+                TimerTopBar(
+                    profileName = profileName,
+                    backEnabled = !isLeaving,
+                    onBack = onBack
+                )
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 24.dp)
+                ) {
+                    if (finished) {
+                        Text(
+                            timerFinishedText,
+                            style = MaterialTheme.typography.displaySmall,
+                            color = primaryColor,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Text(
+                            currentRound,
+                            style = MaterialTheme.typography.displaySmall,
+                            color = primaryColor,
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        if (roundInfo.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    roundInfo,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = onSurfaceVarColor,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                )
-                            }
-                            if (paused) {
-                                Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
                                     color = surfaceVarColor
                                 ) {
                                     Text(
-                                        timerPausedText,
+                                        roundInfo,
                                         style = MaterialTheme.typography.titleMedium,
                                         color = onSurfaceVarColor,
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                     )
                                 }
+                                if (paused) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = surfaceVarColor
+                                    ) {
+                                        Text(
+                                            timerPausedText,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = onSurfaceVarColor,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
-                    Spacer(modifier = Modifier.height(TimerLayoutMetrics.ringTopSpacingDp.dp))
-                    if (canRefresh) {
-                        TimerCountdownRing(
-                            remaining = remaining,
-                            roundTotal = roundTotal,
-                            isRunning = running,
-                            isFinished = finished,
-                            maxRingSize = TimerLayoutMetrics.ringMaxSizeDp(
-                                viewportWidthDp = this@BoxWithConstraints.maxWidth.value,
-                                availableHeightDp = this@BoxWithConstraints.maxHeight.value * TimerLayoutMetrics.refreshContentHeightRatio
-                            ).dp,
-                            timerFontSize = timerFontSize,
-                            onBgColor = onBgColor,
-                            emoji = emoji
-                        )
-                    } else {
+                        Spacer(modifier = Modifier.height(TimerLayoutMetrics.ringTopSpacingDp.dp))
                         BoxWithConstraints(
                             modifier = Modifier
                                 .fillMaxWidth()

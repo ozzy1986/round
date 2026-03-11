@@ -6,9 +6,8 @@ import org.junit.Test
 class TimerLayoutMetricsTest {
 
     @Test
-    fun `active workout reserves pause and stop controls height`() {
-        assertEquals(192f, TimerLayoutMetrics.controlsReservedHeightDp(activeWorkout = true), 0.001f)
-        assertEquals(128f, TimerLayoutMetrics.controlsReservedHeightDp(activeWorkout = false), 0.001f)
+    fun `timer screen always reserves the tallest controls slot`() {
+        assertEquals(192f, TimerLayoutMetrics.controlsReservedHeightDp(), 0.001f)
     }
 
     @Test
