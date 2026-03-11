@@ -78,6 +78,7 @@ import androidx.compose.ui.zIndex
 import com.raund.app.MAX_ROUNDS_PER_PROFILE
 import com.raund.app.MAX_ROUND_DURATION_SECONDS
 import com.raund.app.MIN_ROUND_DURATION_SECONDS
+import com.raund.app.parseDurationExpression
 import com.raund.app.R
 import com.raund.app.viewmodel.ProfileEditorViewModel
 import com.raund.app.viewmodel.RoundEditState
@@ -377,10 +378,11 @@ fun ProfileEditorScreen(
                             OutlinedTextField(
                                 value = dur,
                                 onValueChange = {
-                                    val digitsOnly = it.filter { char -> char.isDigit() }
-                                    val currentDur = digitsOnly.toIntOrNull() ?: 0
+                                    val allowed = it.filter { c -> c.isDigit() || c == '+' || c == '*' || c == ' ' }
+                                    val parsed = parseDurationExpression(allowed)
+                                    val currentDur = parsed ?: 0
                                     val newWarn = if (currentDur <= 10) false else warn
-                                    viewModel.updateRoundAt(index, round.copy(duration = digitsOnly, warn10sec = newWarn))
+                                    viewModel.updateRoundAt(index, round.copy(duration = allowed, warn10sec = newWarn))
                                 },
                                 label = { Text(stringResource(R.string.duration_seconds)) },
                                 singleLine = true,
@@ -393,13 +395,14 @@ fun ProfileEditorScreen(
                                         if (focusState.isFocused) {
                                             refreshImeForKeyboardClass(EditorKeyboardClass.Number)
                                         } else {
-                                            val parsed = dur.toIntOrNull() ?: 0
+                                            val parsed = parseDurationExpression(dur) ?: dur.toIntOrNull() ?: 0
                                             val clamped = parsed.coerceIn(MIN_ROUND_DURATION_SECONDS, MAX_ROUND_DURATION_SECONDS)
-                                            if (clamped != parsed) {
+                                            val displayValue = clamped.toString()
+                                            if (displayValue != dur) {
                                                 viewModel.updateRoundAt(
                                                     index,
                                                     round.copy(
-                                                        duration = clamped.toString(),
+                                                        duration = displayValue,
                                                         warn10sec = if (clamped <= 10) false else warn
                                                     )
                                                 )
@@ -416,7 +419,7 @@ fun ProfileEditorScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                val currentDur = dur.toIntOrNull() ?: 0
+                                val currentDur = parseDurationExpression(dur) ?: dur.toIntOrNull() ?: 0
                                 Switch(
                                     checked = warn && currentDur > 10,
                                     onCheckedChange = { viewModel.updateRoundAt(index, round.copy(warn10sec = it)) },
