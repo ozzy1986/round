@@ -11,6 +11,11 @@ class TimerLayoutMetricsTest {
     }
 
     @Test
+    fun `timer screen keeps fixed chrome height above the ring`() {
+        assertEquals(256f, TimerLayoutMetrics.fixedChromeHeightDp(), 0.001f)
+    }
+
+    @Test
     fun `ring size shrinks when height is the tightest constraint`() {
         assertEquals(
             200f,
@@ -20,8 +25,8 @@ class TimerLayoutMetricsTest {
     }
 
     @Test
-    fun `stable ring area height subtracts reserved top and name chip`() {
-        assertEquals(204f, TimerLayoutMetrics.stableRingAreaHeightDp(400f), 0.001f)
+    fun `stable ring area height subtracts fixed page sections`() {
+        assertEquals(144f, TimerLayoutMetrics.stableRingAreaHeightDp(400f), 0.001f)
         assertEquals(120f, TimerLayoutMetrics.stableRingAreaHeightDp(250f), 0.001f)
     }
 

@@ -30,11 +30,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -73,8 +71,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.raund.app.LocaleManager
@@ -241,9 +239,7 @@ fun TimerScreen(
             onStop = { viewModel.setFinished(true); TimerService.stop(context) },
             onRestart = { viewModel.setFinished(false) },
             reservedHeight = controlsReservedHeight,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset { IntOffset(0, 10) }
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
         if (canRefresh) {
             PullToRefreshContainer(
@@ -292,14 +288,14 @@ private fun TimerVisualContent(
             .background(animatedBgColor)
     ) {
         val maxW = maxWidth.value
-        val maxH = maxHeight.value
+        val contentViewportHeight = this@BoxWithConstraints.maxHeight - controlsReservedHeight
         val contentHeightDp = (this@BoxWithConstraints.maxHeight - controlsReservedHeight).value
-        val stableRingHeightDp = TimerLayoutMetrics.stableRingAreaHeightDp(contentHeightDp)
+        val stableRingHeightDp = TimerLayoutMetrics.stableRingAreaHeightDp(contentHeightDp).dp
         val maxRingSizeStable = TimerLayoutMetrics.ringMaxSizeDp(
             viewportWidthDp = maxW,
-            availableHeightDp = stableRingHeightDp
+            availableHeightDp = stableRingHeightDp.value
         ).dp
-        val baseFontSize = (minOf(maxW / 3.5f, maxH / 8f).coerceIn(48f, 120f) * 0.9f).coerceAtLeast(40f)
+        val baseFontSize = (maxRingSizeStable.value / 3.2f).coerceIn(40f, 96f)
         val timerFontSize = if (remaining >= 3600) (baseFontSize * 0.55f).coerceAtLeast(28f).sp else baseFontSize.sp
         val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
         val primaryColor = MaterialTheme.colorScheme.primary
@@ -315,13 +311,7 @@ private fun TimerVisualContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(
-                        if (canRefresh) {
-                            Modifier.height(this@BoxWithConstraints.maxHeight - controlsReservedHeight)
-                        } else {
-                            Modifier.fillMaxSize()
-                        }
-                    )
+                    .height(contentViewportHeight)
             ) {
                 TimerTopBar(
                     profileName = profileName,
@@ -329,70 +319,42 @@ private fun TimerVisualContent(
                     onBack = onBack
                 )
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 24.dp)
-                ) {
-                    if (finished) {
+                if (finished) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(contentViewportHeight - TimerLayoutMetrics.topBarHeightDp.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
                             timerFinishedText,
                             style = MaterialTheme.typography.displaySmall,
                             color = primaryColor,
                             textAlign = TextAlign.Center
                         )
-                    } else {
-                        Text(
-                            currentRound,
-                            style = MaterialTheme.typography.displaySmall,
-                            color = primaryColor,
-                            textAlign = TextAlign.Center,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(contentViewportHeight - TimerLayoutMetrics.topBarHeightDp.dp)
+                            .padding(horizontal = 24.dp)
+                    ) {
+                        TimerRoundHeader(
+                            currentRound = currentRound,
+                            roundInfo = roundInfo,
+                            paused = paused,
+                            timerPausedText = timerPausedText,
+                            primaryColor = primaryColor,
+                            surfaceVarColor = surfaceVarColor,
+                            onSurfaceVarColor = onSurfaceVarColor
                         )
-                        if (roundInfo.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(20.dp),
-                                    color = surfaceVarColor
-                                ) {
-                                    Text(
-                                        roundInfo,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = onSurfaceVarColor,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                    )
-                                }
-                                if (paused) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(20.dp),
-                                        color = surfaceVarColor
-                                    ) {
-                                        Text(
-                                            timerPausedText,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = onSurfaceVarColor,
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
                         Spacer(modifier = Modifier.height(TimerLayoutMetrics.ringTopSpacingDp.dp))
-                        BoxWithConstraints(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f),
+                                .height(stableRingHeightDp),
                             contentAlignment = Alignment.Center
                         ) {
                             TimerCountdownRing(
@@ -423,7 +385,8 @@ private fun TimerTopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .height(TimerLayoutMetrics.topBarHeightDp.dp)
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack, enabled = backEnabled) {
@@ -434,8 +397,90 @@ private fun TimerTopBar(
             profileName,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = onBgColor
+            color = onBgColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+private fun TimerRoundHeader(
+    currentRound: String,
+    roundInfo: String,
+    paused: Boolean,
+    timerPausedText: String,
+    primaryColor: Color,
+    surfaceVarColor: Color,
+    onSurfaceVarColor: Color
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TimerLayoutMetrics.roundHeaderHeightDp.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(TimerLayoutMetrics.roundTitleHeightDp.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                currentRound,
+                style = MaterialTheme.typography.displaySmall,
+                color = primaryColor,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(modifier = Modifier.height(TimerLayoutMetrics.roundMetaSpacingDp.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(TimerLayoutMetrics.roundMetaHeightDp.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (roundInfo.isNotEmpty() || paused) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (roundInfo.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = surfaceVarColor
+                        ) {
+                            Text(
+                                roundInfo,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = onSurfaceVarColor,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                    if (paused) {
+                        if (roundInfo.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = surfaceVarColor
+                        ) {
+                            Text(
+                                timerPausedText,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = onSurfaceVarColor,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -526,7 +571,7 @@ private fun TimerControls(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = reservedHeight)
+            .height(reservedHeight)
             .padding(
                 horizontal = TimerLayoutMetrics.controlsOuterPaddingDp.dp,
                 vertical = TimerLayoutMetrics.controlsOuterPaddingDp.dp
