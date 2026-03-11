@@ -52,6 +52,9 @@ stay deterministic. Debug builds are 3-4x slower (no R8, unoptimized DEX, no
 AOT) and should be used only for development/debugging. Store/publishing builds
 still use `assembleRelease`.
 
+If Gradle reports "Observed package id ... in inconsistent location" for build-tools
+or platforms, run from project root: .\scripts\fix-android-sdk-paths.ps1
+
 INSTALL THE APK
 ---------------
   & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\localRelease\app-localRelease.apk
