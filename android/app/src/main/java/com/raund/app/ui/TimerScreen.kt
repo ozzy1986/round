@@ -293,7 +293,13 @@ private fun TimerVisualContent(
     ) {
         val maxW = maxWidth.value
         val maxH = maxHeight.value
-        val baseFontSize = minOf(maxW / 3.5f, maxH / 8f).coerceIn(48f, 120f)
+        val contentHeightDp = (this@BoxWithConstraints.maxHeight - controlsReservedHeight).value
+        val stableRingHeightDp = TimerLayoutMetrics.stableRingAreaHeightDp(contentHeightDp)
+        val maxRingSizeStable = TimerLayoutMetrics.ringMaxSizeDp(
+            viewportWidthDp = maxW,
+            availableHeightDp = stableRingHeightDp
+        ).dp
+        val baseFontSize = (minOf(maxW / 3.5f, maxH / 8f).coerceIn(48f, 120f) * 0.9f).coerceAtLeast(40f)
         val timerFontSize = if (remaining >= 3600) (baseFontSize * 0.55f).coerceAtLeast(28f).sp else baseFontSize.sp
         val surfaceVarColor = MaterialTheme.colorScheme.surfaceVariant
         val primaryColor = MaterialTheme.colorScheme.primary
@@ -394,10 +400,7 @@ private fun TimerVisualContent(
                                 roundTotal = roundTotal,
                                 isRunning = running,
                                 isFinished = finished,
-                                maxRingSize = TimerLayoutMetrics.ringMaxSizeDp(
-                                    viewportWidthDp = maxWidth.value,
-                                    availableHeightDp = maxHeight.value
-                                ).dp,
+                                maxRingSize = maxRingSizeStable,
                                 timerFontSize = timerFontSize,
                                 onBgColor = onBgColor,
                                 emoji = emoji

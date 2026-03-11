@@ -23,6 +23,8 @@ EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
      .\scripts\build-apk.ps1
      .\gradlew.bat :app:lintDebug
      Then run on-device checklist from ANDROID_TESTING.txt.
+   - For faster repeated local phone iteration before that final QA gate, use:
+     .\scripts\deploy-phone.ps1
    - Stage and commit:
      git add -A
      git commit -m "Your message"
@@ -43,6 +45,8 @@ EXACT STEPS (run from project root, e.g. d:\laragon\www\raund)
      android/app/build/outputs/apk/localRelease/app-localRelease.apk
      (debug builds are 3-4x slower due to unoptimized DEX, no R8, no AOT).
      For store/publishing builds, use android/app/build/outputs/apk/release/app-release.apk.
+   - Fast one-command local deploy (build + install + launch):
+     .\scripts\deploy-phone.ps1
    - Install via ADB:
      & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\localRelease\app-localRelease.apk
    - Or transfer via USB/cloud/email; install on device (enable "Install from unknown sources" if prompted).

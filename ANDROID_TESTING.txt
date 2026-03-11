@@ -43,6 +43,10 @@ From project root (d:\laragon\www\raund):
 
   .\scripts\build-apk.ps1
 
+Fast local phone deploy (incremental build + install + launch):
+
+  .\scripts\deploy-phone.ps1
+
 Default output APK: android\app\build\outputs\apk\localRelease\app-localRelease.apk
 
 IMPORTANT: For phone QA, always use the optimized local release build
@@ -51,6 +55,11 @@ keeps R8/resource shrinking enabled, but uses the debug keystore so local builds
 stay deterministic. Debug builds are 3-4x slower (no R8, unoptimized DEX, no
 AOT) and should be used only for development/debugging. Store/publishing builds
 still use `assembleRelease`.
+
+`scripts\deploy-phone.ps1` is the fast iteration path for repeated device deploys:
+it reuses the Gradle daemon/cache, skips `lintVitalLocalRelease`, installs the
+APK via ADB, and launches the app. Keep `cd android && .\gradlew.bat :app:lintDebug`
+as the explicit QA gate before commit/publish.
 
 If Gradle reports "Observed package id ... in inconsistent location" for build-tools
 or platforms, run from project root: .\scripts\fix-android-sdk-paths.ps1
@@ -134,11 +143,11 @@ QUICK TEST (no code changes — app already installed)
 FULL WORKFLOW (after code changes in android/ folder)
 -----------------------------------------------------
 1. Make code changes in android/ folder.
-2. Build:   .\scripts\build-apk.ps1
-3. Install: & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r android\app\build\outputs\apk\localRelease\app-localRelease.apk
-4. Launch:  & "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" shell am start -n com.raund.app/.MainActivity
-5. Screenshot: capture and pull (see above), then view the image.
-6. Logs:    check logcat for errors (see above).
+2. Fast deploy for iteration: .\scripts\deploy-phone.ps1
+3. Screenshot: capture and pull (see above), then view the image.
+4. Logs:    check logcat for errors (see above).
+5. Before commit/publish: .\scripts\build-apk.ps1
+6. Before commit/publish: cd android && .\gradlew.bat :app:lintDebug
 7. Repeat from step 1.
 
 REGRESSION CHECKLIST (RUN FROM TOP AFTER EVERY CODE CHANGE)

@@ -20,6 +20,12 @@ class TimerLayoutMetricsTest {
     }
 
     @Test
+    fun `stable ring area height subtracts reserved top and name chip`() {
+        assertEquals(204f, TimerLayoutMetrics.stableRingAreaHeightDp(400f), 0.001f)
+        assertEquals(120f, TimerLayoutMetrics.stableRingAreaHeightDp(250f), 0.001f)
+    }
+
+    @Test
     fun `ring size still respects width and max cap`() {
         assertEquals(
             280f,
