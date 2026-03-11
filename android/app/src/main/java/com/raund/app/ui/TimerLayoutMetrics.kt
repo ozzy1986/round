@@ -12,7 +12,7 @@ internal object TimerLayoutMetrics {
     const val roundMetaHeightDp = 52f
     const val roundHeaderHeightDp = roundTitleHeightDp + roundMetaSpacingDp + roundMetaHeightDp
     const val ringTopSpacingDp = 32f
-    const val maxRingSizeDp = 320f
+    const val maxRingSizeDp = 400f
     const val minRingAreaHeightDp = 120f
 
     fun fixedChromeHeightDp(): Float {

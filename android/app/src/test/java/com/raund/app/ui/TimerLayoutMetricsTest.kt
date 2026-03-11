@@ -38,7 +38,7 @@ class TimerLayoutMetricsTest {
             0.001f
         )
         assertEquals(
-            320f,
+            400f,
             TimerLayoutMetrics.ringMaxSizeDp(viewportWidthDp = 500f, availableHeightDp = 640f),
             0.001f
         )
