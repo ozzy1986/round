@@ -1,0 +1,36 @@
+package com.raund.app.ui
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class TimerLayoutMetricsTest {
+
+    @Test
+    fun `active workout reserves pause and stop controls height`() {
+        assertEquals(192f, TimerLayoutMetrics.controlsReservedHeightDp(activeWorkout = true), 0.001f)
+        assertEquals(128f, TimerLayoutMetrics.controlsReservedHeightDp(activeWorkout = false), 0.001f)
+    }
+
+    @Test
+    fun `ring size shrinks when height is the tightest constraint`() {
+        assertEquals(
+            200f,
+            TimerLayoutMetrics.ringMaxSizeDp(viewportWidthDp = 360f, availableHeightDp = 200f),
+            0.001f
+        )
+    }
+
+    @Test
+    fun `ring size still respects width and max cap`() {
+        assertEquals(
+            280f,
+            TimerLayoutMetrics.ringMaxSizeDp(viewportWidthDp = 280f, availableHeightDp = 500f),
+            0.001f
+        )
+        assertEquals(
+            320f,
+            TimerLayoutMetrics.ringMaxSizeDp(viewportWidthDp = 500f, availableHeightDp = 640f),
+            0.001f
+        )
+    }
+}
