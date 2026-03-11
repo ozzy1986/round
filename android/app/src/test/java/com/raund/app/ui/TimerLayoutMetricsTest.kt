@@ -7,12 +7,12 @@ class TimerLayoutMetricsTest {
 
     @Test
     fun `timer screen always reserves the tallest controls slot`() {
-        assertEquals(192f, TimerLayoutMetrics.controlsReservedHeightDp(), 0.001f)
+        assertEquals(168f, TimerLayoutMetrics.controlsReservedHeightDp(), 0.001f)
     }
 
     @Test
     fun `timer screen keeps fixed chrome height above the ring`() {
-        assertEquals(256f, TimerLayoutMetrics.fixedChromeHeightDp(), 0.001f)
+        assertEquals(216f, TimerLayoutMetrics.fixedChromeHeightDp(), 0.001f)
     }
 
     @Test
@@ -26,7 +26,7 @@ class TimerLayoutMetricsTest {
 
     @Test
     fun `stable ring area height subtracts fixed page sections`() {
-        assertEquals(144f, TimerLayoutMetrics.stableRingAreaHeightDp(400f), 0.001f)
+        assertEquals(184f, TimerLayoutMetrics.stableRingAreaHeightDp(400f), 0.001f)
         assertEquals(120f, TimerLayoutMetrics.stableRingAreaHeightDp(250f), 0.001f)
     }
 

@@ -339,7 +339,7 @@ private fun TimerVisualContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(contentViewportHeight - TimerLayoutMetrics.topBarHeightDp.dp)
-                            .padding(horizontal = 24.dp)
+                            .padding(horizontal = TimerLayoutMetrics.contentHorizontalPaddingDp.dp)
                     ) {
                         TimerRoundHeader(
                             currentRound = currentRound,
