@@ -15,7 +15,8 @@ internal object TimerLayoutMetrics {
     const val roundHeaderHeightDp = roundTitleHeightDp + roundMetaSpacingDp + roundMetaHeightDp
     const val ringTopSpacingDp = 8f
     const val roundHeaderVisualOffsetDp = -22f
-    const val ringContentVisualOffsetDp = 0f
+    // Text/emoji glyph bounds look visually low when mathematically centered.
+    const val ringContentVisualOffsetDp = -10f
     const val maxRingSizeDp = 520f
     const val minRingAreaHeightDp = 120f
 
