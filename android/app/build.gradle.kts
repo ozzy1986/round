@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +7,24 @@ plugins {
     id("com.google.devtools.ksp")
     id("androidx.baselineprofile")
 }
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use(::load)
+    }
+}
+
+fun stringProperty(name: String): String? =
+    (project.findProperty(name) as String?)
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: localProperties.getProperty(name)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        ?: System.getenv(name)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
 val sentryDsn = (project.findProperty("SENTRY_DSN") as String?)?.trim().orEmpty()
 val sentryEnabled = sentryDsn.isNotEmpty()
@@ -24,16 +44,25 @@ android {
         buildConfigField("boolean", "SENTRY_ENABLED", "false")
     }
 
+    bundle {
+        language {
+            // Keep all locales in the base bundle because the app switches
+            // language at runtime without Play Core locale downloads.
+            enableSplit = false
+        }
+    }
+
     signingConfigs {
         getByName("debug") {
             // default debug keystore
         }
-        // For production: create a keystore and set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD (e.g. in local.properties or CI secrets).
+        // For production: configure RELEASE_* in local.properties, gradle.properties,
+        // or CI environment variables.
         create("release") {
-            val storeFile = project.findProperty("RELEASE_STORE_FILE") as String?
-            val storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String?
-            val keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
-            val keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+            val storeFile = stringProperty("RELEASE_STORE_FILE")
+            val storePassword = stringProperty("RELEASE_STORE_PASSWORD")
+            val keyAlias = stringProperty("RELEASE_KEY_ALIAS")
+            val keyPassword = stringProperty("RELEASE_KEY_PASSWORD")
             if (storeFile != null && storePassword != null && keyAlias != null && keyPassword != null) {
                 this.storeFile = file(storeFile)
                 this.storePassword = storePassword

@@ -18,8 +18,9 @@ if (-not (Test-Path $keytool)) {
     Write-Error "keytool not found at $keytool. Set JAVA_HOME to a valid JDK."
 }
 
-# Relative path from app module project dir (android/app) to keystore
-$storeFileRelative = "..\keystore\raund-release.jks"
+# Relative path from app module project dir (android/app) to keystore.
+# Use forward slashes so Gradle/Java properties do not misinterpret backslashes.
+$storeFileRelative = "../keystore/raund-release.jks"
 
 # Generate random password (alphanumeric, 16 chars)
 Add-Type -AssemblyName 'System.Web'
