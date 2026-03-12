@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -68,6 +69,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -393,14 +395,21 @@ private fun TimerTopBar(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
         }
         Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            profileName,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = onBgColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(TimerLayoutMetrics.topBarTitleHeightDp.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Text(
+                profileName,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = onBgColor,
+                maxLines = 2,
+                overflow = TextOverflow.Clip
+            )
+        }
     }
 }
 
@@ -417,7 +426,8 @@ private fun TimerRoundHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(TimerLayoutMetrics.roundHeaderHeightDp.dp),
+            .height(TimerLayoutMetrics.roundHeaderHeightDp.dp)
+            .offset(y = TimerLayoutMetrics.roundHeaderVisualOffsetDp.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -433,7 +443,7 @@ private fun TimerRoundHeader(
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Clip
             )
         }
         Spacer(modifier = Modifier.height(TimerLayoutMetrics.roundMetaSpacingDp.dp))
@@ -530,20 +540,35 @@ private fun TimerCountdownRing(
             color = ringColor,
             strokeCap = StrokeCap.Round
         )
-        Text(
-            emoji,
-            fontSize = 120.sp,
-            modifier = Modifier.graphicsLayer { alpha = 0.5f }
-        )
-        Text(
-            com.raund.app.formatDuration(remaining),
-            fontSize = timerFontSize,
-            fontWeight = FontWeight.Black,
-            color = onBgColor,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            style = TextStyle(fontFeatureSettings = "tnum")
-        )
+        Box(
+            modifier = Modifier
+                .size(maxRingSize)
+                .offset(y = TimerLayoutMetrics.ringContentVisualOffsetDp.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                emoji,
+                fontSize = 120.sp,
+                modifier = Modifier
+                    .offset(y = TimerLayoutMetrics.ringEmojiNudgeUpDp.dp)
+                    .graphicsLayer { alpha = 0.5f },
+                style = TextStyle(
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                )
+            )
+            Text(
+                com.raund.app.formatDuration(remaining),
+                fontSize = timerFontSize,
+                fontWeight = FontWeight.Black,
+                color = onBgColor,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                style = TextStyle(
+                    fontFeatureSettings = "tnum",
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                )
+            )
+        }
     }
 }
 

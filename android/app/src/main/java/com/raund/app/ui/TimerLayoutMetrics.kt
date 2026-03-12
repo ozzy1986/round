@@ -17,6 +17,8 @@ internal object TimerLayoutMetrics {
     const val roundHeaderVisualOffsetDp = -22f
     // Text/emoji glyph bounds look visually low when mathematically centered.
     const val ringContentVisualOffsetDp = -10f
+    /** Extra nudge up for emoji so it appears centered in the ring. */
+    const val ringEmojiNudgeUpDp = -4f
     const val maxRingSizeDp = 520f
     const val minRingAreaHeightDp = 120f
 
