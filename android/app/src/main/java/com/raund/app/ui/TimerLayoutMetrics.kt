@@ -6,13 +6,16 @@ internal object TimerLayoutMetrics {
     const val primaryButtonHeightDp = 64f
     const val secondaryButtonHeightDp = 52f
     const val pausedButtonsSpacingDp = 12f
-    const val topBarHeightDp = 64f
+    const val topBarHeightDp = 80f
+    const val topBarTitleHeightDp = 56f
     const val contentHorizontalPaddingDp = 16f
-    const val roundTitleHeightDp = 80f
-    const val roundMetaSpacingDp = 8f
-    const val roundMetaHeightDp = 48f
+    const val roundTitleHeightDp = 96f
+    const val roundMetaSpacingDp = 4f
+    const val roundMetaHeightDp = 44f
     const val roundHeaderHeightDp = roundTitleHeightDp + roundMetaSpacingDp + roundMetaHeightDp
-    const val ringTopSpacingDp = 16f
+    const val ringTopSpacingDp = 8f
+    const val roundHeaderVisualOffsetDp = -22f
+    const val ringContentVisualOffsetDp = 0f
     const val maxRingSizeDp = 520f
     const val minRingAreaHeightDp = 120f
 
